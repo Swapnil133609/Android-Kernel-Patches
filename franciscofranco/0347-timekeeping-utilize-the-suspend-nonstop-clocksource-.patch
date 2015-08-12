@@ -1,0 +1,122 @@
+From 573a1b73be71d514ff7094772dd5b30f4eff58d5 Mon Sep 17 00:00:00 2001
+From: Feng Tang <feng.tang@intel.com>
+Date: Tue, 12 Mar 2013 11:56:48 +0800
+Subject: [PATCH 347/517] timekeeping: utilize the suspend-nonstop clocksource
+ to count suspended time
+
+There are some new processors whose TSC clocksource won't stop during
+suspend. Currently, after system resumes, kernel will use persistent
+clock or RTC to compensate the sleep time, but with these nonstop
+clocksources, we could skip the special compensation from external
+sources, and just use current clocksource for time recounting.
+
+This can solve some time drift bugs caused by some not-so-accurate or
+error-prone RTC devices.
+
+The current way to count suspended time is first try to use the persistent
+clock, and then try the RTC if persistent clock can't be used. This
+patch will change the trying order to:
+	suspend-nonstop clocksource -> persistent clock -> RTC
+
+When counting the sleep time with nonstop clocksource, use an accurate way
+suggested by Jason Gunthorpe to cover very large delta cycles.
+
+CRs-fixed: 536881
+Change-Id: I59c21b1ce5ae81cebc8cf3e817d9b3f951302a3d
+Signed-off-by: Feng Tang <feng.tang@intel.com>
+[jstultz: Small optimization, avoiding re-reading the clocksource]
+Signed-off-by: John Stultz <john.stultz@linaro.org>
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Git-commit: e445cf1c4257cc0238d72e4129eb4739f46fd3de)
+[sboyd: Took tk and clock local variables]
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/time/timekeeping.c |   61 +++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 53 insertions(+), 8 deletions(-)
+
+diff --git a/kernel/time/timekeeping.c b/kernel/time/timekeeping.c
+index 0a462de..55ec875 100644
+--- a/kernel/time/timekeeping.c
++++ b/kernel/time/timekeeping.c
+@@ -724,22 +724,67 @@ void timekeeping_inject_sleeptime(struct timespec *delta)
+  */
+ static void timekeeping_resume(void)
+ {
++	struct timekeeper *tk = &timekeeper;
++	struct clocksource *clock = tk->clock;
+ 	unsigned long flags;
+-	struct timespec ts;
++	struct timespec ts_new, ts_delta;
++	cycle_t cycle_now, cycle_delta;
++	bool suspendtime_found = false;
+ 
+-	read_persistent_clock(&ts);
++	read_persistent_clock(&ts_new);
+ 
+ 	clocksource_resume();
+ 
+ 	write_seqlock_irqsave(&timekeeper.lock, flags);
+ 
+-	if (timespec_compare(&ts, &timekeeping_suspend_time) > 0) {
+-		ts = timespec_sub(ts, timekeeping_suspend_time);
+-		__timekeeping_inject_sleeptime(&ts);
++	/*
++	 * After system resumes, we need to calculate the suspended time and
++	 * compensate it for the OS time. There are 3 sources that could be
++	 * used: Nonstop clocksource during suspend, persistent clock and rtc
++	 * device.
++	 *
++	 * One specific platform may have 1 or 2 or all of them, and the
++	 * preference will be:
++	 *	suspend-nonstop clocksource -> persistent clock -> rtc
++	 * The less preferred source will only be tried if there is no better
++	 * usable source. The rtc part is handled separately in rtc core code.
++	 */
++	cycle_now = clock->read(clock);
++	if ((clock->flags & CLOCK_SOURCE_SUSPEND_NONSTOP) &&
++		cycle_now > clock->cycle_last) {
++		u64 num, max = ULLONG_MAX;
++		u32 mult = clock->mult;
++		u32 shift = clock->shift;
++		s64 nsec = 0;
++
++		cycle_delta = (cycle_now - clock->cycle_last) & clock->mask;
++
++		/*
++		 * "cycle_delta * mutl" may cause 64 bits overflow, if the
++		 * suspended time is too long. In that case we need do the
++		 * 64 bits math carefully
++		 */
++		do_div(max, mult);
++		if (cycle_delta > max) {
++			num = div64_u64(cycle_delta, max);
++			nsec = (((u64) max * mult) >> shift) * num;
++			cycle_delta -= num * max;
++		}
++		nsec += ((u64) cycle_delta * mult) >> shift;
++
++		ts_delta = ns_to_timespec(nsec);
++		suspendtime_found = true;
++	} else if (timespec_compare(&ts_new, &timekeeping_suspend_time) > 0) {
++		ts_delta = timespec_sub(ts_new, timekeeping_suspend_time);
++		suspendtime_found = true;
+ 	}
+-	/* re-base the last cycle value */
+-	timekeeper.clock->cycle_last = timekeeper.clock->read(timekeeper.clock);
+-	timekeeper.ntp_error = 0;
++
++	if (suspendtime_found)
++		__timekeeping_inject_sleeptime(&ts_delta);
++
++	/* Re-base the last cycle value */
++	clock->cycle_last = cycle_now;
++	tk->ntp_error = 0;
+ 	timekeeping_suspended = 0;
+ 	timekeeping_update(false);
+ 	write_sequnlock_irqrestore(&timekeeper.lock, flags);
+-- 
+1.7.9.5
+

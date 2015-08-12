@@ -1,0 +1,54 @@
+From aa4086f0a086ad5c1fb12c733070f9ad66a4e172 Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Wed, 1 Jan 2014 21:06:52 +0000
+Subject: [PATCH 514/517] input: touchboost: I misinterpretaded the panic log
+ when a BT device was disconnected and what was
+ actually causing the crash was destroying the WQ.
+ Also fix a small bug where if the user underclocked
+ below input_boost_freq after a touch input max/min
+ freqs would be changed to wrong frequencies.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/touchboost.c |   10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/input/touchscreen/touchboost.c b/drivers/input/touchscreen/touchboost.c
+index c28cbdc..ec0b3d9 100644
+--- a/drivers/input/touchscreen/touchboost.c
++++ b/drivers/input/touchscreen/touchboost.c
+@@ -59,6 +59,10 @@ static int boost_adjust_notify(struct notifier_block *nb, unsigned long val, voi
+ 	if (val != CPUFREQ_ADJUST)
+ 		return NOTIFY_OK;
+ 
++	/* just in case someone underclocks below input_boost_freq */
++	if (boost_freq_buf > policy->max)
++		boost_freq_buf = policy->max;
++
+ 	pr_debug("CPU%u policy min before boost: %u kHz\n",
+ 		 cpu, policy->min);
+ 	pr_debug("CPU%u boost min: %u kHz\n", cpu, boost_freq_buf);
+@@ -156,7 +160,6 @@ static void boost_input_disconnect(struct input_handle *handle)
+ {
+ 	input_close_device(handle);
+ 	input_unregister_handle(handle);
+-	destroy_workqueue(input_boost_wq);
+ 	kfree(handle);
+ }
+ 
+@@ -170,6 +173,11 @@ static const struct input_device_id boost_ids[] = {
+ 				BIT_MASK(ABS_MT_POSITION_X) |
+ 				BIT_MASK(ABS_MT_POSITION_Y) },
+ 	},
++	/* Keypad */
++	{
++		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
++		.evbit = { BIT_MASK(EV_KEY) },
++	},
+ 	{ },
+ };
+ 
+-- 
+1.7.9.5
+

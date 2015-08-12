@@ -1,0 +1,39 @@
+From 34b3c7ce271f02930ad003d241040ba202eb6549 Mon Sep 17 00:00:00 2001
+From: Shalabh Jain <shalabhj@codeaurora.org>
+Date: Tue, 12 Nov 2013 15:10:44 -0800
+Subject: [PATCH 325/517] fbcmap: prevent memory overflow
+
+Add bounds check before copying data to prevent
+buffer overflow.
+
+Change-Id: I47b9685b1ab13c4863fb6db62bbb9497a00b36da
+Signed-off-by: Shalabh Jain <shalabhj@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/fbcmap.c |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/video/fbcmap.c b/drivers/video/fbcmap.c
+index 5c3960d..9d42446 100644
+--- a/drivers/video/fbcmap.c
++++ b/drivers/video/fbcmap.c
+@@ -194,11 +194,13 @@ int fb_cmap_to_user(const struct fb_cmap *from, struct fb_cmap_user *to)
+ 		fromoff = to->start - from->start;
+ 	else
+ 		tooff = from->start - to->start;
++	if ((to->len <= tooff) || (from->len <= fromoff))
++		return -EINVAL;
++
+ 	size = to->len - tooff;
++
+ 	if (size > (int) (from->len - fromoff))
+ 		size = from->len - fromoff;
+-	if (size <= 0)
+-		return -EINVAL;
+ 	size *= sizeof(u16);
+ 
+ 	if (copy_to_user(to->red+tooff, from->red+fromoff, size))
+-- 
+1.7.9.5
+

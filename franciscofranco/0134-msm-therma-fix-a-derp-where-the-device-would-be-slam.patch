@@ -1,0 +1,53 @@
+From 29046eea16cb9ae8841860982d5beda2e076a26d Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Fri, 29 Nov 2013 02:26:22 +0000
+Subject: [PATCH 134/517] msm: therma: fix a derp where the device would be
+ slammered to 729Mhz if it reached the thermal
+ throttle threshold.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/thermal/msm_thermal.c |   13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/thermal/msm_thermal.c b/drivers/thermal/msm_thermal.c
+index 602d500..2b46cbd 100644
+--- a/drivers/thermal/msm_thermal.c
++++ b/drivers/thermal/msm_thermal.c
+@@ -58,17 +58,18 @@ static int update_cpu_max_freq(int cpu, uint32_t max_freq)
+ 		return ret;
+ 
+ 	if (cpu_online(cpu)) {
+-		struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
++		struct cpufreq_policy policy;
++		
++		ret = cpufreq_get_policy(&policy, cpu);
+ 
+-		if (!policy)
++		if (ret)
+ 			return ret;
+ 
+ 		if (max_freq == MSM_CPUFREQ_NO_LIMIT)
+-			max_freq = policy->cpuinfo.max_freq;
++			max_freq = policy.max;
+ 
+-		ret = cpufreq_driver_target(policy, max_freq,
++		ret = cpufreq_driver_target(&policy, max_freq,
+ 			CPUFREQ_RELATION_H);
+-		cpufreq_cpu_put(policy);
+ 	}
+ 
+ 	pr_info("%s: Setting cpu%d max frequency to %d\n",
+@@ -100,7 +101,7 @@ static void check_temp(struct work_struct *work)
+ 	tsens_dev.sensor_num = msm_thermal_info.sensor_id;
+ 	tsens_get_temp(&tsens_dev, &temp);
+ 
+-	if (temp >= temp_threshold)
++	if (temp >= (temp_threshold + 25))
+ 	{
+ 		cpu_stats.throttling = true;
+ 		limit_cpu_freqs(cpu_stats.thermal_steps[0]);
+-- 
+1.7.9.5
+

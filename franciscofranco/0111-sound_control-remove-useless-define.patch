@@ -1,0 +1,27 @@
+From 99a5241c10d00966b9ad7b6325566703a6191c22 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Tue, 26 Nov 2013 21:37:48 +0000
+Subject: [PATCH 111/517] sound_control: remove useless define.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/misc/sound_control.c |    2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/drivers/misc/sound_control.c b/drivers/misc/sound_control.c
+index 6970d5b..155defb 100644
+--- a/drivers/misc/sound_control.c
++++ b/drivers/misc/sound_control.c
+@@ -10,8 +10,6 @@
+ #include <linux/device.h>
+ #include <linux/miscdevice.h>
+ 
+-#define SOUNDCONTROL_VERSION 4
+-
+ extern void update_headphones_volume_boost(int vol_boost);
+ extern void update_headset_boost(int vol_boost);
+ extern void update_speaker_gain(int vol_boost);
+-- 
+1.7.9.5
+

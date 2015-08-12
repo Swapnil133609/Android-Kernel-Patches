@@ -1,0 +1,67 @@
+From 78fba2e83ecc5e0d09006a1679f8dc623d3f618c Mon Sep 17 00:00:00 2001
+From: "Paul E. McKenney" <paul.mckenney@linaro.org>
+Date: Thu, 12 Jul 2012 01:55:54 -0700
+Subject: [PATCH 319/517] hotplug: Fix UP bug in smpboot hotplug code
+
+Because kernel subsystems need their per-CPU kthreads on UP systems as
+well as on SMP systems, the smpboot hotplug kthread functions must be
+provided in UP builds as well as in SMP builds.  This commit therefore
+adds smpboot.c to UP builds and excludes irrelevant code via #ifdef.
+
+Signed-off-by: Paul E. McKenney <paul.mckenney@linaro.org>
+Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/Makefile  |    3 +--
+ kernel/smpboot.c |    4 ++++
+ 2 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/Makefile b/kernel/Makefile
+index 6c07f30..5b14853 100644
+--- a/kernel/Makefile
++++ b/kernel/Makefile
+@@ -10,7 +10,7 @@ obj-y     = fork.o exec_domain.o panic.o printk.o \
+ 	    kthread.o wait.o kfifo.o sys_ni.o posix-cpu-timers.o mutex.o \
+ 	    hrtimer.o rwsem.o nsproxy.o srcu.o semaphore.o \
+ 	    notifier.o ksysfs.o cred.o \
+-	    async.o range.o groups.o
++	    async.o range.o groups.o smpboot.o
+ 
+ ifdef CONFIG_FUNCTION_TRACER
+ # Do not trace debug files and internal ftrace files
+@@ -43,7 +43,6 @@ obj-$(CONFIG_DEBUG_RT_MUTEXES) += rtmutex-debug.o
+ obj-$(CONFIG_RT_MUTEX_TESTER) += rtmutex-tester.o
+ obj-$(CONFIG_GENERIC_ISA_DMA) += dma.o
+ obj-$(CONFIG_SMP) += smp.o
+-obj-$(CONFIG_SMP) += smpboot.o
+ ifneq ($(CONFIG_SMP),y)
+ obj-y += up.o
+ endif
+diff --git a/kernel/smpboot.c b/kernel/smpboot.c
+index 9d5f7b0..d6c5fc0 100644
+--- a/kernel/smpboot.c
++++ b/kernel/smpboot.c
+@@ -15,6 +15,8 @@
+ 
+ #include "smpboot.h"
+ 
++#ifdef CONFIG_SMP
++
+ #ifdef CONFIG_GENERIC_SMP_IDLE_THREAD
+ /*
+  * For the hotplug case we keep the task structs around and reuse
+@@ -72,6 +74,8 @@ void __init idle_threads_init(void)
+ }
+ #endif
+ 
++#endif /* #ifdef CONFIG_SMP */
++
+ static LIST_HEAD(hotplug_threads);
+ static DEFINE_MUTEX(smpboot_threads_lock);
+ 
+-- 
+1.7.9.5
+

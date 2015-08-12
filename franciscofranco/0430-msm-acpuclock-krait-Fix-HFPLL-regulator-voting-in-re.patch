@@ -1,0 +1,63 @@
+From dfb5722cfd025c0a9a4a70c3773fbbf356bf070b Mon Sep 17 00:00:00 2001
+From: Matt Wagantall <mattw@codeaurora.org>
+Date: Mon, 11 Nov 2013 09:31:38 -0800
+Subject: [PATCH 430/517] msm: acpuclock-krait: Fix HFPLL regulator voting in
+ regulator_init()
+
+Simply incrementing l2_vreg_count is not enough to ensure the
+regulators necessary for the L2 HFPLL are enabled. Instead,
+enable_l2_regulators() must be called to place votes for the
+regulators.
+
+This problem will only result in incorrect behaviour (a missing
+vote for the HFPLL regulators) if the L2 rate detected at boot is
+not in the frequency table. In all other cases, the vote will be
+applied as part of the hfpll_enable call when init_clock_sources()
+is called for the L2.
+
+Fix the code so that the voting works correctly even if the initial
+L2 rate is not in the frequency table.
+
+Change-Id: I8e84cd81de17a0efcc91281848180cf34ef9bb57
+Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/acpuclock-krait.c |   17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-msm/acpuclock-krait.c b/arch/arm/mach-msm/acpuclock-krait.c
+index 0f2e1e0..e35af39 100644
+--- a/arch/arm/mach-msm/acpuclock-krait.c
++++ b/arch/arm/mach-msm/acpuclock-krait.c
+@@ -761,15 +761,22 @@ static int __cpuinit regulator_init(struct scalable *sc,
+ 	}
+ 
+ 	/*
+-	 * Increment the L2 HFPLL regulator refcount if _this_ CPU's frequency
+-	 * requires a corresponding target L2 frequency that needs the L2 to
+-	 * run off of an HFPLL.
++	 * Vote for the L2 HFPLL regulators if _this_ CPU's frequency requires
++	 * a corresponding target L2 frequency that needs the L2 an HFPLL.
+ 	 */
+-	if (drv.l2_freq_tbl[acpu_level->l2_level].speed.src == HFPLL)
+-		l2_vreg_count++;
++	if (drv.l2_freq_tbl[acpu_level->l2_level].speed.src == HFPLL) {
++		ret = enable_l2_regulators();
++		if (ret) {
++			dev_err(drv.dev, "enable_l2_regulators() failed (%d)\n",
++				ret);
++			goto err_l2_regs;
++		}
++	}
+ 
+ 	return 0;
+ 
++err_l2_regs:
++	regulator_disable(sc->vreg[VREG_CORE].reg);
+ err_core_conf:
+ 	regulator_put(sc->vreg[VREG_CORE].reg);
+ err_core_get:
+-- 
+1.7.9.5
+

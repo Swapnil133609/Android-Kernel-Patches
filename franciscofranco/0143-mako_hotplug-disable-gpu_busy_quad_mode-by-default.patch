@@ -1,0 +1,27 @@
+From a61db9ae33571a7f709feb8ea87a75bb777eee1f Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Fri, 29 Nov 2013 15:39:49 +0000
+Subject: [PATCH 143/517] mako_hotplug: disable gpu_busy_quad_mode by default.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/kernel/mako_hotplug.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/mako_hotplug.c b/arch/arm/kernel/mako_hotplug.c
+index d5aed4a..7b3c8c5 100644
+--- a/arch/arm/kernel/mako_hotplug.c
++++ b/arch/arm/kernel/mako_hotplug.c
+@@ -56,7 +56,7 @@ static struct cpu_stats
+     .counter = {0},
+ 	.timestamp = {0},
+ 	.ready_to_online = {false},
+-	.gpu_busy_quad_mode = true,
++	.gpu_busy_quad_mode = false,
+ };
+ 
+ struct cpu_load_data {
+-- 
+1.7.9.5
+

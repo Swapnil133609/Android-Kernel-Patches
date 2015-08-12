@@ -1,0 +1,49 @@
+From 5b3e7b5f7e60147c02cb9ae581d6856509acad38 Mon Sep 17 00:00:00 2001
+From: Sivaram Nair <sivaramn@nvidia.com>
+Date: Tue, 18 Dec 2012 13:52:50 +0100
+Subject: [PATCH 059/517] cpuidle: Fix finding state with min power_usage
+
+Since cpuidle_state.power_usage is a signed value, use INT_MAX (instead
+of -1) to init the local copies so that functions that tries to find
+cpuidle states with minimum power usage works correctly even if they use
+non-negative values.
+
+Signed-off-by: Sivaram Nair <sivaramn@nvidia.com>
+Reviewed-by: Rik van Riel <riel@redhat.com>
+Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpuidle/cpuidle.c        |    2 +-
+ drivers/cpuidle/governors/menu.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
+index b0a2c91..648d4ae 100644
+--- a/drivers/cpuidle/cpuidle.c
++++ b/drivers/cpuidle/cpuidle.c
+@@ -81,7 +81,7 @@ int cpuidle_play_dead(void)
+ 	struct cpuidle_device *dev = __this_cpu_read(cpuidle_devices);
+ 	struct cpuidle_driver *drv = cpuidle_get_driver();
+ 	int i, dead_state = -1;
+-	int power_usage = -1;
++	int power_usage = INT_MAX;
+ 
+ 	if (!drv)
+ 		return -ENODEV;
+diff --git a/drivers/cpuidle/governors/menu.c b/drivers/cpuidle/governors/menu.c
+index 817503b..9d6e279 100644
+--- a/drivers/cpuidle/governors/menu.c
++++ b/drivers/cpuidle/governors/menu.c
+@@ -300,7 +300,7 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
+ {
+ 	struct menu_device *data = &__get_cpu_var(menu_devices);
+ 	int latency_req = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
+-	int power_usage = -1;
++	int power_usage = INT_MAX;
+ 	int i;
+ 	int multiplier;
+ 	struct timespec t;
+-- 
+1.7.9.5
+

@@ -1,0 +1,62 @@
+From 764d20e20465944034d73f8cfea08f010282bdcb Mon Sep 17 00:00:00 2001
+From: Rohit Gupta <rohgup@codeaurora.org>
+Date: Mon, 9 Dec 2013 17:25:07 -0800
+Subject: [PATCH 335/517] cpufreq: interactive: Remove trace event from
+ idle_start handler
+
+Removed the trace_cpufreq_interactive_idle_start.
+Also fix a crash resulting from accessing NULL policy before taking
+the pcpu->enable_sem lock. The policy can be NULL if the core is
+hotplugged out before the enable_sem lock is taken.
+
+Change-Id: I7e2809cc016b3b383a44cdf3c697013e2d2b5417
+Signed-off-by: Rohit Gupta <rohgup@codeaurora.org>
+(cherry picked from commit 3b7992b90216c74a9ae9ce0df90bc446687a2313)
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c      |    3 ---
+ include/trace/events/cpufreq_interactive.h |    6 ------
+ 2 files changed, 9 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index d12e772..c72248b 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -522,7 +522,6 @@ static void cpufreq_interactive_idle_start(void)
+ 	struct cpufreq_interactive_cpuinfo *pcpu =
+ 		&per_cpu(cpuinfo, smp_processor_id());
+ 	int pending;
+-	int cpu = pcpu->policy->cpu;
+ 	u64 now;
+ 
+ 	if (!down_read_trylock(&pcpu->enable_sem))
+@@ -551,8 +550,6 @@ static void cpufreq_interactive_idle_start(void)
+ 				(now - pcpu->hispeed_validate_time) >
+ 							MIN_BUSY_TIME) {
+ 				pcpu->floor_validate_time = now;
+-				trace_cpufreq_interactive_idle_start(cpu,
+-					pcpu->target_freq, pcpu->policy->cur);
+ 			}
+ 
+ 		}
+diff --git a/include/trace/events/cpufreq_interactive.h b/include/trace/events/cpufreq_interactive.h
+index 507ba97..951e6ca 100644
+--- a/include/trace/events/cpufreq_interactive.h
++++ b/include/trace/events/cpufreq_interactive.h
+@@ -34,12 +34,6 @@ DEFINE_EVENT(set, cpufreq_interactive_setspeed,
+ 	TP_ARGS(cpu_id, targfreq, actualfreq)
+ );
+ 
+-DEFINE_EVENT(set, cpufreq_interactive_idle_start,
+-	TP_PROTO(u32 cpu_id, unsigned long targfreq,
+-	     unsigned long actualfreq),
+-	TP_ARGS(cpu_id, targfreq, actualfreq)
+-);
+-
+ DECLARE_EVENT_CLASS(loadeval,
+ 	    TP_PROTO(unsigned long cpu_id, unsigned long load,
+ 		     unsigned long curtarg, unsigned long curactual,
+-- 
+1.7.9.5
+

@@ -1,0 +1,51 @@
+From 4aa99508bff7d9abeb403825af3ea488ea574d7f Mon Sep 17 00:00:00 2001
+From: Patrick Daly <pdaly@codeaurora.org>
+Date: Tue, 1 Oct 2013 16:51:22 -0700
+Subject: [PATCH 163/517] msm: clock: Check that round_rate is less than fmax
+
+HW has maximum frequency requirements. Ensure that the clock frequency
+returned from clk_round_rate() is within these limits.
+
+Change-Id: I0d4ed5851fc1f9f76c0ad0622cc6609e64e5311f
+Signed-off-by: Patrick Daly <pdaly@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/clock.c |   15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
+index c774d2b..ef4cf0e 100644
+--- a/arch/arm/mach-msm/clock.c
++++ b/arch/arm/mach-msm/clock.c
+@@ -511,13 +511,26 @@ EXPORT_SYMBOL(clk_set_rate);
+ 
+ long clk_round_rate(struct clk *clk, unsigned long rate)
+ {
++	long rrate;
++	unsigned long fmax = 0, i;
++
+ 	if (IS_ERR_OR_NULL(clk))
+ 		return -EINVAL;
+ 
+ 	if (!clk->ops->round_rate)
+ 		return -ENOSYS;
+ 
+-	return clk->ops->round_rate(clk, rate);
++	for (i = 0; i < clk->num_fmax; i++)
++		fmax = max(fmax, clk->fmax[i]);
++
++	if (!fmax)
++		fmax = ULONG_MAX;
++
++	rate = min(rate, fmax);
++	rrate = clk->ops->round_rate(clk, rate);
++	if (rrate > fmax)
++		return -EINVAL;
++	return rrate;
+ }
+ EXPORT_SYMBOL(clk_round_rate);
+ 
+-- 
+1.7.9.5
+

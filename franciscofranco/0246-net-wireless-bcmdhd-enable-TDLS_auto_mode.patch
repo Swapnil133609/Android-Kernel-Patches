@@ -1,0 +1,184 @@
+From 85d7dc781b3bedd36540b01a4a91fc2e14ac8057 Mon Sep 17 00:00:00 2001
+From: Ecco Park <eccopark@broadcom.com>
+Date: Thu, 14 Nov 2013 07:17:38 +0900
+Subject: [PATCH 246/517] net: wireless: bcmdhd: enable TDLS_auto_mode
+
+	Requirement :
+	1. enable auto mode for SETUP request
+	2. disable auto mode for TEARDOWN request
+	bug : 11632025 TDLS hybrid mode support
+Signed-off-by: Ecco Park <eccopark@broadcom.com>
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/net/wireless/bcmdhd/dhd.h         |    2 +-
+ drivers/net/wireless/bcmdhd/dhd_linux.c   |   62 ++++++++++++++++++-----------
+ drivers/net/wireless/bcmdhd/wl_cfg80211.c |   25 ++++++++----
+ 3 files changed, 57 insertions(+), 32 deletions(-)
+
+diff --git a/drivers/net/wireless/bcmdhd/dhd.h b/drivers/net/wireless/bcmdhd/dhd.h
+index ce317d2..12ed1df 100644
+--- a/drivers/net/wireless/bcmdhd/dhd.h
++++ b/drivers/net/wireless/bcmdhd/dhd.h
+@@ -993,7 +993,7 @@ int dhd_arp_get_arp_hostip_table(dhd_pub_t *dhd, void *buf, int buflen, int idx)
+ void dhd_arp_offload_add_ip(dhd_pub_t *dhd, uint32 ipaddr, int idx);
+ #endif /* ARP_OFFLOAD_SUPPORT */
+ #ifdef WLTDLS
+-int dhd_tdls_enable_disable(dhd_pub_t *dhd, bool flag);
++int dhd_tdls_enable(struct net_device *dev, bool tdls_on, bool auto_on, struct ether_addr *mac);
+ #endif
+ /* Neighbor Discovery Offload Support */
+ int dhd_ndo_enable(dhd_pub_t * dhd, int ndo_enable);
+diff --git a/drivers/net/wireless/bcmdhd/dhd_linux.c b/drivers/net/wireless/bcmdhd/dhd_linux.c
+index faa168f..e7680f2 100644
+--- a/drivers/net/wireless/bcmdhd/dhd_linux.c
++++ b/drivers/net/wireless/bcmdhd/dhd_linux.c
+@@ -3561,43 +3561,58 @@ dhd_bus_start(dhd_pub_t *dhdp)
+ 	return 0;
+ }
+ #ifdef WLTDLS
+-int dhd_tdls_enable_disable(dhd_pub_t *dhd, bool flag)
++int _dhd_tdls_enable(dhd_pub_t *dhd, bool tdls_on, bool auto_on, struct ether_addr *mac)
+ {
+ 	char iovbuf[WLC_IOCTL_SMLEN];
+-	uint32 tdls = flag;
+-	int ret;
+-#ifdef WLTDLS_AUTO_ENABLE
+-	uint32 tdls_auto_op = 1;
++	uint32 tdls = tdls_on;
++	int ret = 0;
++	uint32 tdls_auto_op = 0;
+ 	uint32 tdls_idle_time = CUSTOM_TDLS_IDLE_MODE_SETTING;
+-#endif /* WLTDLS_AUTO_ENABLE */
+ 	if (!FW_SUPPORTED(dhd, tdls))
+ 		return BCME_ERROR;
+ 
++	if (dhd->tdls_enable == tdls_on)
++		goto auto_mode;
+ 	bcm_mkiovar("tdls_enable", (char *)&tdls, sizeof(tdls), iovbuf, sizeof(iovbuf));
+ 	if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0)) < 0) {
+ 		DHD_ERROR(("%s: tdls %d failed %d\n", __FUNCTION__, tdls, ret));
+ 		goto exit;
+ 	}
+-	dhd->tdls_enable = flag;
+-	if (!flag)
+-		goto exit;
+-#ifdef WLTDLS_AUTO_ENABLE
+-	bcm_mkiovar("tdls_auto_op", (char *)&tdls_auto_op, sizeof(tdls_auto_op),
+-		iovbuf, sizeof(iovbuf));
+-	if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0)) < 0) {
+-		DHD_ERROR(("%s: tdls_auto_op failed %d\n", __FUNCTION__, ret));
+-		goto exit;
+-	}
+-	bcm_mkiovar("tdls_idle_time", (char *)&tdls_idle_time, sizeof(tdls_idle_time),
+-		iovbuf, sizeof(iovbuf));
+-	if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0)) < 0) {
+-		DHD_ERROR(("%s: tdls_idle_time failed %d\n", __FUNCTION__, ret));
+-		goto exit;
++	dhd->tdls_enable = tdls_on;
++auto_mode:
++	if (mac) {
++		tdls_auto_op = auto_on;
++		bcm_mkiovar("tdls_auto_op", (char *)&tdls_auto_op, sizeof(tdls_auto_op),
++			iovbuf, sizeof(iovbuf));
++		if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf,
++				sizeof(iovbuf), TRUE, 0)) < 0) {
++			DHD_ERROR(("%s: tdls_auto_op failed %d\n", __FUNCTION__, ret));
++			goto exit;
++		}
++
++		if (tdls_auto_op) {
++			bcm_mkiovar("tdls_idle_time", (char *)&tdls_idle_time,
++				sizeof(tdls_idle_time),	iovbuf, sizeof(iovbuf));
++			if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf,
++				sizeof(iovbuf), TRUE, 0)) < 0) {
++				DHD_ERROR(("%s: tdls_idle_time failed %d\n", __FUNCTION__, ret));
++				goto exit;
++			}
++		}
+ 	}
+-#endif /* WLTDLS_AUTO_ENABLE */
+ exit:
+ 	return ret;
+ }
++int dhd_tdls_enable(struct net_device *dev, bool tdls_on, bool auto_on, struct ether_addr *mac)
++{
++	dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev);
++	int ret = 0;
++	if (dhd)
++		ret = _dhd_tdls_enable(&dhd->pub, tdls_on, auto_on, mac);
++	else
++		ret = BCME_ERROR;
++	return ret;
++}
+ #endif /* WLTDLS */
+ 
+ bool dhd_is_concurrent_mode(dhd_pub_t *dhd)
+@@ -3929,7 +3944,8 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
+ #endif /* ROAM_ENABLE */
+ 
+ #ifdef WLTDLS
+-	dhd_tdls_enable_disable(dhd, 1);
++	/* by default TDLS on and auto mode off */
++	_dhd_tdls_enable(dhd, true, false, NULL);
+ #endif /* WLTDLS */
+ 
+ 
+diff --git a/drivers/net/wireless/bcmdhd/wl_cfg80211.c b/drivers/net/wireless/bcmdhd/wl_cfg80211.c
+index afc3b35..ad08f12 100644
+--- a/drivers/net/wireless/bcmdhd/wl_cfg80211.c
++++ b/drivers/net/wireless/bcmdhd/wl_cfg80211.c
+@@ -10613,32 +10613,41 @@ wl_cfg80211_tdls_oper(struct wiphy *wiphy, struct net_device *dev,
+ #ifdef WLTDLS
+ 	struct wl_priv *wl = wlcfg_drv_priv;
+ 	tdls_iovar_t info;
+-	dhd_pub_t *dhd = (dhd_pub_t *)(wl->pub);
+ 	memset(&info, 0, sizeof(tdls_iovar_t));
+ 	if (peer)
+ 		memcpy(&info.ea, peer, ETHER_ADDR_LEN);
+ 	switch (oper) {
+ 	case NL80211_TDLS_DISCOVERY_REQ:
+-		if (!dhd->tdls_enable)
+-			ret = dhd_tdls_enable_disable(dhd, 1);
++		/* turn on TDLS */
++		ret = dhd_tdls_enable(dev, true, false, NULL);
+ 		if (ret < 0)
+ 			return ret;
+ 		info.mode = TDLS_MANUAL_EP_DISCOVERY;
+ 		break;
+ 	case NL80211_TDLS_SETUP:
+-		info.mode = TDLS_MANUAL_EP_CREATE;
++		/* auto mode on */
++		ret = dhd_tdls_enable(dev, true, true, (struct ether_addr *)peer);
++		if (ret < 0)
++			return ret;
+ 		break;
+ 	case NL80211_TDLS_TEARDOWN:
+ 		info.mode = TDLS_MANUAL_EP_DELETE;
++		/* auto mode off */
++		ret = dhd_tdls_enable(dev, true, false, (struct ether_addr *)peer);
++		if (ret < 0)
++			return ret;
+ 		break;
+ 	default:
+ 		WL_ERR(("Unsupported operation : %d\n", oper));
+ 		goto out;
+ 	}
+-	ret = wldev_iovar_setbuf(dev, "tdls_endpoint", &info, sizeof(info),
+-		wl->ioctl_buf, WLC_IOCTL_MAXLEN, &wl->ioctl_buf_sync);
+-	if (ret) {
+-		WL_ERR(("tdls_endpoint error %d\n", ret));
++
++	if (info.mode) {
++		ret = wldev_iovar_setbuf(dev, "tdls_endpoint", &info, sizeof(info),
++			wl->ioctl_buf, WLC_IOCTL_MAXLEN, &wl->ioctl_buf_sync);
++		if (ret) {
++			WL_ERR(("tdls_endpoint error %d\n", ret));
++		}
+ 	}
+ out:
+ #endif /* WLTDLS */
+-- 
+1.7.9.5
+

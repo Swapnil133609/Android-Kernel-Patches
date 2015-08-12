@@ -1,0 +1,82 @@
+From ee64ada003043995c2bede30fb44cf8897696565 Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Sun, 29 Dec 2013 01:22:11 +0000
+Subject: [PATCH 505/517] input: synaptics: remove remnants of boostpulse &
+ syscalls in preparation for a new generic
+ touchboost driver.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/touch_synaptics_ds5.c |   41 -----------------------
+ 1 file changed, 41 deletions(-)
+
+diff --git a/drivers/input/touchscreen/touch_synaptics_ds5.c b/drivers/input/touchscreen/touch_synaptics_ds5.c
+index a09bc6c..aa928ca 100644
+--- a/drivers/input/touchscreen/touch_synaptics_ds5.c
++++ b/drivers/input/touchscreen/touch_synaptics_ds5.c
+@@ -35,7 +35,6 @@
+ #include <linux/of_gpio.h>
+ #include <linux/input/touch_synaptics.h>
+ #include <linux/lcd_notify.h>
+-#include <linux/syscalls.h>
+ 
+ #include "SynaImage_ds5.h"
+ 
+@@ -240,45 +239,6 @@ static int synaptics_init_panel(struct i2c_client *client, struct synaptics_ts_f
+ static int get_ic_info(struct synaptics_ts_data *ts, struct synaptics_ts_fw_info *fw_info);
+ static void *get_touch_handle(struct i2c_client *client);
+ 
+-#define BOOSTPULSE "/sys/devices/system/cpu/cpufreq/interactive/boostpulse"
+-
+-struct touchboost {
+-	int boostpulse_fd;
+-} boost = {
+-	.boostpulse_fd = -1,
+-};
+-
+-inline int boostpulse_open(void)
+-{
+-	if (boost.boostpulse_fd < 0)
+-	{
+-		boost.boostpulse_fd = sys_open(BOOSTPULSE, O_WRONLY, 0);
+-		
+-		if (boost.boostpulse_fd < 0)
+-		{
+-			pr_info("Error opening %s\n", BOOSTPULSE);
+-			return -1;		
+-		}
+-	}
+-
+-	return boost.boostpulse_fd;
+-}
+-
+-inline void touchboost(void)
+-{
+-	int len;
+-
+-	if (boostpulse_open() >= 0)
+-	{
+-		len = sys_write(boost.boostpulse_fd, "1", sizeof(BOOSTPULSE));
+-			
+-		if (len < 0)
+-		{
+-			pr_info("Error writing to %s\n", BOOSTPULSE);			
+-		}
+-	}
+-}
+-
+ /* touch_asb_input_report
+  *
+  * finger status report
+@@ -351,7 +311,6 @@ static irqreturn_t touch_irq_handler(int irq, void *dev_id)
+ 
+ 	switch (touch_work_pre_proc(ts)) {
+ 	case 0:
+-		touchboost();
+ 		touch_abs_input_report(ts, timestamp);
+ 		break;
+ 	case -EIO:
+-- 
+1.7.9.5
+

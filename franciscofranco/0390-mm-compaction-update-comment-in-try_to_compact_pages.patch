@@ -1,0 +1,133 @@
+From c5647cadba05baa3ce85c8d9c781a5ab95d26ed7 Mon Sep 17 00:00:00 2001
+From: Mel Gorman <mgorman@suse.de>
+Date: Mon, 8 Oct 2012 16:29:09 -0700
+Subject: [PATCH 390/517] mm: compaction: update comment in
+ try_to_compact_pages
+
+Allocation success rates have been far lower since 3.4 due to commit
+fe2c2a106663 ("vmscan: reclaim at order 0 when compaction is enabled").
+This commit was introduced for good reasons and it was known in advance
+that the success rates would suffer but it was justified on the grounds
+that the high allocation success rates were achieved by aggressive
+reclaim.  Success rates are expected to suffer even more in 3.6 due to
+commit 7db8889ab05b ("mm: have order > 0 compaction start off where it
+left") which testing has shown to severely reduce allocation success
+rates under load - to 0% in one case.
+
+This series aims to improve the allocation success rates without
+regressing the benefits of commit fe2c2a106663.  The series is based on
+latest mmotm and takes into account the __GFP_NO_KSWAPD flag is going
+away.
+
+Patch 1 updates a stale comment seeing as I was in the general area.
+
+Patch 2 updates reclaim/compaction to reclaim pages scaled on the number
+	of recent failures.
+
+Patch 3 captures suitable high-order pages freed by compaction to reduce
+	races with parallel allocation requests.
+
+Patch 4 fixes the upstream commit [7db8889a: mm: have order > 0 compaction
+	start off where it left] to enable compaction again
+
+Patch 5 identifies when compacion is taking too long due to contention
+	and aborts.
+
+STRESS-HIGHALLOC
+		 3.6-rc1-akpm	  full-series
+Pass 1          36.00 ( 0.00%)    51.00 (15.00%)
+Pass 2          42.00 ( 0.00%)    63.00 (21.00%)
+while Rested    86.00 ( 0.00%)    86.00 ( 0.00%)
+
+From
+
+  http://www.csn.ul.ie/~mel/postings/mmtests-20120424/global-dhp__stress-highalloc-performance-ext3/hydra/comparison.html
+
+I know that the allocation success rates in 3.3.6 was 78% in comparison
+to 36% in in the current akpm tree.  With the full series applied, the
+success rates are up to around 51% with some variability in the results.
+This is not as high a success rate but it does not reclaim excessively
+which is a key point.
+
+MMTests Statistics: vmstat
+Page Ins                                     3050912     3078892
+Page Outs                                    8033528     8039096
+Swap Ins                                           0           0
+Swap Outs                                          0           0
+
+Note that swap in/out rates remain at 0. In 3.3.6 with 78% success rates
+there were 71881 pages swapped out.
+
+Direct pages scanned                           70942      122976
+Kswapd pages scanned                         1366300     1520122
+Kswapd pages reclaimed                       1366214     1484629
+Direct pages reclaimed                         70936      105716
+Kswapd efficiency                                99%         97%
+Kswapd velocity                             1072.550    1182.615
+Direct efficiency                                99%         85%
+Direct velocity                               55.690      95.672
+
+The kswapd velocity changes very little as expected.  kswapd velocity is
+around the 1000 pages/sec mark where as in kernel 3.3.6 with the high
+allocation success rates it was 8140 pages/second.  Direct velocity is
+higher as a result of patch 2 of the series but this is expected and is
+acceptable.  The direct reclaim and kswapd velocities change very little.
+
+If these get accepted for merging then there is a difficulty in how they
+should be handled.  7db8889a ("mm: have order > 0 compaction start off
+where it left") is broken but it is already in 3.6-rc1 and needs to be
+fixed.  However, if just patch 4 from this series is applied then Jim
+Schutt's workload is known to break again as his workload also requires
+patch 5.  While it would be preferred to have all these patches in 3.6 to
+improve compaction in general, it would at least be acceptable if just
+patches 4 and 5 were merged to 3.6 to fix a known problem without breaking
+compaction completely.  On the face of it, that would force
+__GFP_NO_KSWAPD patches to be merged at the same time but I can do a
+version of this series with __GFP_NO_KSWAPD change reverted and then
+rebase it on top of this series.  That might be best overall because I
+note that the __GFP_NO_KSWAPD patch should have removed
+deferred_compaction from page_alloc.c but it didn't but fixing that causes
+collisions with this series.
+
+This patch:
+
+The comment about order applied when the check was order >
+PAGE_ALLOC_COSTLY_ORDER which has not been the case since c5a73c3d ("thp:
+use compaction for all allocation orders").  Fixing the comment while I'm
+in the general area.
+
+Change-Id: Ida65d938b78618ec098d5e511e88cf39578ba606
+Signed-off-by: Mel Gorman <mgorman@suse.de>
+Reviewed-by: Rik van Riel <riel@redhat.com>
+Reviewed-by: Minchan Kim <minchan@kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: 4ffb6335da87b51c17e7ff6495170785f21558dd
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/compaction.c |    6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
+
+diff --git a/mm/compaction.c b/mm/compaction.c
+index a33241b..3a63bff 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -812,11 +812,7 @@ unsigned long try_to_compact_pages(struct zonelist *zonelist,
+ 	int rc = COMPACT_SKIPPED;
+ 	int alloc_flags = 0;
+ 
+-	/*
+-	 * Check whether it is worth even starting compaction. The order check is
+-	 * made because an assumption is made that the page allocator can satisfy
+-	 * the "cheaper" orders without taking special steps
+-	 */
++	/* Check if the GFP flags allow compaction */
+ 	if (!order || !may_enter_fs || !may_perform_io)
+ 		return rc;
+ 
+-- 
+1.7.9.5
+

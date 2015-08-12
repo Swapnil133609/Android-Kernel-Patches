@@ -1,0 +1,47 @@
+From 41bade02bb19c31b5f77bbf3f1f7736893feb357 Mon Sep 17 00:00:00 2001
+From: Laura Abbott <lauraa@codeaurora.org>
+Date: Mon, 2 Dec 2013 16:24:38 -0800
+Subject: [PATCH 460/517] mm: change freepage state correctly in
+ __isolate_free_page
+
+Commit 2e30abd1730751d58463d88bc0844ab8fd7112a9
+(mm: cma: skip watermarks check for already isolated blocks
+in split_free_page()) changed the ordering of where the watermark
+checks go for isolated pages. There was already an 'enhancement'
+present in __isolate_free_page to skip the watermark checks for
+CMA pages to increase success. The merging of the enhancment and
+the aforementioned commit was done incorrectly, resulting in
+the free page state never being modified for CMA pages even if
+the CMA page was removed from the free list. Add the enhancement
+properly by only checking for CMA pages at the watermark level
+and allow the page state to be modfied for CMA pages as well.
+
+Change-Id: Iabea982108d98150f54e5c42b7dbf30f0743653a
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/page_alloc.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 6fd1c04..24a3afd 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -1451,10 +1451,11 @@ static int __isolate_free_page(struct page *page, unsigned int order)
+ 	zone = page_zone(page);
+ 	mt = get_pageblock_migratetype(page);
+ 
+-	if (mt != MIGRATE_ISOLATE && !is_migrate_cma(mt)) {
++	if (mt != MIGRATE_ISOLATE) {
+ 		/* Obey watermarks as if the page was being allocated */
+ 		watermark = low_wmark_pages(zone) + (1 << order);
+-		if (!zone_watermark_ok(zone, 0, watermark, 0, 0))
++		if (!is_migrate_cma(mt) &&
++		    !zone_watermark_ok(zone, 0, watermark, 0, 0))
+ 			return 0;
+ 
+ 		__mod_zone_freepage_state(zone, -(1UL << order), mt);
+-- 
+1.7.9.5
+

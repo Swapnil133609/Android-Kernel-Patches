@@ -1,0 +1,47 @@
+From a28c7547f9fb673d90485663598e2d0410356119 Mon Sep 17 00:00:00 2001
+From: Srivatsa Vaddagiri <vatsa@codeaurora.org>
+Date: Fri, 1 Mar 2013 16:16:27 -0800
+Subject: [PATCH 129/517] cpufreq: interactive: fix input_boost_freq not being
+ always choosen for target_freq when boosted is
+ true. Also do not boost the target_cpu to SYNC_FREQ
+ if the source_cpu current frequency is not higher
+ than target_cpu current freq to avoid overusage of
+ SYNC_FREQ.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |    8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index bd8f0cf..27bb7c8 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -375,6 +375,8 @@ static void cpufreq_interactive_timer(unsigned long data)
+ 
+ 		if (new_freq < hispeed_freq)
+ 			new_freq = hispeed_freq;
++	} else if (boosted) {
++		new_freq = input_boost_freq; 
+ 	} else {
+ 		new_freq = choose_freq(pcpu, loadadjfreq);
+ 	}
+@@ -701,10 +703,12 @@ static int thread_migration_notify(struct notifier_block *nb,
+ 				unsigned long target_cpu, void *arg)
+ {
+ 	unsigned long flags;
+-	struct cpufreq_interactive_cpuinfo *target;
++	struct cpufreq_interactive_cpuinfo *target, *source;
+ 	target = &per_cpu(cpuinfo, target_cpu);
++	source = &per_cpu(cpuinfo, (int)arg);
+ 	
+-	if (target->policy->cur < CPU_SYNC_FREQ)
++	if ((source->policy->cur > target->policy->cur) & 
++			(target->policy->cur < CPU_SYNC_FREQ))
+ 	{
+ 		target->target_freq = CPU_SYNC_FREQ;
+ 		target->floor_freq = CPU_SYNC_FREQ;
+-- 
+1.7.9.5
+

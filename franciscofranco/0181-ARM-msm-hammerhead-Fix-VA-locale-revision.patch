@@ -1,0 +1,31 @@
+From ba6e69c60a5d8126111f9a82adee5fa7071039a0 Mon Sep 17 00:00:00 2001
+From: Dmitry Shmidt <dimitrysh@google.com>
+Date: Tue, 15 Oct 2013 16:03:55 -0700
+Subject: [PATCH 181/517] ARM: msm: hammerhead: Fix VA locale revision
+
+Bug: 11172689
+
+Change-Id: I892ad17b0d336842aa77259b2aaab3b288bcdb3c
+Signed-off-by: Dmitry Shmidt <dimitrysh@google.com>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/lge/board-wifi-bcm.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/lge/board-wifi-bcm.c b/arch/arm/mach-msm/lge/board-wifi-bcm.c
+index 77e0d35..bec95a6 100644
+--- a/arch/arm/mach-msm/lge/board-wifi-bcm.c
++++ b/arch/arm/mach-msm/lge/board-wifi-bcm.c
+@@ -623,7 +623,7 @@ static struct cntry_locales_custom wifi_translate_custom_table[] = {
+ 	{"GB", "GB", 6},
+ 	{"UY", "UY", 1},
+ 	{"VI", "VI", 13},
+-	{"VA", "VA", 12},	/* changed 2 -> 12 */
++	{"VA", "VA", 2},
+ 	{"VE", "VE", 3},
+ 	{"VN", "VN", 4},
+ 	{"MA", "MA", 1},
+-- 
+1.7.9.5
+

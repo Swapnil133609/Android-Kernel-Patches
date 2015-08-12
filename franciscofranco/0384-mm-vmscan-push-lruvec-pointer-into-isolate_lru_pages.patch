@@ -1,0 +1,99 @@
+From b734f1098e9db1d44bb75aecfe84f65c4e2792b3 Mon Sep 17 00:00:00 2001
+From: Konstantin Khlebnikov <khlebnikov@openvz.org>
+Date: Tue, 29 May 2012 15:06:58 -0700
+Subject: [PATCH 384/517] mm/vmscan: push lruvec pointer into
+ isolate_lru_pages()
+
+Move the mem_cgroup_zone_lruvec() call from isolate_lru_pages() into
+shrink_[in]active_list().  Further patches push it to shrink_zone() step
+by step.
+
+Change-Id: I59593e52a524b1b6713c0421c3ed956f78c1e1a8
+Signed-off-by: Konstantin Khlebnikov <khlebnikov@openvz.org>
+Cc: Mel Gorman <mel@csn.ul.ie>
+Cc: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+Acked-by: Hugh Dickins <hughd@google.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: 5dc35979e444b50d5551bdeb7a7abc5c69c875d0
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/vmscan.c |   16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 11e1f98..7104628 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -1029,7 +1029,7 @@ int __isolate_lru_page(struct page *page, isolate_mode_t mode)
+  * Appropriate locks must be held before calling this function.
+  *
+  * @nr_to_scan:	The number of pages to look through on the list.
+- * @mz:		The mem_cgroup_zone to pull pages from.
++ * @lruvec:	The LRU vector to pull pages from.
+  * @dst:	The temp list to put pages on to.
+  * @nr_scanned:	The number of pages that were scanned.
+  * @sc:		The scan_control struct for this reclaim session
+@@ -1039,17 +1039,15 @@ int __isolate_lru_page(struct page *page, isolate_mode_t mode)
+  * returns how many pages were moved onto *@dst.
+  */
+ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
+-		struct mem_cgroup_zone *mz, struct list_head *dst,
++		struct lruvec *lruvec, struct list_head *dst,
+ 		unsigned long *nr_scanned, struct scan_control *sc,
+ 		isolate_mode_t mode, enum lru_list lru)
+ {
+-	struct lruvec *lruvec;
+ 	struct list_head *src;
+ 	unsigned long nr_taken = 0;
+ 	unsigned long scan;
+ 	int file = is_file_lru(lru);
+ 
+-	lruvec = mem_cgroup_zone_lruvec(mz->zone, mz->mem_cgroup);
+ 	src = &lruvec->lists[lru];
+ 
+ 	for (scan = 0; scan < nr_to_scan && !list_empty(src); scan++) {
+@@ -1276,6 +1274,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct mem_cgroup_zone *mz,
+ 	int file = is_file_lru(lru);
+ 	struct zone *zone = mz->zone;
+ 	struct zone_reclaim_stat *reclaim_stat = get_reclaim_stat(mz);
++	struct lruvec *lruvec = mem_cgroup_zone_lruvec(zone, mz->mem_cgroup);
+ 
+ 	while (unlikely(too_many_isolated(zone, file, sc))) {
+ 		congestion_wait(BLK_RW_ASYNC, HZ/10);
+@@ -1294,8 +1293,8 @@ shrink_inactive_list(unsigned long nr_to_scan, struct mem_cgroup_zone *mz,
+ 
+ 	spin_lock_irq(&zone->lru_lock);
+ 
+-	nr_taken = isolate_lru_pages(nr_to_scan, mz, &page_list, &nr_scanned,
+-				     sc, isolate_mode, lru);
++	nr_taken = isolate_lru_pages(nr_to_scan, lruvec, &page_list,
++				     &nr_scanned, sc, isolate_mode, lru);
+ 	if (global_reclaim(sc)) {
+ 		zone->pages_scanned += nr_scanned;
+ 		if (current_is_kswapd())
+@@ -1446,6 +1445,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
+ 	isolate_mode_t isolate_mode = 0;
+ 	int file = is_file_lru(lru);
+ 	struct zone *zone = mz->zone;
++	struct lruvec *lruvec = mem_cgroup_zone_lruvec(zone, mz->mem_cgroup);
+ 
+ 	lru_add_drain();
+ 
+@@ -1456,8 +1456,8 @@ static void shrink_active_list(unsigned long nr_to_scan,
+ 
+ 	spin_lock_irq(&zone->lru_lock);
+ 
+-	nr_taken = isolate_lru_pages(nr_to_scan, mz, &l_hold, &nr_scanned, sc,
+-				     isolate_mode, lru);
++	nr_taken = isolate_lru_pages(nr_to_scan, lruvec, &l_hold,
++				     &nr_scanned, sc, isolate_mode, lru);
+ 	if (global_reclaim(sc))
+ 		zone->pages_scanned += nr_scanned;
+ 
+-- 
+1.7.9.5
+

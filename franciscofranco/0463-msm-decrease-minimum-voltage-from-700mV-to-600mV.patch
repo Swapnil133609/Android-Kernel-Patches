@@ -1,0 +1,27 @@
+From 88de49de2c6dfac390ba86b4ef1a7048a80ae385 Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Sat, 21 Dec 2013 15:35:19 +0000
+Subject: [PATCH 463/517] msm: decrease minimum voltage from 700mV to 600mV.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/acpuclock-krait.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/acpuclock-krait.c b/arch/arm/mach-msm/acpuclock-krait.c
+index 9733066..82764c5 100644
+--- a/arch/arm/mach-msm/acpuclock-krait.c
++++ b/arch/arm/mach-msm/acpuclock-krait.c
+@@ -955,7 +955,7 @@ static void __init bus_init(const struct l2_level *l2_level)
+ }
+ 
+ #define MAX_VDD 1300
+-#define MIN_VDD 700
++#define MIN_VDD 600
+ 
+ ssize_t acpuclk_get_vdd_levels_str(char *buf)
+ {
+-- 
+1.7.9.5
+

@@ -1,0 +1,33 @@
+From 3c8fb9568f6230dc1500e36f11f89958208e2ce7 Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Tue, 31 Dec 2013 05:31:11 +0000
+Subject: [PATCH 512/517] input: touchboost: add back keypad filtering. I
+ removed it earlier because I didn't know what it
+ was for, so it seems it is, in this device's case,
+ volume up/down and power button.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/touchboost.c |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/input/touchscreen/touchboost.c b/drivers/input/touchscreen/touchboost.c
+index f621278..7055600 100644
+--- a/drivers/input/touchscreen/touchboost.c
++++ b/drivers/input/touchscreen/touchboost.c
+@@ -128,6 +128,11 @@ static const struct input_device_id boost_ids[] = {
+ 				BIT_MASK(ABS_MT_POSITION_X) |
+ 				BIT_MASK(ABS_MT_POSITION_Y) },
+ 	},
++	/* Keypad */
++	{
++		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
++		.evbit = { BIT_MASK(EV_KEY) },
++	},
+ 	{ },
+ };
+ 
+-- 
+1.7.9.5
+

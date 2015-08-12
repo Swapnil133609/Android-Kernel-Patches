@@ -1,0 +1,66 @@
+From 46fc2aeff10434502ae419f8f513ae52ca002adb Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Fri, 29 Nov 2013 02:23:31 +0000
+Subject: [PATCH 131/517] dts: gpu: remove duplicates freqs (even though being
+ duplicates they had different bus values).
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/boot/dts/msm8974-gpu.dtsi                 |   18 ++----------------
+ .../dts/msm8974-hammerhead/msm8974-hammerhead.dtsi |    4 ++--
+ 2 files changed, 4 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm/boot/dts/msm8974-gpu.dtsi b/arch/arm/boot/dts/msm8974-gpu.dtsi
+index 06b9c18..d34053f 100644
+--- a/arch/arm/boot/dts/msm8974-gpu.dtsi
++++ b/arch/arm/boot/dts/msm8974-gpu.dtsi
+@@ -80,27 +80,13 @@
+ 
+ 			qcom,gpu-pwrlevel@2 {
+ 				reg = <2>;
+-				qcom,gpu-freq = <320000000>;
+-				qcom,bus-freq = <3>;
+-				qcom,io-fraction = <66>;
+-			};
+-
+-			qcom,gpu-pwrlevel@3 {
+-				reg = <3>;
+-				qcom,gpu-freq = <200000000>;
+-				qcom,bus-freq = <2>;
+-				qcom,io-fraction = <100>;
+-			};
+-
+-			qcom,gpu-pwrlevel@4 {
+-				reg = <4>;
+ 				qcom,gpu-freq = <200000000>;
+ 				qcom,bus-freq = <1>;
+ 				qcom,io-fraction = <100>;
+ 			};
+ 
+-			qcom,gpu-pwrlevel@5 {
+-				reg = <5>;
++			qcom,gpu-pwrlevel@3 {
++				reg = <3>;
+ 				qcom,gpu-freq = <27000000>;
+ 				qcom,bus-freq = <0>;
+ 				qcom,io-fraction = <0>;
+diff --git a/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead.dtsi b/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead.dtsi
+index b4225be..2ef6e43 100644
+--- a/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead.dtsi
++++ b/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead.dtsi
+@@ -716,9 +716,9 @@
+ &rpm_bus {
+ 	rpm-regulator-ldoa22 {
+ 		pm8941_l22: regulator-l22 {
+-			regulator-min-microvolt = <3000000>;
++			regulator-min-microvolt = <2700000>;
+ 			regulator-max-microvolt = <3300000>;
+-			qcom,init-voltage = <3100000>;
++			qcom,init-voltage = <2700000>;
+ 		};
+ 	};
+ 
+-- 
+1.7.9.5
+

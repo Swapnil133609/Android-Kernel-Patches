@@ -1,0 +1,61 @@
+From 9d2bfb7126c936fa5ada9f3972839f56695d17f4 Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Mon, 16 Dec 2013 01:44:34 +0000
+Subject: [PATCH 359/517] cpufreq: interactive: make sure boosted_time is
+ initialized with jiffies and use standard jiffies
+ API to detect if time is after or before jiffes.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |   10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index e01293a..151f940 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -54,7 +54,6 @@ struct cpufreq_interactive_cpuinfo {
+ 	u64 hispeed_validate_time;
+ 	struct rw_semaphore enable_sem;
+ 	int governor_enabled;
+-	unsigned int max_load_freq_divided;
+ 	int prev_load;
+ };
+ 
+@@ -135,7 +134,7 @@ static int input_boost_freq = DEFAULT_INPUT_BOOST_FREQ;
+ static struct workqueue_struct *input_wq;
+ static struct work_struct input_work;
+ #define DEFAULT_BOOSTED_TIME_INTERVAL 100
+-u32 boosted_time;
++unsigned long boosted_time;
+ 
+ #define CPU_SYNC_FREQ 960000
+ 
+@@ -662,7 +661,8 @@ static void cpufreq_interactive_boost(struct work_struct *work)
+ 	int i;
+ 	struct cpufreq_interactive_cpuinfo *pcpu;
+ 
+-	if (boosted_time + msecs_to_jiffies(DEFAULT_BOOSTED_TIME_INTERVAL) > jiffies)
++	if (time_is_after_jiffies(boosted_time 
++			+ msecs_to_jiffies(DEFAULT_BOOSTED_TIME_INTERVAL)))
+ 		return;
+ 
+ 	/* 
+@@ -1258,10 +1258,12 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
+ 			down_write(&pcpu->enable_sem);
+ 			cpufreq_interactive_timer_start(j);
+ 			pcpu->governor_enabled = 1;
+-			pcpu->max_load_freq_divided = policy->cpuinfo.max_freq / 100;
+ 			up_write(&pcpu->enable_sem);
+ 		}
+ 
++		if (!boosted_time)
++			boosted_time = jiffies;
++
+ 		/*
+ 		 * Do not register the idle hook and create sysfs
+ 		 * entries if we have already done so.
+-- 
+1.7.9.5
+

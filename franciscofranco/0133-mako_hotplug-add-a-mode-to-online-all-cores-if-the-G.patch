@@ -1,0 +1,172 @@
+From 1a06b56e2cb90397ff7a3256581410bc34b86b61 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Fri, 29 Nov 2013 02:25:52 +0000
+Subject: [PATCH 133/517] mako_hotplug: add a mode to online all cores if the
+ GPU busy count is very high for at least 8-10
+ consecutive seconds.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/kernel/mako_hotplug.c      |   22 ++++++++++++++++++----
+ drivers/misc/mako_hotplug_control.c |   28 ++++++++++++++++++++--------
+ include/linux/hotplug.h             |    2 ++
+ 3 files changed, 40 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/kernel/mako_hotplug.c b/arch/arm/kernel/mako_hotplug.c
+index 1f8bf87..d5aed4a 100644
+--- a/arch/arm/kernel/mako_hotplug.c
++++ b/arch/arm/kernel/mako_hotplug.c
+@@ -32,6 +32,7 @@
+ #define DEFAULT_CORES_ON_TOUCH 2
+ #define HIGH_LOAD_COUNTER 20
+ #define TIMER HZ
++#define GPU_BUSY_THRESHOLD 60
+ 
+ /*
+  * 1000ms = 1 second
+@@ -47,6 +48,7 @@ static struct cpu_stats
+ 	unsigned long timestamp[2];
+ 	bool ready_to_online[2];
+ 	struct notifier_block notif;
++	bool gpu_busy_quad_mode;
+ } stats = {
+ 	.default_first_level = DEFAULT_FIRST_LEVEL,
+     .suspend_frequency = DEFAULT_SUSPEND_FREQ,
+@@ -54,6 +56,7 @@ static struct cpu_stats
+     .counter = {0},
+ 	.timestamp = {0},
+ 	.ready_to_online = {false},
++	.gpu_busy_quad_mode = true,
+ };
+ 
+ struct cpu_load_data {
+@@ -98,14 +101,14 @@ static inline int get_cpu_load(unsigned int cpu)
+ static inline void calc_cpu_hotplug(unsigned int counter0,
+ 									unsigned int counter1)
+ {
+-	//int cpu;
++	int cpu;
+ 	int i, k;
+ 
+ 	stats.ready_to_online[0] = counter0 >= 10;
+ 	stats.ready_to_online[1] = counter1 >= 10;
+ 
+-	//commented for now
+-	/*if (unlikely(gpu_pref_counter >= 60))
++	if (stats.gpu_busy_quad_mode && 
++			unlikely(gpu_pref_counter >= GPU_BUSY_THRESHOLD))
+ 	{
+ 		if (num_online_cpus() < num_possible_cpus())
+ 		{
+@@ -117,7 +120,7 @@ static inline void calc_cpu_hotplug(unsigned int counter0,
+ 		}
+ 
+ 		return;
+-	}*/
++	}
+ 
+ 	for (i = 0, k = 2; i < 2; i++, k++)
+ 	{
+@@ -261,6 +264,11 @@ void update_cores_on_touch(unsigned int num)
+     stats.cores_on_touch = num;
+ }
+ 
++void update_gpu_busy_quad_mode(unsigned int num)
++{
++	stats.gpu_busy_quad_mode = num;
++}
++
+ unsigned int get_first_level()
+ {
+     return stats.default_first_level;
+@@ -275,6 +283,12 @@ unsigned int get_cores_on_touch()
+ {
+     return stats.cores_on_touch;
+ }
++
++unsigned int get_gpu_busy_quad_mode()
++{
++	return stats.gpu_busy_quad_mode;
++}
++
+ /* end sysfs functions from external driver */
+ 
+ int __init mako_hotplug_init(void)
+diff --git a/drivers/misc/mako_hotplug_control.c b/drivers/misc/mako_hotplug_control.c
+index 7b6653d..f6edf09 100644
+--- a/drivers/misc/mako_hotplug_control.c
++++ b/drivers/misc/mako_hotplug_control.c
+@@ -11,8 +11,6 @@
+ #include <linux/miscdevice.h>
+ #include <linux/hotplug.h>
+ 
+-#define MAKO_HOTPLUG_CONTROL_VERSION 2
+-
+ /*
+  * Sysfs get/set entries
+  */
+@@ -74,20 +72,34 @@ static ssize_t cores_on_touch_store(struct device *dev, struct device_attribute
+     return size;
+ }
+ 
+-static ssize_t mako_hotplug_control_version(struct device *dev, struct device_attribute* attr, char *buf)
++static ssize_t gpu_busy_quad_mode_show(struct device *dev, struct device_attribute *attr, char *buf)
++{
++    return sprintf(buf, "%u\n", get_gpu_busy_quad_mode());
++}
++
++static ssize_t gpu_busy_quad_mode_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+ {
+-    return sprintf(buf, "%d\n", MAKO_HOTPLUG_CONTROL_VERSION);
++    unsigned int new_val;
++    
++    sscanf(buf, "%u", &new_val);
++    
++    if (new_val != get_cores_on_touch() && new_val >= 0 && new_val <= 1)
++    {
++        update_cores_on_touch(new_val);
++    }
++    
++    return size;
+ }
+ 
+-static DEVICE_ATTR(first_level, 0777, first_level_show, first_level_store);
+-static DEVICE_ATTR(cores_on_touch, 0777, cores_on_touch_show, cores_on_touch_store);
+-static DEVICE_ATTR(version, 0777 , mako_hotplug_control_version, NULL);
++static DEVICE_ATTR(first_level, 0664, first_level_show, first_level_store);
++static DEVICE_ATTR(cores_on_touch, 0664, cores_on_touch_show, cores_on_touch_store);
++static DEVICE_ATTR(gpu_busy_quad_mode, 0664, gpu_busy_quad_mode_show, gpu_busy_quad_mode_store);
+ 
+ static struct attribute *mako_hotplug_control_attributes[] =
+ {
+ 	&dev_attr_first_level.attr,
+     &dev_attr_cores_on_touch.attr,
+-	&dev_attr_version.attr,
++	&dev_attr_gpu_busy_quad_mode.attr,
+ 	NULL
+ };
+ 
+diff --git a/include/linux/hotplug.h b/include/linux/hotplug.h
+index 4fcc6bf..a00e0ed 100644
+--- a/include/linux/hotplug.h
++++ b/include/linux/hotplug.h
+@@ -21,6 +21,7 @@ extern void update_third_level(unsigned int level);
+ extern void update_fourth_level(unsigned int level);
+ extern void update_suspend_frequency(unsigned int freq);
+ extern void update_cores_on_touch(unsigned int num);
++extern void update_gpu_busy_quad_mode(unsigned int num);
+ 
+ extern unsigned int get_first_level(void);
+ extern unsigned int get_second_level(void);
+@@ -28,6 +29,7 @@ extern unsigned int get_third_level(void);
+ extern unsigned int get_fourth_level(void);
+ extern unsigned int get_suspend_frequency(void);
+ extern unsigned int get_cores_on_touch(void);
++extern unsigned int get_gpu_busy_quad_mode(void);
+ 
+ extern unsigned int get_input_boost_freq(void);
+ extern unsigned int get_min_sample_time(void);
+-- 
+1.7.9.5
+

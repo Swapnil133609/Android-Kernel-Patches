@@ -1,0 +1,36 @@
+From f908e64697119b9ba1fa78534d27704ec32ccabf Mon Sep 17 00:00:00 2001
+From: myfluxi <linflux@arcor.de>
+Date: Sat, 14 Dec 2013 13:26:39 +0100
+Subject: [PATCH 297/517] cpufreq: interactive: Fix race in sync freq feature
+
+When we switch to the interactive governor, the kernel will panic
+because the policy object is NULL on affected cpus. Add a check to
+avoid this situation.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index f434644..e01293a 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -402,6 +402,13 @@ static void cpufreq_interactive_timer(unsigned long data)
+ 	for_each_online_cpu(i) {
+ 		struct cpufreq_interactive_cpuinfo *picpu =
+ 						&per_cpu(cpuinfo, i);
++		if (!down_read_trylock(&picpu->enable_sem))
++			continue;
++		if (!picpu->governor_enabled) {
++			up_read(&picpu->enable_sem);
++			continue;
++		}
++		up_read(&picpu->enable_sem);
+ 		if (i == data)
+ 			continue;
+ 		if (max_load_other_cpu < picpu->prev_load)
+-- 
+1.7.9.5
+

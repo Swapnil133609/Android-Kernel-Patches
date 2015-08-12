@@ -1,0 +1,38 @@
+From 8b20b95f8a4e5a31c8dff7eda6b6dc24953e22be Mon Sep 17 00:00:00 2001
+From: Sahitya Tummala <stummala@codeaurora.org>
+Date: Wed, 23 Oct 2013 09:05:21 +0530
+Subject: [PATCH 499/517] mmc: block: Fix error path of mmc_blk_alloc_req()
+
+In case of any error within mmc_blk_alloc_req(), the bitmaps
+that keep track of devices are not getting cleared. This may
+result in failure to detect a card in case it reaches maximum
+devices limitation. Fix it by clearing those bitmaps appropriately.
+
+CRs-fixed: 563264
+Change-Id: I0e23c45856355565534146f5fabb957fd4b1d007
+Signed-off-by: Sahitya Tummala <stummala@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/mmc/card/block.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+index 668cc7a..4c5863e 100644
+--- a/drivers/mmc/card/block.c
++++ b/drivers/mmc/card/block.c
+@@ -2832,8 +2832,11 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct mmc_card *card,
+  err_putdisk:
+ 	put_disk(md->disk);
+  err_kfree:
++	if (!subname)
++		__clear_bit(md->name_idx, name_use);
+ 	kfree(md);
+  out:
++	__clear_bit(devidx, dev_use);
+ 	return ERR_PTR(ret);
+ }
+ 
+-- 
+1.7.9.5
+

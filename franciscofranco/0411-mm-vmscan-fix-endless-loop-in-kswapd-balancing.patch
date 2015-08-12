@@ -1,0 +1,110 @@
+From c1e57b01a426108fac7b4b3ed70fd7a7122b45a7 Mon Sep 17 00:00:00 2001
+From: Johannes Weiner <hannes@cmpxchg.org>
+Date: Thu, 29 Nov 2012 13:54:23 -0800
+Subject: [PATCH 411/517] mm: vmscan: fix endless loop in kswapd balancing
+
+Kswapd does not in all places have the same criteria for a balanced
+zone.  Zones are only being reclaimed when their high watermark is
+breached, but compaction checks loop over the zonelist again when the
+zone does not meet the low watermark plus two times the size of the
+allocation.  This gets kswapd stuck in an endless loop over a small
+zone, like the DMA zone, where the high watermark is smaller than the
+compaction requirement.
+
+Add a function, zone_balanced(), that checks the watermark, and, for
+higher order allocations, if compaction has enough free memory.  Then
+use it uniformly to check for balanced zones.
+
+This makes sure that when the compaction watermark is not met, at least
+reclaim happens and progress is made - or the zone is declared
+unreclaimable at some point and skipped entirely.
+
+Change-Id: I17a375f356189bde63406e2127153287208157a8
+Signed-off-by: Johannes Weiner <hannes@cmpxchg.org>
+Reported-by: George Spelvin <linux@horizon.com>
+Reported-by: Johannes Hirte <johannes.hirte@fem.tu-ilmenau.de>
+Reported-by: Tomas Racek <tracek@redhat.com>
+Tested-by: Johannes Hirte <johannes.hirte@fem.tu-ilmenau.de>
+Reviewed-by: Rik van Riel <riel@redhat.com>
+Cc: Mel Gorman <mel@csn.ul.ie>
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: 60cefed485a02bd99b6299dad70666fe49245da7
+Git-repo: https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/
+Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/vmscan.c |   27 ++++++++++++++++++---------
+ 1 file changed, 18 insertions(+), 9 deletions(-)
+
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 8c3898b..af651a7 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -2310,6 +2310,19 @@ static void age_active_anon(struct zone *zone, struct scan_control *sc)
+ 	} while (memcg);
+ }
+ 
++static bool zone_balanced(struct zone *zone, int order,
++			  unsigned long balance_gap, int classzone_idx)
++{
++	if (!zone_watermark_ok_safe(zone, order, high_wmark_pages(zone) +
++				    balance_gap, classzone_idx, 0))
++		return false;
++
++	if (COMPACTION_BUILD && order && !compaction_suitable(zone, order))
++		return false;
++
++	return true;
++}
++
+ /*
+  * pgdat_balanced is used when checking if a node is balanced for high-order
+  * allocations. Only zones that meet watermarks and are in a zone allowed
+@@ -2369,8 +2382,7 @@ static bool sleeping_prematurely(pg_data_t *pgdat, int order, long remaining,
+ 			continue;
+ 		}
+ 
+-		if (!zone_watermark_ok_safe(zone, order, high_wmark_pages(zone),
+-							i, 0))
++		if (!zone_balanced(zone, order, 0, i))
+ 			all_zones_ok = false;
+ 		else
+ 			balanced += zone->present_pages;
+@@ -2479,8 +2491,7 @@ loop_again:
+ 				break;
+ 			}
+ 
+-			if (!zone_watermark_ok_safe(zone, order,
+-					high_wmark_pages(zone), 0, 0)) {
++			if (!zone_balanced(zone, order, 0, 0)) {
+ 				end_zone = i;
+ 				break;
+ 			} else {
+@@ -2556,9 +2567,8 @@ loop_again:
+ 				testorder = 0;
+ 
+ 			if ((buffer_heads_over_limit && is_highmem_idx(i)) ||
+-				    !zone_watermark_ok_safe(zone, testorder,
+-					high_wmark_pages(zone) + balance_gap,
+-					end_zone, 0)) {
++			    !zone_balanced(zone, testorder,
++					   balance_gap, end_zone)) {
+ 				shrink_zone(zone, &sc);
+ 
+ 				reclaim_state->reclaimed_slab = 0;
+@@ -2585,8 +2595,7 @@ loop_again:
+ 				continue;
+ 			}
+ 
+-			if (!zone_watermark_ok_safe(zone, testorder,
+-					high_wmark_pages(zone), end_zone, 0)) {
++			if (!zone_balanced(zone, testorder, 0, end_zone)) {
+ 				all_zones_ok = 0;
+ 				/*
+ 				 * We are still under min water mark.  This
+-- 
+1.7.9.5
+

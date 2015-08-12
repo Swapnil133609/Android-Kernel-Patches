@@ -1,0 +1,92 @@
+From b77b3438a1cf307f83b074ce76852e38353b474b Mon Sep 17 00:00:00 2001
+From: Hugh Dickins <hughd@google.com>
+Date: Tue, 29 May 2012 15:06:52 -0700
+Subject: [PATCH 379/517] mm/memcg: scanning_global_lru means
+ mem_cgroup_disabled
+
+Although one has to admire the skill with which it has been concealed,
+scanning_global_lru(mz) is actually just an interesting way to test
+mem_cgroup_disabled().  Too many developer hours have been wasted on
+confusing it with global_reclaim(): just use mem_cgroup_disabled().
+
+Change-Id: I9f8f70b41b002cc8c4583a0a9869459da24b4fe5
+Signed-off-by: Hugh Dickins <hughd@google.com>
+Signed-off-by: Konstantin Khlebnikov <khlebnikov@openvz.org>
+Acked-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+Acked-by: Glauber Costa <glommer@parallels.com>
+Cc: Michal Hocko <mhocko@suse.cz>
+Cc: Johannes Weiner <hannes@cmpxchg.org>
+Cc: Minchan Kim <minchan@kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: c3c787e8c38557ccf44c670d73aebe630a2b1479
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/vmscan.c |   18 ++++--------------
+ 1 file changed, 4 insertions(+), 14 deletions(-)
+
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index a6360b5..71d459b 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -140,26 +140,16 @@ static bool global_reclaim(struct scan_control *sc)
+ {
+ 	return !sc->target_mem_cgroup;
+ }
+-
+-static bool scanning_global_lru(struct mem_cgroup_zone *mz)
+-{
+-	return !mz->mem_cgroup;
+-}
+ #else
+ static bool global_reclaim(struct scan_control *sc)
+ {
+ 	return true;
+ }
+-
+-static bool scanning_global_lru(struct mem_cgroup_zone *mz)
+-{
+-	return true;
+-}
+ #endif
+ 
+ static struct zone_reclaim_stat *get_reclaim_stat(struct mem_cgroup_zone *mz)
+ {
+-	if (!scanning_global_lru(mz))
++	if (!mem_cgroup_disabled())
+ 		return mem_cgroup_get_reclaim_stat(mz->mem_cgroup, mz->zone);
+ 
+ 	return &mz->zone->reclaim_stat;
+@@ -168,7 +158,7 @@ static struct zone_reclaim_stat *get_reclaim_stat(struct mem_cgroup_zone *mz)
+ static unsigned long zone_nr_lru_pages(struct mem_cgroup_zone *mz,
+ 				       enum lru_list lru)
+ {
+-	if (!scanning_global_lru(mz))
++	if (!mem_cgroup_disabled())
+ 		return mem_cgroup_zone_nr_lru_pages(mz->mem_cgroup,
+ 						    zone_to_nid(mz->zone),
+ 						    zone_idx(mz->zone),
+@@ -1564,7 +1554,7 @@ static int inactive_anon_is_low(struct mem_cgroup_zone *mz)
+ 	if (!total_swap_pages)
+ 		return 0;
+ 
+-	if (!scanning_global_lru(mz))
++	if (!mem_cgroup_disabled())
+ 		return mem_cgroup_inactive_anon_is_low(mz->mem_cgroup,
+ 						       mz->zone);
+ 
+@@ -1603,7 +1593,7 @@ static int inactive_file_is_low_global(struct zone *zone)
+  */
+ static int inactive_file_is_low(struct mem_cgroup_zone *mz)
+ {
+-	if (!scanning_global_lru(mz))
++	if (!mem_cgroup_disabled())
+ 		return mem_cgroup_inactive_file_is_low(mz->mem_cgroup,
+ 						       mz->zone);
+ 
+-- 
+1.7.9.5
+

@@ -1,0 +1,91 @@
+From 709cdc20153c0ffff9520594f08dff5cf9c91c2d Mon Sep 17 00:00:00 2001
+From: Minchan Kim <minchan@kernel.org>
+Date: Thu, 20 Dec 2012 15:05:06 -0800
+Subject: [PATCH 410/517] compaction: fix build error in CMA && !COMPACTION
+
+isolate_freepages_block() and isolate_migratepages_range() are used for
+CMA as well as compaction so it breaks build for CONFIG_CMA &&
+!CONFIG_COMPACTION.
+
+This patch fixes it.
+
+Change-Id: I5163a4f20cc2002e19f87d1652ccabd75694b644
+[akpm@linux-foundation.org: add "do { } while (0)", per Mel]
+Signed-off-by: Minchan Kim <minchan@kernel.org>
+Cc: Mel Gorman <mgorman@suse.de>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: 010fc29a45a2e8dbc08bf45ef80b8622619aaae0
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/compaction.c |   26 ++++++++++++++++++++------
+ 1 file changed, 20 insertions(+), 6 deletions(-)
+
+diff --git a/mm/compaction.c b/mm/compaction.c
+index f461b37..673142d 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -16,6 +16,21 @@
+ #include <linux/sysfs.h>
+ #include "internal.h"
+ 
++#ifdef CONFIG_COMPACTION
++static inline void count_compact_event(enum vm_event_item item)
++{
++	count_vm_event(item);
++}
++
++static inline void count_compact_events(enum vm_event_item item, long delta)
++{
++	count_vm_events(item, delta);
++}
++#else
++#define count_compact_event(item) do { } while (0)
++#define count_compact_events(item, delta) do { } while (0)
++#endif
++
+ #if defined CONFIG_COMPACTION || defined CONFIG_CMA
+ 
+ #define CREATE_TRACE_POINTS
+@@ -302,10 +317,9 @@ static unsigned long isolate_freepages_block(struct compact_control *cc,
+ 	if (blockpfn == end_pfn)
+ 		update_pageblock_skip(cc, valid_page, total_isolated, false);
+ 
+-	count_vm_events(COMPACTFREE_SCANNED, nr_scanned);
++	count_compact_events(COMPACTFREE_SCANNED, nr_scanned);
+ 	if (total_isolated)
+-		count_vm_events(COMPACTISOLATED, total_isolated);
+-
++		count_compact_events(COMPACTISOLATED, total_isolated);
+ 	return total_isolated;
+ }
+ 
+@@ -593,9 +607,9 @@ next_pageblock:
+ 
+ 	trace_mm_compaction_isolate_migratepages(nr_scanned, nr_isolated);
+ 
+-	count_vm_events(COMPACTMIGRATE_SCANNED, nr_scanned);
++	count_compact_events(COMPACTMIGRATE_SCANNED, nr_scanned);
+ 	if (nr_isolated)
+-		count_vm_events(COMPACTISOLATED, nr_isolated);
++		count_compact_events(COMPACTISOLATED, nr_isolated);
+ 
+ 	return low_pfn;
+ }
+@@ -1025,7 +1039,7 @@ unsigned long try_to_compact_pages(struct zonelist *zonelist,
+ 	if (!order || !may_enter_fs || !may_perform_io)
+ 		return rc;
+ 
+-	count_vm_event(COMPACTSTALL);
++	count_compact_event(COMPACTSTALL);
+ 
+ #ifdef CONFIG_CMA
+ 	if (allocflags_to_migratetype(gfp_mask) == MIGRATE_MOVABLE)
+-- 
+1.7.9.5
+

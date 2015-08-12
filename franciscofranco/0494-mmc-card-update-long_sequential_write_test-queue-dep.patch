@@ -1,0 +1,53 @@
+From bd1af9bce293631bb3fd389b5d8902a116d1fe7d Mon Sep 17 00:00:00 2001
+From: Lee Susman <lsusman@codeaurora.org>
+Date: Sun, 11 Aug 2013 09:28:19 +0300
+Subject: [PATCH 494/517] mmc: card: update long_sequential_write_test queue
+ depth
+
+Since some systems have higher memory pressure, we limit the amount of
+simultaneous test requests. The former limitation was 118, due to the
+request queue size, but now we further restrict this number to half.
+
+Change-Id: I893b9ad1b133c922f90497b0ec1f416514529fb8
+CRs-fixed: 510814
+Signed-off-by: Lee Susman <lsusman@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/mmc/card/mmc_block_test.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/mmc/card/mmc_block_test.c b/drivers/mmc/card/mmc_block_test.c
+index 7a4d19e..0b6ac49 100644
+--- a/drivers/mmc/card/mmc_block_test.c
++++ b/drivers/mmc/card/mmc_block_test.c
+@@ -2868,6 +2868,7 @@ static int run_long_seq_write(struct test_data *td)
+ {
+ 	int ret = 0;
+ 	int i;
++	int num_requests = TEST_MAX_REQUESTS / 2;
+ 
+ 	td->test_count = 0;
+ 	mbtd->completed_req_count = 0;
+@@ -2877,15 +2878,15 @@ static int run_long_seq_write(struct test_data *td)
+ 		     td->wr_rd_next_req_id);
+ 
+ 	do {
+-		for (i = 0; i < TEST_MAX_REQUESTS; i++) {
++		for (i = 0; i < num_requests; i++) {
+ 			/*
+ 			 * since our requests come from a pool containing 128
+ 			 * requests, we don't want to exhaust this quantity,
+-			 * therefore we add up to TEST_MAX_REQUESTS (which
++			 * therefore we add up to num_requests (which
+ 			 * includes a safety margin) and then call the mmc layer
+ 			 * to fetch them
+ 			 */
+-			if (td->test_count > TEST_MAX_REQUESTS)
++			if (td->test_count > num_requests)
+ 				break;
+ 
+ 			ret = test_iosched_add_wr_rd_test_req(0, WRITE,
+-- 
+1.7.9.5
+

@@ -1,0 +1,68 @@
+From 888621c900933983c9849e5d0a7a0d1d05928ed7 Mon Sep 17 00:00:00 2001
+From: Neeti Desai <neetid@codeaurora.org>
+Date: Wed, 14 Aug 2013 17:34:55 -0700
+Subject: [PATCH 432/517] Kconfig: Add menu choice option to reclaim virtual
+ memory
+
+Add menu choice options for selecting the method of reclaiming
+virtual memory, either by mapping around the largest hole or
+reclaiming virtual memory belonging to any subsystem expected to
+have a lifetime of the entire system. By default virtual memory
+is not reclaimed.
+
+Change-Id: I1b8a1492062bb9532700122878618989e5148647
+Signed-off-by: Neeti Desai <neetid@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/Kconfig |   31 +++++++++++++++++++++++++++----
+ 1 file changed, 27 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e2d8560..29205d5 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1855,13 +1855,36 @@ config ARCH_MEMORY_REMOVE
+ config ENABLE_DMM
+ 	def_bool n
+ 
++choice
++	prompt "Virtual Memory Reclaim"
++	default NO_VM_RECLAIM
++	help
++	  Select the method of reclaiming virtual memory
++
+ config DONT_MAP_HOLE_AFTER_MEMBANK0
+-	def_bool n
+-	depends on ENABLE_VMALLOC_SAVING=n
++	bool "Map around the largest hole"
++	help
++	  Do not map the memory belonging to the largest hole
++	  into the virtual space. This results in more lowmem.
++	  If multiple holes are present, only the largest hole
++	  in the first 256MB of memory is not mapped.
+ 
+ config ENABLE_VMALLOC_SAVING
+-	def_bool n
+-	depends on DONT_MAP_HOLE_AFTER_MEMBANK0=n
++	bool "Reclaim memory for each subsystem"
++	help
++	  Enable this config to reclaim the virtual space belonging
++	  to any subsystem which is expected to have a lifetime of
++	  the entire system. This feature allows lowmem to be non-
++	  contiguous.
++
++config NO_VM_RECLAIM
++	bool "Do not reclaim memory"
++	help
++	  Do not reclaim any memory. This might result in less lowmem
++	  and wasting virtual memory space which could otherwise be
++	  reclaimed by using any of the other two config options.
++
++endchoice
+ 
+ config HOLES_IN_ZONE
+ 	def_bool n
+-- 
+1.7.9.5
+

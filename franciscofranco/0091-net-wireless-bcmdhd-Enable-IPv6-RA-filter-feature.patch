@@ -1,0 +1,62 @@
+From a0f3f27d6716abf0648239c21c51dfdccd09a314 Mon Sep 17 00:00:00 2001
+From: Ecco Park <eccopark@broadcom.com>
+Date: Fri, 15 Nov 2013 09:45:30 +0900
+Subject: [PATCH 091/517] net: wireless: bcmdhd: Enable IPv6 RA filter feature
+
+1) We will block IPv6 Router Advertisement multicast packet in suspend mode to save power on device.
+
+Bug: 11638281
+Signed-off-by: Ecco Park <eccopark@broadcom.com>
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/net/wireless/bcmdhd/dhd_linux.c |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/drivers/net/wireless/bcmdhd/dhd_linux.c b/drivers/net/wireless/bcmdhd/dhd_linux.c
+index 5865b46..e7680f2 100644
+--- a/drivers/net/wireless/bcmdhd/dhd_linux.c
++++ b/drivers/net/wireless/bcmdhd/dhd_linux.c
+@@ -755,6 +755,8 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
+ #ifndef ENABLE_FW_ROAM_SUSPEND
+ 	uint roamvar = 1;
+ #endif /* ENABLE_FW_ROAM_SUSPEND */
++	uint nd_ra_filter = 0;
++	int ret = 0;
+ 
+ 	if (!dhd)
+ 		return -ENODEV;
+@@ -797,6 +799,14 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
+ 					iovbuf, sizeof(iovbuf));
+ 				dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+ #endif /* ENABLE_FW_ROAM_SUSPEND */
++				if (FW_SUPPORTED(dhd, ndoe)) {
++					/* enable IPv6 RA filter in  firmware during suspend */
++					nd_ra_filter = 1;
++					bcm_mkiovar("nd_ra_filter_enable", (char *)&nd_ra_filter, 4,
++							iovbuf, sizeof(iovbuf));
++					if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0)) < 0)
++						DHD_ERROR(("failed to set nd_ra_filter (%d)\n", ret));
++				}
+ 			} else {
+ #ifdef PKT_FILTER_SUPPORT
+ 				dhd->early_suspended = 0;
+@@ -825,6 +835,15 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
+ 					sizeof(iovbuf));
+ 				dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+ #endif /* ENABLE_FW_ROAM_SUSPEND */
++				if (FW_SUPPORTED(dhd, ndoe)) {
++					/* disable IPv6 RA filter in  firmware during suspend */
++					nd_ra_filter = 0;
++					bcm_mkiovar("nd_ra_filter_enable", (char *)&nd_ra_filter, 4,
++							iovbuf, sizeof(iovbuf));
++					if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0)) < 0)
++						DHD_ERROR(("failed to set nd_ra_filter (%d)\n", ret));
++				}
++
+ 			}
+ 	}
+ 	dhd_suspend_unlock(dhd);
+-- 
+1.7.9.5
+

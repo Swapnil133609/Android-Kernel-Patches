@@ -1,0 +1,590 @@
+From a0b1fc7f6fc0951e749850f59862884bee3fca20 Mon Sep 17 00:00:00 2001
+From: Deepak Verma <dverma@codeaurora.org>
+Date: Fri, 18 Oct 2013 15:17:33 +0530
+Subject: [PATCH 157/517] msm: vidc: Initialize kernel space stack variables
+
+This change initializes kernel space stack variables
+that are passed between kernel space and user space
+using ioctls.
+Non initialization of these variables may lead to
+leakage of memory values from the kernel stack to
+user space.
+
+PS2-3: Correct authorship and date.
+
+Change-Id: I5b45f3a7baf9c538fee2ec356cd8545f8b042b5e
+CRs-fixed: 556771,563420
+Signed-off-by: Deepak Verma <dverma@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/vidc/common/dec/vdec.c          |   42 ++++++++++--
+ drivers/video/msm/vidc/common/enc/venc.c          |   76 ++++++++++++++++++++-
+ drivers/video/msm/vidc/common/enc/venc_internal.c |    6 +-
+ include/linux/msm_vidc_enc.h                      |    2 +-
+ 4 files changed, 114 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/video/msm/vidc/common/dec/vdec.c b/drivers/video/msm/vidc/common/dec/vdec.c
+index ec27b00..a4d1aa6 100644
+--- a/drivers/video/msm/vidc/common/dec/vdec.c
++++ b/drivers/video/msm/vidc/common/dec/vdec.c
+@@ -1785,6 +1785,8 @@ static long vid_dec_ioctl(struct file *file,
+ 	case VDEC_IOCTL_SET_PICRES:
+ 	{
+ 		struct vdec_picsize video_resoultion;
++		memset((void *)&video_resoultion, 0,
++			sizeof(struct vdec_picsize));
+ 		DBG("VDEC_IOCTL_SET_PICRES\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+@@ -1800,6 +1802,8 @@ static long vid_dec_ioctl(struct file *file,
+ 	case VDEC_IOCTL_GET_PICRES:
+ 	{
+ 		struct vdec_picsize video_resoultion;
++		memset((void *)&video_resoultion, 0,
++			sizeof(struct vdec_picsize));
+ 		DBG("VDEC_IOCTL_GET_PICRES\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+@@ -1823,6 +1827,10 @@ static long vid_dec_ioctl(struct file *file,
+ 		struct vdec_allocatorproperty vdec_buf_req;
+ 		struct vcd_buffer_requirement buffer_req;
+ 		DBG("VDEC_IOCTL_SET_BUFFER_REQ\n");
++		memset((void *)&vdec_buf_req, 0,
++			sizeof(struct vdec_allocatorproperty));
++		memset((void *)&buffer_req, 0,
++			sizeof(struct vcd_buffer_requirement));
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+ 
+@@ -1859,6 +1867,8 @@ static long vid_dec_ioctl(struct file *file,
+ 	case VDEC_IOCTL_GET_BUFFER_REQ:
+ 	{
+ 		struct vdec_allocatorproperty vdec_buf_req;
++		memset((void *)&vdec_buf_req, 0,
++			sizeof(struct vdec_allocatorproperty));
+ 		DBG("VDEC_IOCTL_GET_BUFFER_REQ\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+@@ -1879,6 +1889,8 @@ static long vid_dec_ioctl(struct file *file,
+ 	case VDEC_IOCTL_SET_BUFFER:
+ 	{
+ 		struct vdec_setbuffer_cmd setbuffer;
++		memset((void *)&setbuffer, 0,
++			sizeof(struct vdec_setbuffer_cmd));
+ 		DBG("VDEC_IOCTL_SET_BUFFER\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+@@ -1893,6 +1905,8 @@ static long vid_dec_ioctl(struct file *file,
+ 	case VDEC_IOCTL_FREE_BUFFER:
+ 	{
+ 		struct vdec_setbuffer_cmd setbuffer;
++		memset((void *)&setbuffer, 0,
++			sizeof(struct vdec_setbuffer_cmd));
+ 		DBG("VDEC_IOCTL_FREE_BUFFER\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+@@ -1941,6 +1955,8 @@ static long vid_dec_ioctl(struct file *file,
+ 		struct vdec_input_frameinfo input_frame_info;
+ 		u8 *desc_buf = NULL;
+ 		u32 desc_size = 0;
++		memset((void *)&input_frame_info, 0,
++			sizeof(struct vdec_input_frameinfo));
+ 		DBG("VDEC_IOCTL_DECODE_FRAME\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+@@ -1981,6 +1997,8 @@ static long vid_dec_ioctl(struct file *file,
+ 	case VDEC_IOCTL_FILL_OUTPUT_BUFFER:
+ 	{
+ 		struct vdec_fillbuffer_cmd fill_buffer_cmd;
++		memset((void *)&fill_buffer_cmd, 0,
++			sizeof(struct vdec_fillbuffer_cmd));
+ 		DBG("VDEC_IOCTL_FILL_OUTPUT_BUFFER\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+@@ -2010,6 +2028,8 @@ static long vid_dec_ioctl(struct file *file,
+ 	case VDEC_IOCTL_GET_NEXT_MSG:
+ 	{
+ 		struct vdec_msginfo vdec_msg_info;
++		memset((void *)&vdec_msg_info, 0,
++			sizeof(struct vdec_msginfo));
+ 		DBG("VDEC_IOCTL_GET_NEXT_MSG\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+@@ -2033,6 +2053,10 @@ static long vid_dec_ioctl(struct file *file,
+ 		struct vdec_seqheader seq_header;
+ 		struct vcd_sequence_hdr vcd_seq_hdr;
+ 		unsigned long ionflag;
++		memset((void *)&seq_header, 0,
++			sizeof(struct vdec_seqheader));
++		memset((void *)&vcd_seq_hdr, 0,
++			sizeof(struct vcd_sequence_hdr));
+ 		DBG("VDEC_IOCTL_SET_SEQUENCE_HEADER\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg))) {
+ 			ERR("Copy from user vdec_msg failed\n");
+@@ -2136,7 +2160,7 @@ static long vid_dec_ioctl(struct file *file,
+ 	}
+ 	case VDEC_IOCTL_GET_INTERLACE_FORMAT:
+ 	{
+-		u32 progressive_only, interlace_format;
++		u32 progressive_only = 0, interlace_format = 0;
+ 		DBG("VDEC_IOCTL_GET_INTERLACE_FORMAT\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+@@ -2156,7 +2180,7 @@ static long vid_dec_ioctl(struct file *file,
+ 
+ 	case VDEC_IOCTL_GET_DISABLE_DMX_SUPPORT:
+ 	{
+-		u32 disable_dmx;
++		u32 disable_dmx = 0;
+ 		DBG("VDEC_IOCTL_GET_DISABLE_DMX_SUPPORT\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+@@ -2172,7 +2196,7 @@ static long vid_dec_ioctl(struct file *file,
+ 	}
+ 	case VDEC_IOCTL_GET_DISABLE_DMX:
+ 	{
+-		u32 disable_dmx;
++		u32 disable_dmx = 0;
+ 		DBG("VDEC_IOCTL_GET_DISABLE_DMX\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+@@ -2197,7 +2221,7 @@ static long vid_dec_ioctl(struct file *file,
+ 	}
+ 	case VDEC_IOCTL_SET_PICTURE_ORDER:
+ 	{
+-		u32 picture_order;
++		u32 picture_order = 0;
+ 		DBG("VDEC_IOCTL_SET_PICTURE_ORDER\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+@@ -2212,6 +2236,8 @@ static long vid_dec_ioctl(struct file *file,
+ 	case VDEC_IOCTL_SET_FRAME_RATE:
+ 	{
+ 		struct vdec_framerate frame_rate;
++		memset((void *)&frame_rate, 0,
++			sizeof(struct vdec_framerate));
+ 		DBG("VDEC_IOCTL_SET_FRAME_RATE\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+@@ -2225,7 +2251,7 @@ static long vid_dec_ioctl(struct file *file,
+ 	}
+ 	case VDEC_IOCTL_SET_EXTRADATA:
+ 	{
+-		u32 extradata_flag;
++		u32 extradata_flag = 0;
+ 		DBG("VDEC_IOCTL_SET_EXTRADATA\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+@@ -2240,6 +2266,8 @@ static long vid_dec_ioctl(struct file *file,
+ 	case VDEC_IOCTL_SET_META_BUFFERS:
+ 	{
+ 		struct vdec_meta_buffers meta_buffers;
++		memset((void *)&meta_buffers, 0,
++			sizeof(struct vdec_meta_buffers));
+ 		DBG("VDEC_IOCTL_SET_META_BUFFERS\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+@@ -2263,6 +2291,8 @@ static long vid_dec_ioctl(struct file *file,
+ 	case VDEC_IOCTL_SET_H264_MV_BUFFER:
+ 	{
+ 		struct vdec_h264_mv mv_data;
++		memset((void *)&mv_data, 0,
++			sizeof(struct vdec_h264_mv));
+ 		DBG("VDEC_IOCTL_SET_H264_MV_BUFFER\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+@@ -2286,6 +2316,8 @@ static long vid_dec_ioctl(struct file *file,
+ 	case VDEC_IOCTL_GET_MV_BUFFER_SIZE:
+ 	{
+ 		struct vdec_mv_buff_size mv_buff;
++		memset((void *)&mv_buff, 0,
++			sizeof(struct vdec_mv_buff_size));
+ 		DBG("VDEC_IOCTL_GET_MV_BUFFER_SIZE\n");
+ 		if (copy_from_user(&vdec_msg, arg, sizeof(vdec_msg)))
+ 			return -EFAULT;
+diff --git a/drivers/video/msm/vidc/common/enc/venc.c b/drivers/video/msm/vidc/common/enc/venc.c
+index 823626a..9ac9c53 100644
+--- a/drivers/video/msm/vidc/common/enc/venc.c
++++ b/drivers/video/msm/vidc/common/enc/venc.c
+@@ -856,6 +856,7 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_CMD_READ_NEXT_MSG:
+ 	{
+ 		struct venc_msg cb_msg;
++		memset((void *)&cb_msg, 0, sizeof(struct venc_msg));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		DBG("VEN_IOCTL_CMD_READ_NEXT_MSG\n");
+@@ -877,6 +878,7 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_CMD_FILL_OUTPUT_BUFFER:
+ 	{
+ 		struct venc_buffer enc_buffer;
++		memset((void *)&enc_buffer, 0, sizeof(struct venc_buffer));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		if (copy_from_user(&enc_buffer, venc_msg.in,
+@@ -903,6 +905,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	{
+ 		enum venc_buffer_dir buffer_dir;
+ 		struct venc_bufferpayload buffer_info;
++		memset((void *)&buffer_info, 0,
++			sizeof(struct venc_bufferpayload));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		DBG("VEN_IOCTL_SET_INPUT_BUFFER/VEN_IOCTL_SET_OUTPUT_BUFFER\n");
+@@ -926,6 +930,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	{
+ 		enum venc_buffer_dir buffer_dir;
+ 		struct venc_bufferpayload buffer_info;
++		memset((void *)&buffer_info, 0,
++			sizeof(struct venc_bufferpayload));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 
+@@ -953,6 +959,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_SET_OUTPUT_BUFFER_REQ:
+ 	{
+ 		struct venc_allocatorproperty allocatorproperty;
++		memset((void *)&allocatorproperty, 0,
++			sizeof(struct venc_allocatorproperty));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 
+@@ -980,6 +988,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_OUTPUT_BUFFER_REQ:
+ 	{
+ 		struct venc_allocatorproperty allocatorproperty;
++		memset((void *)&allocatorproperty, 0,
++			sizeof(struct venc_allocatorproperty));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 
+@@ -1002,6 +1012,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_CMD_FLUSH:
+ 	{
+ 		struct venc_bufferflush bufferflush;
++		memset((void *)&bufferflush, 0,
++			sizeof(struct venc_bufferflush));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 
+@@ -1064,6 +1076,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_SET_RECON_BUFFER:
+ 	{
+ 		struct venc_recon_addr venc_recon;
++		memset((void *)&venc_recon, 0,
++			sizeof(struct venc_recon_addr));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		DBG("VEN_IOCTL_SET_RECON_BUFFER\n");
+@@ -1081,6 +1095,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_FREE_RECON_BUFFER:
+ 	{
+ 		struct venc_recon_addr venc_recon;
++		memset((void *)&venc_recon, 0,
++			sizeof(struct venc_recon_addr));
+ 		DBG("VEN_IOCTL_FREE_RECON_BUFFER\n");
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+@@ -1098,6 +1114,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_RECON_BUFFER_SIZE:
+ 	{
+ 		struct venc_recon_buff_size venc_recon_size;
++		memset((void *)&venc_recon_size, 0,
++			sizeof(struct venc_recon_buff_size));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		DBG("VEN_IOCTL_GET_RECON_BUFFER_SIZE\n");
+@@ -1121,6 +1139,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_QP_RANGE:
+ 	{
+ 		struct venc_qprange qprange;
++		memset((void *)&qprange, 0,
++			sizeof(struct venc_qprange));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		DBG("VEN_IOCTL_G(S)ET_QP_RANGE\n");
+@@ -1149,6 +1169,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_HEC:
+ 	{
+ 		struct venc_headerextension headerextension;
++		memset((void *)&headerextension, 0,
++			sizeof(struct venc_headerextension));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		DBG("VEN_IOCTL_(G)SET_HEC\n");
+@@ -1179,6 +1201,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_TARGET_BITRATE:
+ 	{
+ 		struct venc_targetbitrate targetbitrate;
++		memset((void *)&targetbitrate, 0,
++			sizeof(struct venc_targetbitrate));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		DBG("VEN_IOCTL_(G)SET_TARGET_BITRATE\n");
+@@ -1208,6 +1232,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_FRAME_RATE:
+ 	{
+ 		struct venc_framerate framerate;
++		memset((void *)&framerate, 0,
++			sizeof(struct venc_framerate));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		DBG("VEN_IOCTL_(G)SET_FRAME_RATE\n");
+@@ -1237,6 +1263,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_VOP_TIMING_CFG:
+ 	{
+ 		struct venc_voptimingcfg voptimingcfg;
++		memset((void *)&voptimingcfg, 0,
++			sizeof(struct venc_voptimingcfg));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 
+@@ -1266,6 +1294,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_RATE_CTRL_CFG:
+ 	{
+ 		struct venc_ratectrlcfg ratectrlcfg;
++		memset((void *)&ratectrlcfg, 0,
++			sizeof(struct venc_ratectrlcfg));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		DBG("VEN_IOCTL_(G)SET_RATE_CTRL_CFG\n");
+@@ -1295,6 +1325,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_MULTI_SLICE_CFG:
+ 	{
+ 		struct venc_multiclicecfg multiclicecfg;
++		memset((void *)&multiclicecfg, 0,
++			sizeof(struct venc_multiclicecfg));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		DBG("VEN_IOCTL_(G)SET_MULTI_SLICE_CFG\n");
+@@ -1324,6 +1356,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_INTRA_REFRESH:
+ 	{
+ 		struct venc_intrarefresh intrarefresh;
++		memset((void *)&intrarefresh, 0,
++			sizeof(struct venc_intrarefresh));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		DBG("VEN_IOCTL_(G)SET_INTRA_REFRESH\n");
+@@ -1352,6 +1386,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_DEBLOCKING_CFG:
+ 	{
+ 		struct venc_dbcfg dbcfg;
++		memset((void *)&dbcfg, 0,
++			sizeof(struct venc_dbcfg));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 
+@@ -1381,6 +1417,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_ENTROPY_CFG:
+ 	{
+ 		struct venc_entropycfg entropy_cfg;
++		memset((void *)&entropy_cfg, 0,
++			sizeof(struct venc_entropycfg));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		DBG("VEN_IOCTL_(G)SET_ENTROPY_CFG\n");
+@@ -1408,6 +1446,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_SEQUENCE_HDR:
+ 	{
+ 		struct venc_seqheader seq_header;
++		memset((void *)&seq_header, 0,
++			sizeof(struct venc_seqheader));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 
+@@ -1445,6 +1485,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_INTRA_PERIOD:
+ 	{
+ 		struct venc_intraperiod intraperiod;
++		memset((void *)&intraperiod, 0,
++			sizeof(struct venc_intraperiod));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		DBG("VEN_IOCTL_(G)SET_INTRA_PERIOD\n");
+@@ -1473,6 +1515,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_SESSION_QP:
+ 	{
+ 		struct venc_sessionqp session_qp;
++		memset((void *)&session_qp, 0,
++			sizeof(struct venc_sessionqp));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		DBG("VEN_IOCTL_(G)SET_SESSION_QP\n");
+@@ -1501,6 +1545,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_PROFILE_LEVEL:
+ 	{
+ 		struct ven_profilelevel profile_level;
++		memset((void *)&profile_level, 0,
++			sizeof(struct ven_profilelevel));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 
+@@ -1530,6 +1576,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_CODEC_PROFILE:
+ 	{
+ 		struct venc_profile profile;
++		memset((void *)&profile, 0,
++			sizeof(struct venc_profile));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 
+@@ -1559,6 +1607,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_SHORT_HDR:
+ 	{
+ 		struct venc_switch encoder_switch;
++		memset((void *)&encoder_switch, 0,
++			sizeof(struct venc_switch));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		DBG("Getting VEN_IOCTL_(G)SET_SHORT_HDR\n");
+@@ -1588,6 +1638,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_BASE_CFG:
+ 	{
+ 		struct venc_basecfg base_config;
++		memset((void *)&base_config, 0,
++			sizeof(struct venc_basecfg));
+ 		DBG("VEN_IOCTL_SET_BASE_CFG\n");
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+@@ -1616,6 +1668,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_LIVE_MODE:
+ 	{
+ 		struct venc_switch encoder_switch;
++		memset((void *)&encoder_switch, 0,
++			sizeof(struct venc_switch));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 
+@@ -1653,9 +1707,11 @@ static long vid_enc_ioctl(struct file *file,
+ 	}
+ 	case VEN_IOCTL_SET_METABUFFER_MODE:
+ 	{
+-		u32 metabuffer_mode, vcd_status;
++		u32 metabuffer_mode = 0, vcd_status = 0;
+ 		struct vcd_property_hdr vcd_property_hdr;
+ 		struct vcd_property_live live_mode;
++		memset((void *)&live_mode, 0,
++			sizeof(struct vcd_property_live));
+ 
+ 		DBG("VEN_IOCTL_SET_METABUFFER_MODE\n");
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+@@ -1678,7 +1734,7 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_SET_EXTRADATA:
+ 	case VEN_IOCTL_GET_EXTRADATA:
+ 	{
+-		u32 extradata_flag;
++		u32 extradata_flag = 0;
+ 		DBG("VEN_IOCTL_(G)SET_EXTRADATA\n");
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+@@ -1722,8 +1778,10 @@ static long vid_enc_ioctl(struct file *file,
+ 	{
+ 		struct vcd_property_hdr vcd_property_hdr;
+ 		struct venc_plusptype plusptype;
+-		u32 enable;
++		u32 enable = 1;
+ 		u32 vcd_status = VCD_ERR_FAIL;
++		memset((void *)&plusptype, 0,
++			sizeof(struct venc_plusptype));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		if (copy_from_user(&plusptype, venc_msg.in,
+@@ -1745,6 +1803,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_LTRMODE:
+ 	{
+ 		struct venc_ltrmode encoder_ltrmode;
++		memset((void *)&encoder_ltrmode, 0,
++			sizeof(struct venc_ltrmode));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		if (cmd == VEN_IOCTL_SET_LTRMODE) {
+@@ -1774,6 +1834,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_LTRCOUNT:
+ 	{
+ 		struct venc_ltrcount encoder_ltrcount;
++		memset((void *)&encoder_ltrcount, 0,
++			sizeof(struct venc_ltrcount));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		if (cmd == VEN_IOCTL_SET_LTRCOUNT) {
+@@ -1804,6 +1866,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_LTRPERIOD:
+ 	{
+ 		struct venc_ltrperiod encoder_ltrperiod;
++		memset((void *)&encoder_ltrperiod, 0,
++			sizeof(struct venc_ltrperiod));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		if (cmd == VEN_IOCTL_SET_LTRPERIOD) {
+@@ -1833,6 +1897,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_CAPABILITY_LTRCOUNT:
+ 	{
+ 		struct venc_range venc_capltrcount;
++		memset((void *)&venc_capltrcount, 0,
++			sizeof(struct venc_range));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		DBG("VEN_IOCTL_GET_CAPABILITY_LTRCOUNT\n");
+@@ -1852,6 +1918,8 @@ static long vid_enc_ioctl(struct file *file,
+ 	case VEN_IOCTL_GET_LTRUSE:
+ 	{
+ 		struct venc_ltruse encoder_ltruse;
++		memset((void *)&encoder_ltruse, 0,
++			sizeof(struct venc_ltruse));
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+ 		if (cmd == VEN_IOCTL_SET_LTRUSE) {
+@@ -1884,6 +1952,8 @@ static long vid_enc_ioctl(struct file *file,
+ 		struct vcd_property_sps_pps_for_idr_enable idr_enable;
+ 		u32 vcd_status = VCD_ERR_FAIL;
+ 		u32 enabled = 1;
++		memset((void *)&idr_enable, 0,
++			sizeof(struct vcd_property_sps_pps_for_idr_enable));
+ 
+ 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+ 			return -EFAULT;
+diff --git a/drivers/video/msm/vidc/common/enc/venc_internal.c b/drivers/video/msm/vidc/common/enc/venc_internal.c
+index 06b690d..c83049e 100644
+--- a/drivers/video/msm/vidc/common/enc/venc_internal.c
++++ b/drivers/video/msm/vidc/common/enc/venc_internal.c
+@@ -961,7 +961,7 @@ u32 vid_enc_set_get_entropy_cfg(struct video_client_ctx *client_ctx,
+ 	vcd_property_hdr.sz =
+ 		sizeof(struct vcd_property_entropy_control);
+ 	if (set_flag) {
+-		switch (entropy_cfg->longentropysel) {
++		switch (entropy_cfg->entropysel) {
+ 		case VEN_ENTROPY_MODEL_CAVLC:
+ 			control.entropy_sel = VCD_ENTROPY_SEL_CAVLC;
+ 			break;
+@@ -1014,11 +1014,11 @@ u32 vid_enc_set_get_entropy_cfg(struct video_client_ctx *client_ctx,
+ 		} else {
+ 			switch (control.entropy_sel) {
+ 			case VCD_ENTROPY_SEL_CABAC:
+-				entropy_cfg->cabacmodel =
++				entropy_cfg->entropysel =
+ 					VEN_ENTROPY_MODEL_CABAC;
+ 				break;
+ 			case VCD_ENTROPY_SEL_CAVLC:
+-				entropy_cfg->cabacmodel =
++				entropy_cfg->entropysel =
+ 					VEN_ENTROPY_MODEL_CAVLC;
+ 				break;
+ 			default:
+diff --git a/include/linux/msm_vidc_enc.h b/include/linux/msm_vidc_enc.h
+index dcc2353..bba2905 100644
+--- a/include/linux/msm_vidc_enc.h
++++ b/include/linux/msm_vidc_enc.h
+@@ -603,7 +603,7 @@ struct venc_capability{
+ };
+ 
+ struct venc_entropycfg{
+-	unsigned longentropysel;
++	unsigned long	entropysel;
+ 	unsigned long	cabacmodel;
+ };
+ 
+-- 
+1.7.9.5
+

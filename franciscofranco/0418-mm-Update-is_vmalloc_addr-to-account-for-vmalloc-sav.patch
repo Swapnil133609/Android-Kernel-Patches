@@ -1,0 +1,128 @@
+From 4b4500c7dd734b33601dd14df5c900af3e5fff22 Mon Sep 17 00:00:00 2001
+From: Laura Abbott <lauraa@codeaurora.org>
+Date: Thu, 22 Aug 2013 13:46:07 -0700
+Subject: [PATCH 418/517] mm: Update is_vmalloc_addr to account for vmalloc
+ savings
+
+is_vmalloc_addr current assumes that all vmalloc addresses
+exist between VMALLOC_START and VMALLOC_END. This may not be
+the case when interleaving vmalloc and lowmem. Update the
+is_vmalloc_addr to properly check for this.
+
+Change-Id: I5def3d6ae1a4de59ea36f095b8c73649a37b1f36
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mm/mmu.c       |    2 +-
+ include/linux/mm.h      |   12 ++++++------
+ include/linux/vmalloc.h |    1 +
+ mm/vmalloc.c            |   33 +++++++++++++++++++++++++++++++++
+ 4 files changed, 41 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index de67865..58beb57 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1473,7 +1473,7 @@ static void __init map_lowmem(void)
+ 		vm->addr = (void *)(vaddr & PAGE_MASK);
+ 		vm->size = PAGE_ALIGN(length + (vaddr & ~PAGE_MASK));
+ 		vm->phys_addr = __pfn_to_phys(pfn);
+-		vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
++		vm->flags = VM_LOWMEM | VM_ARM_STATIC_MAPPING;
+ 		vm->flags |= VM_ARM_MTYPE(type);
+ 		vm->caller = map_lowmem;
+ 		vm_area_add_early(vm++);
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index cfa2607..a4fd9de 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -302,16 +302,16 @@ unsigned long vmalloc_to_pfn(const void *addr);
+  * On nommu, vmalloc/vfree wrap through kmalloc/kfree directly, so there
+  * is no special casing required.
+  */
+-static inline int is_vmalloc_addr(const void *x)
+-{
+-#ifdef CONFIG_MMU
+-	unsigned long addr = (unsigned long)x;
+ 
+-	return addr >= VMALLOC_START && addr < VMALLOC_END;
++#ifdef CONFIG_MMU
++extern int is_vmalloc_addr(const void *x);
+ #else
++static inline int is_vmalloc_addr(const void *x)
++{
+ 	return 0;
+-#endif
+ }
++#endif
++
+ #ifdef CONFIG_MMU
+ extern int is_vmalloc_or_module_addr(const void *x);
+ #else
+diff --git a/include/linux/vmalloc.h b/include/linux/vmalloc.h
+index 663bc05..7675a5c 100644
+--- a/include/linux/vmalloc.h
++++ b/include/linux/vmalloc.h
+@@ -14,6 +14,7 @@ struct vm_area_struct;		/* vma defining user mapping in mm_types.h */
+ #define VM_USERMAP	0x00000008	/* suitable for remap_vmalloc_range */
+ #define VM_VPAGES	0x00000010	/* buffer for pages was vmalloc'ed */
+ #define VM_UNLIST	0x00000020	/* vm_struct is not listed in vmlist */
++#define VM_LOWMEM	0x00000040	/* Tracking of direct mapped lowmem */
+ /* bits [20..32] reserved for arch specific ioremap internals */
+ 
+ /*
+diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+index a2ab2ab..e174693 100644
+--- a/mm/vmalloc.c
++++ b/mm/vmalloc.c
+@@ -184,6 +184,36 @@ static int vmap_page_range(unsigned long start, unsigned long end,
+ 	return ret;
+ }
+ 
++#ifdef ENABLE_VMALLOC_SAVING
++int is_vmalloc_addr(const void *x)
++{
++	struct rb_node *n;
++	struct vmap_area *va;
++	int ret = 0;
++
++	spin_lock(&vmap_area_lock);
++
++	for (n = rb_first(vmap_area_root); n; rb_next(n)) {
++		va = rb_entry(n, struct vmap_area, rb_node);
++		if (x >= va->va_start && x < va->va_end) {
++			ret = 1;
++			break;
++		}
++	}
++
++	spin_unlock(&vmap_area_lock);
++	return ret;
++}
++#else
++int is_vmalloc_addr(const void *x)
++{
++	unsigned long addr = (unsigned long)x;
++
++	return addr >= VMALLOC_START && addr < VMALLOC_END;
++}
++#endif
++EXPORT_SYMBOL(is_vmalloc_addr);
++
+ int is_vmalloc_or_module_addr(const void *x)
+ {
+ 	/*
+@@ -2643,6 +2673,9 @@ static int s_show(struct seq_file *m, void *p)
+ 	if (v->flags & VM_VPAGES)
+ 		seq_printf(m, " vpages");
+ 
++	if (v->flags & VM_LOWMEM)
++		seq_printf(m, " lowmem");
++
+ 	show_numa_info(m, v);
+ 	seq_putc(m, '\n');
+ 	return 0;
+-- 
+1.7.9.5
+

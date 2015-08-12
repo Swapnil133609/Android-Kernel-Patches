@@ -1,0 +1,89 @@
+From 1ba6e967cf3290cb663b4ee2ddca9165979ce6a2 Mon Sep 17 00:00:00 2001
+From: Rom Lemarchand <romlem@google.com>
+Date: Wed, 23 Oct 2013 15:09:11 -0700
+Subject: [PATCH 486/517] ion: add new ion_user_handle_t type for the
+ user-space token
+
+Declare new ion_user_handle_t type to contain the token returned to user-space.
+This allows a 2-step migration of the user-space code to a new kernel header
+first, then will allow us to change the definition of the ion_user_handle_type_t
+to int without breaking the API.
+
+Change-Id: I4200b6600df8e56fe98cf1580a13a65cb25ec646
+Signed-off-by: Rom Lemarchand <romlem@google.com>
+(cherry picked from commit ebb8269bbb05b06ecedca3e21b3e65f23d48eadd)
+Git-commit: 29f271de6ffdf6a96375cd244986617e87afc8d0
+Git-repo: https://android.googlesource.com/kernel/common
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/ion/ion.c |    4 ++--
+ include/linux/ion.h   |    8 +++++---
+ 2 files changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/gpu/ion/ion.c b/drivers/gpu/ion/ion.c
+index 017506e..9f1972d 100644
+--- a/drivers/gpu/ion/ion.c
++++ b/drivers/gpu/ion/ion.c
+@@ -1317,7 +1317,7 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+ 		if (IS_ERR(handle))
+ 			return PTR_ERR(handle);
+ 
+-		data.handle = (struct ion_handle *)handle->id;
++		data.handle = (ion_user_handle_t)handle->id;
+ 
+ 		if (copy_to_user((void __user *)arg, &data, sizeof(data))) {
+ 			ion_free(client, handle);
+@@ -1370,7 +1370,7 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+ 		if (IS_ERR(handle))
+ 			ret = PTR_ERR(handle);
+ 		else
+-			data.handle = (struct ion_handle *)handle->id;
++			data.handle = (ion_user_handle_t)handle->id;
+ 
+ 		if (copy_to_user((void __user *)arg, &data,
+ 				 sizeof(struct ion_fd_data)))
+diff --git a/include/linux/ion.h b/include/linux/ion.h
+index f36298b..7131da3 100644
+--- a/include/linux/ion.h
++++ b/include/linux/ion.h
+@@ -22,6 +22,8 @@
+ #include <linux/types.h>
+ 
+ struct ion_handle;
++typedef struct ion_handle *ion_user_handle_t;
++
+ /**
+  * enum ion_heap_types - list of all possible types of heaps
+  * @ION_HEAP_TYPE_SYSTEM:	 memory allocated via vmalloc
+@@ -350,7 +352,7 @@ struct ion_allocation_data {
+ 	size_t align;
+ 	unsigned int heap_mask;
+ 	unsigned int flags;
+-	struct ion_handle *handle;
++	ion_user_handle_t handle;
+ };
+ 
+ /**
+@@ -364,7 +366,7 @@ struct ion_allocation_data {
+  * provides the file descriptor and the kernel returns the handle.
+  */
+ struct ion_fd_data {
+-	struct ion_handle *handle;
++	ion_user_handle_t handle;
+ 	int fd;
+ };
+ 
+@@ -373,7 +375,7 @@ struct ion_fd_data {
+  * @handle:	a handle
+  */
+ struct ion_handle_data {
+-	struct ion_handle *handle;
++	ion_user_handle_t handle;
+ };
+ 
+ /**
+-- 
+1.7.9.5
+

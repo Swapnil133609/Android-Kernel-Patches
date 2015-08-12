@@ -1,0 +1,37 @@
+From 725bbf326b3a8515323e416acbbb6d66bee4d64d Mon Sep 17 00:00:00 2001
+From: Mel Gorman <mgorman@suse.de>
+Date: Mon, 8 Oct 2012 16:32:31 -0700
+Subject: [PATCH 394/517] mm: compaction: Update
+ try_to_compact_pages()kerneldoc comment
+
+Parameters were added without documentation, tut tut.
+
+Change-Id: I1355906b3a3a6e3319a0fedc8ba28c3327a0c8f2
+Signed-off-by: Mel Gorman <mgorman@suse.de>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: 661c4cb9b829110cb68c18ea05a56be39f75a4d2
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/compaction.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/mm/compaction.c b/mm/compaction.c
+index c2f4170..4b86321 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -868,6 +868,8 @@ int sysctl_extfrag_threshold = 500;
+  * @gfp_mask: The GFP mask of the current allocation
+  * @nodemask: The allowed nodes to allocate from
+  * @sync: Whether migration is synchronous or not
++ * @contended: Return value that is true if compaction was aborted due to lock contention
++ * @page: Optionally capture a free page of the requested order during compaction
+  *
+  * This is the main entry point for direct page compaction.
+  */
+-- 
+1.7.9.5
+

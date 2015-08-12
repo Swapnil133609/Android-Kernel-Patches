@@ -1,0 +1,25 @@
+From ffd9113de8ab12676eceed42d1ff5ddb7bf51d58 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Thu, 14 Nov 2013 23:22:39 +0000
+Subject: [PATCH 075/517] drivers: misc: removed this by mistake on a previous
+ commit.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/misc/Makefile |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+index 81ebc61..652cf8c 100644
+--- a/drivers/misc/Makefile
++++ b/drivers/misc/Makefile
+@@ -74,4 +74,5 @@ obj-$(CONFIG_TI_DRV2667) += ti_drv2667.o
+ obj-$(CONFIG_QPNP_MISC) += qpnp-misc.o
+ obj-$(CONFIG_EARJACK_DEBUGGER) += earjack_debugger.o
+ obj-$(CONFIG_FAN48632_BOOST) += fan48632_boost.o
++obj-y += mako_hotplug_control.o
+ obj-y += sound_control.o
+-- 
+1.7.9.5
+

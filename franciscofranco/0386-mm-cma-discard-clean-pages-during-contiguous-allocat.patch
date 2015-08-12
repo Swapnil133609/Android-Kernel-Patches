@@ -1,0 +1,203 @@
+From 49c9a111fcc87b9a605184ba4b83666c3c659bd3 Mon Sep 17 00:00:00 2001
+From: Minchan Kim <minchan@kernel.org>
+Date: Mon, 8 Oct 2012 16:31:55 -0700
+Subject: [PATCH 386/517] mm: cma: discard clean pages during contiguous
+ allocation instead of migration
+
+Drop clean cache pages instead of migration during alloc_contig_range() to
+minimise allocation latency by reducing the amount of migration that is
+necessary.  It's useful for CMA because latency of migration is more
+important than evicting the background process's working set.  In
+addition, as pages are reclaimed then fewer free pages for migration
+targets are required so it avoids memory reclaiming to get free pages,
+which is a contributory factor to increased latency.
+
+I measured elapsed time of __alloc_contig_migrate_range() which migrates
+10M in 40M movable zone in QEMU machine.
+
+Before - 146ms, After - 7ms
+
+Change-Id: Ia527b7253bc5fa63b555ac445b676588b6def119
+[akpm@linux-foundation.org: fix nommu build]
+Signed-off-by: Mel Gorman <mgorman@suse.de>
+Signed-off-by: Minchan Kim <minchan@kernel.org>
+Reviewed-by: Mel Gorman <mgorman@suse.de>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Acked-by: Michal Nazarewicz <mina86@mina86.com>
+Cc: Rik van Riel <riel@redhat.com>
+Tested-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: 02c6de8d757cb32c0829a45d81c3dfcbcafd998b
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+[lauraa@codeaurora.org: Fixups in mm/internal.h due to contexts]
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/rmap.h |   21 +++++++++++----------
+ mm/internal.h        |    3 +++
+ mm/page_alloc.c      |    2 ++
+ mm/vmscan.c          |   43 +++++++++++++++++++++++++++++++++++++------
+ 4 files changed, 53 insertions(+), 16 deletions(-)
+
+diff --git a/include/linux/rmap.h b/include/linux/rmap.h
+index fd07c45..a5ddc60 100644
+--- a/include/linux/rmap.h
++++ b/include/linux/rmap.h
+@@ -67,6 +67,17 @@ struct anon_vma_chain {
+ 	struct list_head same_anon_vma;	/* locked by anon_vma->mutex */
+ };
+ 
++enum ttu_flags {
++	TTU_UNMAP = 0,			/* unmap mode */
++	TTU_MIGRATION = 1,		/* migration mode */
++	TTU_MUNLOCK = 2,		/* munlock mode */
++	TTU_ACTION_MASK = 0xff,
++
++	TTU_IGNORE_MLOCK = (1 << 8),	/* ignore mlock */
++	TTU_IGNORE_ACCESS = (1 << 9),	/* don't age */
++	TTU_IGNORE_HWPOISON = (1 << 10),/* corrupted page is recoverable */
++};
++
+ #ifdef CONFIG_MMU
+ static inline void get_anon_vma(struct anon_vma *anon_vma)
+ {
+@@ -161,16 +172,6 @@ int page_referenced(struct page *, int is_locked,
+ int page_referenced_one(struct page *, struct vm_area_struct *,
+ 	unsigned long address, unsigned int *mapcount, unsigned long *vm_flags);
+ 
+-enum ttu_flags {
+-	TTU_UNMAP = 0,			/* unmap mode */
+-	TTU_MIGRATION = 1,		/* migration mode */
+-	TTU_MUNLOCK = 2,		/* munlock mode */
+-	TTU_ACTION_MASK = 0xff,
+-
+-	TTU_IGNORE_MLOCK = (1 << 8),	/* ignore mlock */
+-	TTU_IGNORE_ACCESS = (1 << 9),	/* don't age */
+-	TTU_IGNORE_HWPOISON = (1 << 10),/* corrupted page is recoverable */
+-};
+ #define TTU_ACTION(x) ((x) & TTU_ACTION_MASK)
+ 
+ bool is_vma_temporary_stack(struct vm_area_struct *vma);
+diff --git a/mm/internal.h b/mm/internal.h
+index 8c6fd44..8f45659 100644
+--- a/mm/internal.h
++++ b/mm/internal.h
+@@ -356,3 +356,6 @@ extern u32 hwpoison_filter_enable;
+ #define ALLOC_HIGH		0x20 /* __GFP_HIGH set */
+ #define ALLOC_CPUSET		0x40 /* check for correct cpuset */
+ #define ALLOC_CMA		0x80 /* allow allocations from CMA areas */
++
++unsigned long reclaim_clean_pages_from_list(struct zone *zone,
++					    struct list_head *page_list);
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 918a87a..97e8aec 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5823,6 +5823,8 @@ static int __alloc_contig_migrate_range(unsigned long start, unsigned long end)
+ 			break;
+ 		}
+ 
++		reclaim_clean_pages_from_list(cc.zone, &cc.migratepages);
++
+ 		ret = migrate_pages(&cc.migratepages,
+ 				    __alloc_contig_migrate_alloc,
+ 				    0, false, MIGRATE_SYNC);
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 70f48bc..6272d3d 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -692,8 +692,10 @@ static enum page_references page_check_references(struct page *page,
+ static unsigned long shrink_page_list(struct list_head *page_list,
+ 				      struct zone *zone,
+ 				      struct scan_control *sc,
++				      enum ttu_flags ttu_flags,
+ 				      unsigned long *ret_nr_dirty,
+-				      unsigned long *ret_nr_writeback)
++				      unsigned long *ret_nr_writeback,
++				      bool force_reclaim)
+ {
+ 	LIST_HEAD(ret_pages);
+ 	LIST_HEAD(free_pages);
+@@ -706,10 +708,10 @@ static unsigned long shrink_page_list(struct list_head *page_list,
+ 	cond_resched();
+ 
+ 	while (!list_empty(page_list)) {
+-		enum page_references references;
+ 		struct address_space *mapping;
+ 		struct page *page;
+ 		int may_enter_fs;
++		enum page_references references = PAGEREF_RECLAIM_CLEAN;
+ 
+ 		cond_resched();
+ 
+@@ -743,7 +745,9 @@ static unsigned long shrink_page_list(struct list_head *page_list,
+ 			goto keep;
+ 		}
+ 
+-		references = page_check_references(page, sc);
++		if (!force_reclaim)
++			references = page_check_references(page, sc);
++
+ 		switch (references) {
+ 		case PAGEREF_ACTIVATE:
+ 			goto activate_locked;
+@@ -773,7 +777,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
+ 		 * processes. Try to unmap it here.
+ 		 */
+ 		if (page_mapped(page) && mapping) {
+-			switch (try_to_unmap(page, TTU_UNMAP)) {
++			switch (try_to_unmap(page, ttu_flags)) {
+ 			case SWAP_FAIL:
+ 				goto activate_locked;
+ 			case SWAP_AGAIN:
+@@ -944,6 +948,33 @@ keep:
+ 	return nr_reclaimed;
+ }
+ 
++unsigned long reclaim_clean_pages_from_list(struct zone *zone,
++					    struct list_head *page_list)
++{
++	struct scan_control sc = {
++		.gfp_mask = GFP_KERNEL,
++		.priority = DEF_PRIORITY,
++		.may_unmap = 1,
++	};
++	unsigned long ret, dummy1, dummy2;
++	struct page *page, *next;
++	LIST_HEAD(clean_pages);
++
++	list_for_each_entry_safe(page, next, page_list, lru) {
++		if (page_is_file_cache(page) && !PageDirty(page)) {
++			ClearPageActive(page);
++			list_move(&page->lru, &clean_pages);
++		}
++	}
++
++	ret = shrink_page_list(&clean_pages, zone, &sc,
++				TTU_UNMAP|TTU_IGNORE_ACCESS,
++				&dummy1, &dummy2, true);
++	list_splice(&clean_pages, page_list);
++	__mod_zone_page_state(zone, NR_ISOLATED_FILE, -ret);
++	return ret;
++}
++
+ /*
+  * Attempt to remove the specified page from its LRU.  Only take this page
+  * if it is of the appropriate PageActive status.  Pages which are being
+@@ -1265,8 +1296,8 @@ shrink_inactive_list(unsigned long nr_to_scan, struct mem_cgroup_zone *mz,
+ 	if (nr_taken == 0)
+ 		return 0;
+ 
+-	nr_reclaimed = shrink_page_list(&page_list, zone, sc,
+-						&nr_dirty, &nr_writeback);
++	nr_reclaimed = shrink_page_list(&page_list, zone, sc, TTU_UNMAP,
++					&nr_dirty, &nr_writeback, false);
+ 
+ 	spin_lock_irq(&zone->lru_lock);
+ 
+-- 
+1.7.9.5
+

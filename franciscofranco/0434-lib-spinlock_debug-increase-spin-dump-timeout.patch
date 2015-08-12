@@ -1,0 +1,33 @@
+From 607402e69b6d67c9fa1341cd42f6046fd266903b Mon Sep 17 00:00:00 2001
+From: Syed Rameez Mustafa <rameezmustafa@codeaurora.org>
+Date: Mon, 5 Aug 2013 16:32:13 -0700
+Subject: [PATCH 434/517] lib: spinlock_debug: increase spin dump timeout
+
+On certain targets the worst case console buffer draining time can
+exceed the aggressive spin dump timeout value. Relax the timeout value
+to cater to these scenarios.
+
+Change-Id: I7312ffe06bafd2dc7adf0f4e8b73a53fc5839235
+Signed-off-by: Syed Rameez Mustafa <rameezmustafa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ lib/spinlock_debug.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/spinlock_debug.c b/lib/spinlock_debug.c
+index ac516f4..6d22836 100644
+--- a/lib/spinlock_debug.c
++++ b/lib/spinlock_debug.c
+@@ -108,7 +108,7 @@ static inline void debug_spin_unlock(raw_spinlock_t *lock)
+ static void __spin_lock_debug(raw_spinlock_t *lock)
+ {
+ 	u64 i;
+-	u64 loops = (loops_per_jiffy * HZ) >> 4;
++	u64 loops = (loops_per_jiffy * HZ) >> 1;
+ 
+ 	for (i = 0; i < loops; i++) {
+ 		if (arch_spin_trylock(&lock->raw_lock))
+-- 
+1.7.9.5
+

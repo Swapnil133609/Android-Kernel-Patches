@@ -1,0 +1,344 @@
+From 0195a66aed68df51a91f363c0aa9f902bc1e4c71 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Thu, 14 Nov 2013 22:08:25 +0000
+Subject: [PATCH 074/517] sound_control: add headset, speaker and mic gain
+ interfaces. Also add the sysfs control file.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/misc/sound_control.c |  206 ++++++++++++++++++++++++++++++++++++++++++
+ sound/soc/codecs/wcd9320.c   |   78 +++++++++++++++-
+ 2 files changed, 281 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/misc/sound_control.c
+
+diff --git a/drivers/misc/sound_control.c b/drivers/misc/sound_control.c
+new file mode 100644
+index 0000000..6970d5b
+--- /dev/null
++++ b/drivers/misc/sound_control.c
+@@ -0,0 +1,206 @@
++/*
++ * Copyright 2013 Francisco Franco
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/init.h>
++#include <linux/device.h>
++#include <linux/miscdevice.h>
++
++#define SOUNDCONTROL_VERSION 4
++
++extern void update_headphones_volume_boost(int vol_boost);
++extern void update_headset_boost(int vol_boost);
++extern void update_speaker_gain(int vol_boost);
++extern void update_mic_gain(int vol_boost);
++
++/*
++ * Volume boost value
++ */
++int headphones_boost = 0;
++int headphones_boost_limit = 20;
++int headphones_boost_limit_min = -20;
++
++/*
++ * Headset boost value
++ */
++int headset_boost = 0;
++int headset_boost_limit = 20;
++int headset_boost_limit_min = -20;
++
++/*
++ * Speaker boost value
++ */
++int speaker_boost = 0;
++int speaker_boost_limit = 20;
++int speaker_boost_limit_min = -20;
++
++/*
++ * Mic boost value
++ */
++int mic_boost = 0;
++int mic_boost_limit = 20;
++int mic_boost_limit_min = -20;
++
++/*
++ * Sysfs get/set entries
++ */
++
++static ssize_t headphones_boost_show(struct device *dev, struct device_attribute *attr, char *buf)
++{
++    return sprintf(buf, "%d\n", headphones_boost);
++}
++
++static ssize_t headphones_boost_store(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
++{
++    int new_val;
++
++	sscanf(buf, "%d", &new_val);
++
++	if (new_val != headphones_boost) {
++		if (new_val <= headphones_boost_limit_min)
++			new_val = headphones_boost_limit_min;
++
++		else if (new_val >= headphones_boost_limit)
++			new_val = headphones_boost_limit;
++
++		pr_info("New headphones_boost: %d\n", new_val);
++
++		headphones_boost = new_val;
++		update_headphones_volume_boost(headphones_boost);
++	}
++
++    return size;
++}
++
++static ssize_t headset_boost_show(struct device *dev, struct device_attribute *attr, char *buf)
++{
++    return sprintf(buf, "%d\n", headset_boost);
++}
++
++static ssize_t headset_boost_store(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
++{
++    int new_val;
++
++	sscanf(buf, "%d", &new_val);
++
++	if (new_val != headset_boost) {
++		if (new_val <= headset_boost_limit_min)
++			new_val = headset_boost_limit_min;
++
++		else if (new_val >= headset_boost_limit)
++			new_val = headset_boost_limit;
++
++		pr_info("New headset_boost: %d\n", new_val);
++
++		headset_boost = new_val;
++
++		update_headset_boost(new_val);
++	}
++
++    return size;
++}
++
++static ssize_t speaker_boost_show(struct device *dev, struct device_attribute *attr, char *buf)
++{
++    return sprintf(buf, "%d\n", speaker_boost);
++}
++
++static ssize_t speaker_boost_store(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
++{
++    int new_val;
++
++	sscanf(buf, "%d", &new_val);
++
++	if (new_val != speaker_boost) {
++		if (new_val <= speaker_boost_limit_min)
++			new_val = speaker_boost_limit_min;
++
++		else if (new_val >= speaker_boost_limit)
++			new_val = speaker_boost_limit;
++
++		pr_info("New speaker_boost: %d\n", new_val);
++
++		speaker_boost = new_val;
++		update_speaker_gain(speaker_boost);
++	}
++
++    return size;
++}
++
++static ssize_t mic_boost_show(struct device *dev, struct device_attribute *attr, char *buf)
++{
++    return sprintf(buf, "%d\n", mic_boost);
++}
++
++static ssize_t mic_boost_store(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
++{
++    int new_val;
++
++	sscanf(buf, "%d", &new_val);
++
++	if (new_val != mic_boost) {
++		if (new_val <= mic_boost_limit_min)
++			new_val = mic_boost_limit_min;
++
++		else if (new_val >= mic_boost_limit)
++			new_val = mic_boost_limit;
++
++		pr_info("New mic_boost: %d\n", new_val);
++
++		mic_boost = new_val;
++		update_mic_gain(mic_boost);
++	}
++
++    return size;
++}
++
++static DEVICE_ATTR(volume_boost, 0664, headphones_boost_show, headphones_boost_store);
++static DEVICE_ATTR(headset_boost, 0664, headset_boost_show, headset_boost_store);
++static DEVICE_ATTR(speaker_boost, 0664, speaker_boost_show, speaker_boost_store);
++static DEVICE_ATTR(mic_boost, 0664, mic_boost_show, mic_boost_store);
++
++static struct attribute *soundcontrol_attributes[] = 
++{
++	&dev_attr_volume_boost.attr,
++	&dev_attr_headset_boost.attr,
++	&dev_attr_speaker_boost.attr,
++	&dev_attr_mic_boost.attr,
++	NULL
++};
++
++static struct attribute_group soundcontrol_group = 
++{
++	.attrs  = soundcontrol_attributes,
++};
++
++static struct miscdevice soundcontrol_device = 
++{
++	.minor = MISC_DYNAMIC_MINOR,
++	.name = "soundcontrol",
++};
++
++static int __init soundcontrol_init(void)
++{
++    int ret;
++
++    pr_info("%s misc_register(%s)\n", __FUNCTION__, soundcontrol_device.name);
++
++    ret = misc_register(&soundcontrol_device);
++
++    if (ret) {
++	    pr_err("%s misc_register(%s) fail\n", __FUNCTION__, soundcontrol_device.name);
++	    return 1;
++	}
++
++    if (sysfs_create_group(&soundcontrol_device.this_device->kobj, &soundcontrol_group) < 0) {
++	    pr_err("%s sysfs_create_group fail\n", __FUNCTION__);
++	    pr_err("Failed to create sysfs group for device (%s)!\n", soundcontrol_device.name);
++	}
++
++    return 0;
++}
++late_initcall(soundcontrol_init);
+diff --git a/sound/soc/codecs/wcd9320.c b/sound/soc/codecs/wcd9320.c
+index 79ee533..f823217 100644
+--- a/sound/soc/codecs/wcd9320.c
++++ b/sound/soc/codecs/wcd9320.c
+@@ -6002,6 +6002,8 @@ static void taiko_update_reg_defaults(struct snd_soc_codec *codec)
+ 	u32 i;
+ 	struct wcd9xxx *taiko_core = dev_get_drvdata(codec->dev->parent);
+ 
++	pr_info("Update TAIKO register defaults.\n");
++
+ 	for (i = 0; i < ARRAY_SIZE(taiko_reg_defaults); i++)
+ 		snd_soc_write(codec, taiko_reg_defaults[i].reg,
+ 			      taiko_reg_defaults[i].val);
+@@ -6364,14 +6366,17 @@ static struct regulator *taiko_codec_find_regulator(struct snd_soc_codec *codec,
+ }
+ 
+ struct sound_control {
+-	unsigned int default_headphones_value;
++	int default_headphones_value;
++	int default_headset_value;
++	int default_speaker_value;
++	int default_mic_value;
+ 	struct snd_soc_codec *snd_control_codec;
+ } soundcontrol;
+ 
+ void update_headphones_volume_boost(int vol_boost)
+ {
+-	unsigned int default_val = soundcontrol.default_headphones_value;
+-	unsigned int boosted_val = vol_boost != 0 ? 
++	int default_val = soundcontrol.default_headphones_value;
++	int boosted_val = vol_boost != 0 ? 
+ 		default_val + vol_boost : default_val;
+ 
+ 	pr_info("Sound Control: Headphones default value %d\n", default_val);
+@@ -6390,6 +6395,67 @@ void update_headphones_volume_boost(int vol_boost)
+ 		TAIKO_A_CDC_RX2_VOL_CTL_B2_CTL));
+ }
+ 
++void update_headset_boost(int vol_boost)
++{
++	int default_val = soundcontrol.default_headset_value;
++	int boosted_val = vol_boost != 0 ? 
++		default_val + vol_boost : default_val;
++
++	pr_info("Sound Control: Headset default value %d\n", default_val);
++
++	taiko_write(soundcontrol.snd_control_codec,
++		TAIKO_A_RX_HPH_R_GAIN, boosted_val);
++	taiko_write(soundcontrol.snd_control_codec,
++		TAIKO_A_RX_HPH_L_GAIN, boosted_val);
++	
++	pr_info("Sound Control: Boosted Headset R value %d\n",
++		taiko_read(soundcontrol.snd_control_codec,
++		TAIKO_A_RX_HPH_R_GAIN));
++
++	pr_info("Sound Control: Boosted Headset L value %d\n", 
++		taiko_read(soundcontrol.snd_control_codec, 
++		TAIKO_A_RX_HPH_L_GAIN));
++}
++
++void update_speaker_gain(int vol_boost)
++{
++	int default_val = soundcontrol.default_speaker_value;
++	int boosted_val = vol_boost != 0 ? 
++		default_val + vol_boost : default_val;
++
++	pr_info("Sound Control: Speaker default value %d\n", default_val);
++
++	taiko_write(soundcontrol.snd_control_codec,
++		TAIKO_A_CDC_RX3_VOL_CTL_B2_CTL, boosted_val);
++
++	taiko_write(soundcontrol.snd_control_codec,
++		TAIKO_A_CDC_RX7_VOL_CTL_B2_CTL, boosted_val);
++	
++	pr_info("Sound Control: Boosted Speaker RX3 value %d\n",
++		taiko_read(soundcontrol.snd_control_codec,
++		TAIKO_A_CDC_RX3_VOL_CTL_B2_CTL));
++
++	pr_info("Sound Control: Boosted Speaker RX7 value %d\n",
++		taiko_read(soundcontrol.snd_control_codec,
++		TAIKO_A_CDC_RX7_VOL_CTL_B2_CTL));
++}
++
++void update_mic_gain(int vol_boost)
++{
++	int default_val = soundcontrol.default_mic_value;
++	int boosted_val = vol_boost != 0 ? 
++		default_val + vol_boost : default_val;
++
++	pr_info("Sound Control: Mic default value %d\n", default_val);
++
++	taiko_write(soundcontrol.snd_control_codec,
++		TAIKO_A_CDC_TX7_VOL_CTL_GAIN, boosted_val);
++	
++	pr_info("Sound Control: Boosted Mic value %d\n",
++		taiko_read(soundcontrol.snd_control_codec,
++		TAIKO_A_CDC_TX7_VOL_CTL_GAIN));
++}
++
+ static int taiko_codec_probe(struct snd_soc_codec *codec)
+ {
+ 	struct wcd9xxx *control;
+@@ -6570,6 +6636,12 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
+ 	 */
+ 	soundcontrol.default_headphones_value = taiko_read(codec, 
+ 		TAIKO_A_CDC_RX1_VOL_CTL_B2_CTL);
++	soundcontrol.default_headset_value = taiko_read(codec,
++		TAIKO_A_RX_HPH_R_GAIN);
++	soundcontrol.default_speaker_value = taiko_read(codec,
++		TAIKO_A_CDC_RX3_VOL_CTL_B2_CTL);
++	soundcontrol.default_mic_value = taiko_read(codec,
++		TAIKO_A_CDC_TX7_VOL_CTL_GAIN);
+ 
+ 	return ret;
+ 
+-- 
+1.7.9.5
+

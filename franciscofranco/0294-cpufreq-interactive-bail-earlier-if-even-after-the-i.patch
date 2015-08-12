@@ -1,0 +1,43 @@
+From 79d4585cef1e03b485e860dfefe60affda79951d Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Fri, 13 Dec 2013 17:43:25 +0000
+Subject: [PATCH 294/517] cpufreq: interactive: bail earlier if even after the
+ input_boost minimum interval the input_work is
+ pending.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index 0eb8602..915a4ae 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -651,7 +651,12 @@ static void cpufreq_interactive_boost(struct work_struct *work)
+ 	if (boosted_time + msecs_to_jiffies(DEFAULT_BOOSTED_TIME_INTERVAL) > jiffies)
+ 		return;
+ 
+-	boosted_time = jiffies;
++	/* 
++	 * You lazy bastard are officially punished for being late so next time
++	 * finish the work faster and we won't bail on you so early
++	 */
++	if (work_pending(&input_work))
++		return;
+ 
+ 	for_each_online_cpu(i) {
+ 		pcpu = &per_cpu(cpuinfo, i);
+@@ -684,6 +689,8 @@ static void cpufreq_interactive_boost(struct work_struct *work)
+ 		if (i)
+ 			break;
+ 	}
++
++	boosted_time = jiffies;
+ }
+ 
+ static int cpufreq_interactive_notifier(
+-- 
+1.7.9.5
+

@@ -1,0 +1,59 @@
+From 05edd705e3a987e7fd3290a9e57ada11fdb41966 Mon Sep 17 00:00:00 2001
+From: Mel Gorman <mgorman@suse.de>
+Date: Thu, 6 Dec 2012 19:01:14 +0000
+Subject: [PATCH 405/517] mm: compaction: validate pfn range passed to
+ isolate_freepages_block
+
+Commit 0bf380bc70ec ("mm: compaction: check pfn_valid when entering a
+new MAX_ORDER_NR_PAGES block during isolation for migration") added a
+check for pfn_valid() when isolating pages for migration as the scanner
+does not necessarily start pageblock-aligned.
+
+Since commit c89511ab2f8f ("mm: compaction: Restart compaction from near
+where it left off"), the free scanner has the same problem.  This patch
+makes sure that the pfn range passed to isolate_freepages_block() is
+within the same block so that pfn_valid() checks are unnecessary.
+
+In answer to Henrik's wondering why others have not reported this:
+reproducing this requires a large enough hole with the right aligment to
+have compaction walk into a PFN range with no memmap.  Size and
+alignment depends in the memory model - 4M for FLATMEM and 128M for
+SPARSEMEM on x86.  It needs a "lucky" machine.
+
+Change-Id: I5de91fc8d9792cb339b87fe9ef058143cde5995a
+Reported-by: Henrik Rydberg <rydberg@euromail.se>
+Signed-off-by: Mel Gorman <mgorman@suse.de>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: 60177d31d215bc2b4c5a7aa6f742800e04fa0a92
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/compaction.c |   10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/mm/compaction.c b/mm/compaction.c
+index 7240d56..eab7c37 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -710,7 +710,15 @@ static void isolate_freepages(struct zone *zone,
+ 
+ 		/* Found a block suitable for isolating free pages from */
+ 		isolated = 0;
+-		end_pfn = min(pfn + pageblock_nr_pages, zone_end_pfn);
++
++		/*
++		 * As pfn may not start aligned, pfn+pageblock_nr_page
++		 * may cross a MAX_ORDER_NR_PAGES boundary and miss
++		 * a pfn_valid check. Ensure isolate_freepages_block()
++		 * only scans within a pageblock
++		 */
++		end_pfn = ALIGN(pfn + 1, pageblock_nr_pages);
++		end_pfn = min(end_pfn, zone_end_pfn);
+ 		isolated = isolate_freepages_block(cc, pfn, end_pfn,
+ 						   freelist, false);
+ 		nr_freepages += isolated;
+-- 
+1.7.9.5
+

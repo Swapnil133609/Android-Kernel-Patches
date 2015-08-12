@@ -1,0 +1,158 @@
+From 657d4dd31ff0a29befe0d850d49edd3e194b7858 Mon Sep 17 00:00:00 2001
+From: Konstantin Khlebnikov <khlebnikov@openvz.org>
+Date: Tue, 29 May 2012 15:06:54 -0700
+Subject: [PATCH 377/517] mm: remove lru type checks from __isolate_lru_page()
+
+After patch "mm: forbid lumpy-reclaim in shrink_active_list()" we can
+completely remove anon/file and active/inactive lru type filters from
+__isolate_lru_page(), because isolation for 0-order reclaim always
+isolates pages from right lru list.  And pages-isolation for lumpy
+shrink_inactive_list() or memory-compaction anyway allowed to isolate
+pages from all evictable lru lists.
+
+Change-Id: I2a1a0325b1d193f4ca5e3ea7d5eda9b8bf7c6698
+Signed-off-by: Konstantin Khlebnikov <khlebnikov@openvz.org>
+Acked-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+Cc: Hugh Dickins <hughd@google.com>
+Acked-by: Michal Hocko <mhocko@suse.cz>
+Cc: Glauber Costa <glommer@parallels.com>
+Cc: Johannes Weiner <hannes@cmpxchg.org>
+Cc: Minchan Kim <minchan@kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: f3fd4a61928a5edf5b033a417e761b488b43e203
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/mmzone.h |   10 +++-------
+ include/linux/swap.h   |    2 +-
+ mm/compaction.c        |    4 ++--
+ mm/vmscan.c            |   23 ++++-------------------
+ 4 files changed, 10 insertions(+), 29 deletions(-)
+
+diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+index 44d75a9..97ad1cc 100644
+--- a/include/linux/mmzone.h
++++ b/include/linux/mmzone.h
+@@ -204,16 +204,12 @@ struct lruvec {
+ #define LRU_ALL_EVICTABLE (LRU_ALL_FILE | LRU_ALL_ANON)
+ #define LRU_ALL	     ((1 << NR_LRU_LISTS) - 1)
+ 
+-/* Isolate inactive pages */
+-#define ISOLATE_INACTIVE	((__force isolate_mode_t)0x1)
+-/* Isolate active pages */
+-#define ISOLATE_ACTIVE		((__force isolate_mode_t)0x2)
+ /* Isolate clean file */
+-#define ISOLATE_CLEAN		((__force isolate_mode_t)0x4)
++#define ISOLATE_CLEAN		((__force isolate_mode_t)0x1)
+ /* Isolate unmapped file */
+-#define ISOLATE_UNMAPPED	((__force isolate_mode_t)0x8)
++#define ISOLATE_UNMAPPED	((__force isolate_mode_t)0x2)
+ /* Isolate for asynchronous migration */
+-#define ISOLATE_ASYNC_MIGRATE	((__force isolate_mode_t)0x10)
++#define ISOLATE_ASYNC_MIGRATE	((__force isolate_mode_t)0x4)
+ 
+ /* LRU Isolation modes. */
+ typedef unsigned __bitwise__ isolate_mode_t;
+diff --git a/include/linux/swap.h b/include/linux/swap.h
+index bc3073c..d5bd6ee 100644
+--- a/include/linux/swap.h
++++ b/include/linux/swap.h
+@@ -251,7 +251,7 @@ static inline void lru_cache_add_file(struct page *page)
+ /* linux/mm/vmscan.c */
+ extern unsigned long try_to_free_pages(struct zonelist *zonelist, int order,
+ 					gfp_t gfp_mask, nodemask_t *mask);
+-extern int __isolate_lru_page(struct page *page, isolate_mode_t mode, int file);
++extern int __isolate_lru_page(struct page *page, isolate_mode_t mode);
+ extern unsigned long try_to_free_mem_cgroup_pages(struct mem_cgroup *mem,
+ 						  gfp_t gfp_mask, bool noswap);
+ extern unsigned long mem_cgroup_shrink_node_zone(struct mem_cgroup *mem,
+diff --git a/mm/compaction.c b/mm/compaction.c
+index d6ae4dd..425bbfa 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -226,7 +226,7 @@ isolate_migratepages_range(struct zone *zone, struct compact_control *cc,
+ 	unsigned long last_pageblock_nr = 0, pageblock_nr;
+ 	unsigned long nr_scanned = 0, nr_isolated = 0;
+ 	struct list_head *migratelist = &cc->migratepages;
+-	isolate_mode_t mode = ISOLATE_ACTIVE|ISOLATE_INACTIVE;
++	isolate_mode_t mode = 0;
+ 
+ 	/*
+ 	 * Ensure that there are not too many pages isolated from the LRU
+@@ -328,7 +328,7 @@ isolate_migratepages_range(struct zone *zone, struct compact_control *cc,
+ 			mode |= ISOLATE_ASYNC_MIGRATE;
+ 
+ 		/* Try isolate the page */
+-		if (__isolate_lru_page(page, mode, 0) != 0)
++		if (__isolate_lru_page(page, mode) != 0)
+ 			continue;
+ 
+ 		VM_BUG_ON(PageTransCompound(page));
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 0adcc5a..2b0223b 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -961,29 +961,14 @@ keep:
+  *
+  * returns 0 on success, -ve errno on failure.
+  */
+-int __isolate_lru_page(struct page *page, isolate_mode_t mode, int file)
++int __isolate_lru_page(struct page *page, isolate_mode_t mode)
+ {
+-	bool all_lru_mode;
+ 	int ret = -EINVAL;
+ 
+ 	/* Only take pages on the LRU. */
+ 	if (!PageLRU(page))
+ 		return ret;
+ 
+-	all_lru_mode = (mode & (ISOLATE_ACTIVE|ISOLATE_INACTIVE)) ==
+-		(ISOLATE_ACTIVE|ISOLATE_INACTIVE);
+-
+-	/*
+-	 * When checking the active state, we need to be sure we are
+-	 * dealing with comparible boolean values.  Take the logical not
+-	 * of each.
+-	 */
+-	if (!all_lru_mode && !PageActive(page) != !(mode & ISOLATE_ACTIVE))
+-		return ret;
+-
+-	if (!all_lru_mode && !!page_is_file_cache(page) != file)
+-		return ret;
+-
+ 	/* Do not give back unevictable pages for compaction */
+ 	if (PageUnevictable(page))
+ 		return ret;
+@@ -1082,7 +1067,7 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
+ 
+ 		VM_BUG_ON(!PageLRU(page));
+ 
+-		switch (__isolate_lru_page(page, mode, file)) {
++		switch (__isolate_lru_page(page, mode)) {
+ 		case 0:
+ 			mem_cgroup_lru_del(page);
+ 			list_move(&page->lru, dst);
+@@ -1294,7 +1279,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct mem_cgroup_zone *mz,
+ 	unsigned long nr_file;
+ 	unsigned long nr_dirty = 0;
+ 	unsigned long nr_writeback = 0;
+-	isolate_mode_t isolate_mode = ISOLATE_INACTIVE;
++	isolate_mode_t isolate_mode = 0;
+ 	int file = is_file_lru(lru);
+ 	struct zone *zone = mz->zone;
+ 	struct zone_reclaim_stat *reclaim_stat = get_reclaim_stat(mz);
+@@ -1464,7 +1449,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
+ 	struct page *page;
+ 	struct zone_reclaim_stat *reclaim_stat = get_reclaim_stat(mz);
+ 	unsigned long nr_rotated = 0;
+-	isolate_mode_t isolate_mode = ISOLATE_ACTIVE;
++	isolate_mode_t isolate_mode = 0;
+ 	int file = is_file_lru(lru);
+ 	struct zone *zone = mz->zone;
+ 
+-- 
+1.7.9.5
+

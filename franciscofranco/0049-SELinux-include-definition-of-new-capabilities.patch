@@ -1,0 +1,38 @@
+From ab7f67740d283c0d7c6b2143f8f52b2fdcd031ec Mon Sep 17 00:00:00 2001
+From: Eric Paris <eparis@redhat.com>
+Date: Fri, 6 Jul 2012 14:13:29 -0400
+Subject: [PATCH 049/517] SELinux: include definition of new capabilities
+
+The kernel has added CAP_WAKE_ALARM and CAP_EPOLLWAKEUP.  We need to
+define these in SELinux so they can be mediated by policy.
+
+Change-Id: I8a3e0db15ec5f4eb05d455a57e8446a8c2b484c2
+Signed-off-by: Eric Paris <eparis@redhat.com>
+Signed-off-by: James Morris <james.l.morris@oracle.com>
+[sds: rename epollwakeup to block_suspend to match upstream merge]
+Signed-off-by: Stephen Smalley <sds@tycho.nsa.gov>
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ security/selinux/include/classmap.h |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/security/selinux/include/classmap.h b/security/selinux/include/classmap.h
+index 4a4a9ae..20b00fc 100644
+--- a/security/selinux/include/classmap.h
++++ b/security/selinux/include/classmap.h
+@@ -145,7 +145,9 @@ struct security_class_mapping secclass_map[] = {
+ 	    "node_bind", "name_connect", NULL } },
+ 	{ "memprotect", { "mmap_zero", NULL } },
+ 	{ "peer", { "recv", NULL } },
+-	{ "capability2", { "mac_override", "mac_admin", "syslog", NULL } },
++	{ "capability2",
++	  { "mac_override", "mac_admin", "syslog", "wake_alarm", "block_suspend",
++	    NULL } },
+ 	{ "kernel_service", { "use_as_override", "create_files_as", NULL } },
+ 	{ "tun_socket",
+ 	  { COMMON_SOCK_PERMS, NULL } },
+-- 
+1.7.9.5
+

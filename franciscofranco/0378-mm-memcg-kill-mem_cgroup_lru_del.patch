@@ -1,0 +1,85 @@
+From f3365c5e6b1dd258dfbc49cc36ce9c2ac5554388 Mon Sep 17 00:00:00 2001
+From: Konstantin Khlebnikov <khlebnikov@openvz.org>
+Date: Tue, 29 May 2012 15:06:54 -0700
+Subject: [PATCH 378/517] mm/memcg: kill mem_cgroup_lru_del()
+
+This patch kills mem_cgroup_lru_del(), we can use
+mem_cgroup_lru_del_list() instead.  On 0-order isolation we already have
+right lru list id.
+
+Change-Id: I403d40074299fb5f125603435c057071714d5b92
+Signed-off-by: Konstantin Khlebnikov <khlebnikov@openvz.org>
+Cc: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+Cc: Hugh Dickins <hughd@google.com>
+Cc: Glauber Costa <glommer@parallels.com>
+Cc: Michal Hocko <mhocko@suse.cz>
+Cc: Johannes Weiner <hannes@cmpxchg.org>
+Cc: Minchan Kim <minchan@kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: bbf808ed7de68fdf626fd4f9718d88cf03ce13a9
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/memcontrol.h |    5 -----
+ mm/memcontrol.c            |    5 -----
+ mm/vmscan.c                |    2 +-
+ 3 files changed, 1 insertion(+), 11 deletions(-)
+
+diff --git a/include/linux/memcontrol.h b/include/linux/memcontrol.h
+index f94efd2..b87a13e 100644
+--- a/include/linux/memcontrol.h
++++ b/include/linux/memcontrol.h
+@@ -66,7 +66,6 @@ struct lruvec *mem_cgroup_zone_lruvec(struct zone *, struct mem_cgroup *);
+ struct lruvec *mem_cgroup_lru_add_list(struct zone *, struct page *,
+ 				       enum lru_list);
+ void mem_cgroup_lru_del_list(struct page *, enum lru_list);
+-void mem_cgroup_lru_del(struct page *);
+ struct lruvec *mem_cgroup_lru_move_lists(struct zone *, struct page *,
+ 					 enum lru_list, enum lru_list);
+ 
+@@ -262,10 +261,6 @@ static inline void mem_cgroup_lru_del_list(struct page *page, enum lru_list lru)
+ {
+ }
+ 
+-static inline void mem_cgroup_lru_del(struct page *page)
+-{
+-}
+-
+ static inline struct lruvec *mem_cgroup_lru_move_lists(struct zone *zone,
+ 						       struct page *page,
+ 						       enum lru_list from,
+diff --git a/mm/memcontrol.c b/mm/memcontrol.c
+index 51eadf5..86a2832 100644
+--- a/mm/memcontrol.c
++++ b/mm/memcontrol.c
+@@ -1116,11 +1116,6 @@ void mem_cgroup_lru_del_list(struct page *page, enum lru_list lru)
+ 	mz->lru_size[lru] -= 1 << compound_order(page);
+ }
+ 
+-void mem_cgroup_lru_del(struct page *page)
+-{
+-	mem_cgroup_lru_del_list(page, page_lru(page));
+-}
+-
+ /**
+  * mem_cgroup_lru_move_lists - account for moving a page between lrus
+  * @zone: zone of the page
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 2b0223b..a6360b5 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -1069,7 +1069,7 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
+ 
+ 		switch (__isolate_lru_page(page, mode)) {
+ 		case 0:
+-			mem_cgroup_lru_del(page);
++			mem_cgroup_lru_del_list(page, lru);
+ 			list_move(&page->lru, dst);
+ 			nr_taken += hpage_nr_pages(page);
+ 			break;
+-- 
+1.7.9.5
+

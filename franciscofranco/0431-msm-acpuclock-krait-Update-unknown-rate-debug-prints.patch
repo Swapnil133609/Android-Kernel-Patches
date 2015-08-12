@@ -1,0 +1,45 @@
+From 75d3db7c3cda4ab7947da974bcc3ade5a048b888 Mon Sep 17 00:00:00 2001
+From: Matt Wagantall <mattw@codeaurora.org>
+Date: Fri, 15 Nov 2013 14:11:08 -0800
+Subject: [PATCH 431/517] msm: acpuclock-krait: Update 'unknown rate' debug
+ prints to warnings
+
+While not fatal, boot performance will be suboptimal if the L2 or
+CPU frequencies at boot are not in the frequency tables. This is
+because acpuclock 'plays it safe' by applying the lowest possible
+clock rate in such situations to ensure clocks are not set higher
+than boot-up voltages can support.
+
+Change-Id: I07fcff70d742b2590fa996ea4ca7a1f1c560eee3
+Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/acpuclock-krait.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-msm/acpuclock-krait.c b/arch/arm/mach-msm/acpuclock-krait.c
+index e35af39..9733066 100644
+--- a/arch/arm/mach-msm/acpuclock-krait.c
++++ b/arch/arm/mach-msm/acpuclock-krait.c
+@@ -908,7 +908,7 @@ static int __cpuinit per_cpu_init(int cpu)
+ 			ret = -ENODEV;
+ 			goto err_table;
+ 		}
+-		dev_dbg(drv.dev, "CPU%d is running at an unknown rate. Defaulting to %lu KHz.\n",
++		dev_warn(drv.dev, "CPU%d is running at an unknown rate. Defaulting to %lu KHz.\n",
+ 			cpu, acpu_level->speed.khz);
+ 	} else {
+ 		dev_dbg(drv.dev, "CPU%d is running at %lu KHz\n", cpu,
+@@ -1263,7 +1263,7 @@ static void __init hw_init(void)
+ 	l2_level = find_cur_l2_level();
+ 	if (!l2_level) {
+ 		l2_level = drv.l2_freq_tbl;
+-		dev_dbg(drv.dev, "L2 is running at an unknown rate. Defaulting to %lu KHz.\n",
++		dev_warn(drv.dev, "L2 is running at an unknown rate. Defaulting to %lu KHz.\n",
+ 			l2_level->speed.khz);
+ 	} else {
+ 		dev_dbg(drv.dev, "L2 is running at %lu KHz\n",
+-- 
+1.7.9.5
+

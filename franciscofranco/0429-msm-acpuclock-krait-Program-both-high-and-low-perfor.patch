@@ -1,0 +1,71 @@
+From e5c9cc496625337dda28386796009b348a9d7d45 Mon Sep 17 00:00:00 2001
+From: Matt Wagantall <mattw@codeaurora.org>
+Date: Fri, 6 Sep 2013 14:01:26 -0700
+Subject: [PATCH 429/517] msm: acpuclock-krait: Program both high- and
+ low-performance sources
+
+The latest LDO/BHS switching sequence employed in the 8974
+krait-regulator driver involves mandatory operations that cause
+the CPUs to switch to the low-performance clock source when the
+CPU is powered from the LDO, and to the high-performance clock
+source when powered from the BHS.
+
+This results in potential undervolting of the CPUs since the
+acpuclock driver does not program the low-performance source,
+and the clock source it selects be default is running at the
+same speed as DDR (which can be very fast).
+
+Fix this by programming both the high and low-performance clock
+sources to be the same at all times.
+
+CRs-Fixed: 538629
+Change-Id: Iaa39cca9165b892e52acd8ec3aac5d0784112623
+Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/acpuclock-krait.c |   14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-msm/acpuclock-krait.c b/arch/arm/mach-msm/acpuclock-krait.c
+index 0b33e62..0f2e1e0 100644
+--- a/arch/arm/mach-msm/acpuclock-krait.c
++++ b/arch/arm/mach-msm/acpuclock-krait.c
+@@ -66,7 +66,11 @@ static void __set_pri_clk_src(struct scalable *sc, u32 pri_src_sel)
+ 
+ 	regval = get_l2_indirect_reg(sc->l2cpmr_iaddr);
+ 	regval &= ~0x3;
+-	regval |= (pri_src_sel & 0x3);
++	regval |= pri_src_sel;
++	if (sc != &drv.scalable[L2]) {
++		regval &= ~(0x3 << 8);
++		regval |= pri_src_sel << 8;
++	}
+ 	set_l2_indirect_reg(sc->l2cpmr_iaddr, regval);
+ 	/* Wait for switch to complete. */
+ 	mb();
+@@ -101,7 +105,11 @@ static void __cpuinit set_sec_clk_src(struct scalable *sc, u32 sec_src_sel)
+ 
+ 	regval = get_l2_indirect_reg(sc->l2cpmr_iaddr);
+ 	regval &= ~(0x3 << 2);
+-	regval |= ((sec_src_sel & 0x3) << 2);
++	regval |= sec_src_sel << 2;
++	if (sc != &drv.scalable[L2]) {
++		regval &= ~(0x3 << 10);
++		regval |= sec_src_sel << 10;
++	}
+ 	set_l2_indirect_reg(sc->l2cpmr_iaddr, regval);
+ 	/* Wait for switch to complete. */
+ 	mb();
+@@ -810,6 +818,8 @@ static int __cpuinit init_clock_sources(struct scalable *sc,
+ 	/* Set PRI_SRC_SEL_HFPLL_DIV2 divider to div-2. */
+ 	regval = get_l2_indirect_reg(sc->l2cpmr_iaddr);
+ 	regval &= ~(0x3 << 6);
++	if (sc != &drv.scalable[L2])
++		regval &= ~(0x3 << 14);
+ 	set_l2_indirect_reg(sc->l2cpmr_iaddr, regval);
+ 
+ 	/* Enable and switch to the target clock source. */
+-- 
+1.7.9.5
+

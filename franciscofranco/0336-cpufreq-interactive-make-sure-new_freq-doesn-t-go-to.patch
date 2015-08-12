@@ -1,0 +1,29 @@
+From ca20bc35fdcd69094ea71a1380592f35c5fe2145 Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Fri, 13 Dec 2013 02:44:07 +0000
+Subject: [PATCH 336/517] cpufreq: interactive: make sure new_freq doesn't go
+ to the cpufreq call uninitialised.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index c72248b..4f3a499 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -420,8 +420,7 @@ static void cpufreq_interactive_timer(unsigned long data)
+ 	}
+ 	else if (boosted)
+ 	{
+-		if (new_freq < input_boost_freq)
+-			new_freq = input_boost_freq;
++		new_freq = input_boost_freq;
+ 	}
+ 	else 
+ 	{
+-- 
+1.7.9.5
+

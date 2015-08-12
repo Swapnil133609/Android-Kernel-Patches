@@ -1,0 +1,79 @@
+From 3b6a24d73022f3d4d929b88c8c7e221b33e7e275 Mon Sep 17 00:00:00 2001
+From: Jeremy Gebben <jgebben@codeaurora.org>
+Date: Thu, 24 Oct 2013 14:07:39 -0600
+Subject: [PATCH 211/517] msm: kgsl: manage active count in adreno_ioctl()
+
+Most of the adreno specific ioctls do not need the hardware
+on. The few that do are perfcounter related, it may be
+better at some point to optimize them further to shadow
+the counters when the hardware is not on rather than
+forcing the power on.
+
+Change-Id: I9ea83106e0aaf3d3ac8d261bdec4e4c2e21c4659
+Signed-off-by: Jeremy Gebben <jgebben@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/msm/adreno.c |   13 +++++++++++++
+ drivers/gpu/msm/kgsl.c   |    3 +--
+ 2 files changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/msm/adreno.c b/drivers/gpu/msm/adreno.c
+index 5d4cec0..16dc25e 100644
+--- a/drivers/gpu/msm/adreno.c
++++ b/drivers/gpu/msm/adreno.c
+@@ -2733,8 +2733,17 @@ static long adreno_ioctl(struct kgsl_device_private *dev_priv,
+ 	}
+ 	case IOCTL_KGSL_PERFCOUNTER_GET: {
+ 		struct kgsl_perfcounter_get *get = data;
++		/*
++		 * adreno_perfcounter_get() is called by kernel clients
++		 * during start(), so it is not safe to take an
++		 * active count inside this function.
++		 */
++		result = kgsl_active_count_get(device);
++		if (result)
++			break;
+ 		result = adreno_perfcounter_get(adreno_dev, get->groupid,
+ 			get->countable, &get->offset, PERFCOUNTER_FLAG_NONE);
++		kgsl_active_count_put(device);
+ 		break;
+ 	}
+ 	case IOCTL_KGSL_PERFCOUNTER_PUT: {
+@@ -2752,8 +2761,12 @@ static long adreno_ioctl(struct kgsl_device_private *dev_priv,
+ 	}
+ 	case IOCTL_KGSL_PERFCOUNTER_READ: {
+ 		struct kgsl_perfcounter_read *read = data;
++		result = kgsl_active_count_get(device);
++		if (result)
++			break;
+ 		result = adreno_perfcounter_read_group(adreno_dev,
+ 			read->reads, read->count);
++		kgsl_active_count_put(device);
+ 		break;
+ 	}
+ 	default:
+diff --git a/drivers/gpu/msm/kgsl.c b/drivers/gpu/msm/kgsl.c
+index 42eb1ef..4944341 100644
+--- a/drivers/gpu/msm/kgsl.c
++++ b/drivers/gpu/msm/kgsl.c
+@@ -3441,7 +3441,7 @@ static long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
+ 	struct kgsl_device_private *dev_priv = filep->private_data;
+ 	unsigned int nr;
+ 	kgsl_ioctl_func_t func;
+-	int lock, ret, use_hw;
++	int lock, ret, use_hw = 0;
+ 	char ustack[64];
+ 	void *uptr = NULL;
+ 
+@@ -3509,7 +3509,6 @@ static long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
+ 			goto done;
+ 		}
+ 		lock = 1;
+-		use_hw = 1;
+ 	}
+ 
+ 	if (lock) {
+-- 
+1.7.9.5
+

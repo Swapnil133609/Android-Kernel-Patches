@@ -1,0 +1,104 @@
+From aa2c72d1f0cd1902b191fe67ced29978282fcfda Mon Sep 17 00:00:00 2001
+From: Shubhraprakash Das <sadas@codeaurora.org>
+Date: Fri, 25 Oct 2013 16:59:43 -0600
+Subject: [PATCH 213/517] msm: kgsl: Set CP_DEBUG in GPU cores start routine
+
+The CP_DEBUG register needs to be programmed with values that
+depend on the GPU core. Set this register in the core specific
+start routine.
+
+Change-Id: I5fa3813fa4b98efa8c73e1fc00b61f3cc3745b2f
+Signed-off-by: Shubhraprakash Das <sadas@codeaurora.org>
+Signed-off-by: Tarun Karra <tkarra@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/msm/a2xx_reg.h          |   10 +++++++++-
+ drivers/gpu/msm/adreno_a2xx.c       |    2 ++
+ drivers/gpu/msm/adreno_a3xx.c       |    3 +++
+ drivers/gpu/msm/adreno_ringbuffer.c |    9 ---------
+ 4 files changed, 14 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/gpu/msm/a2xx_reg.h b/drivers/gpu/msm/a2xx_reg.h
+index c70c4eb..b2fb99f 100644
+--- a/drivers/gpu/msm/a2xx_reg.h
++++ b/drivers/gpu/msm/a2xx_reg.h
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2002,2007-2012, The Linux Foundation. All rights reserved.
++/* Copyright (c) 2002,2007-2013, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -252,7 +252,15 @@ union reg_cp_rb_cntl {
+ #define REG_CP_CSQ_IB1_STAT              0x01FE
+ #define REG_CP_CSQ_IB2_STAT              0x01FF
+ #define REG_CP_CSQ_RB_STAT               0x01FD
++
+ #define REG_CP_DEBUG                     0x01FC
++/*
++ * CP DEBUG settings for a3xx and a2xx cores:
++ * DYNAMIC_CLK_DISABLE [27] - turn off the dynamic clock control
++ * MIU_128BIT_WRITE_ENABLE [25] - Allow 128 bit writes to the VBIF
++ */
++#define A2XX_CP_DEBUG_DEFAULT ((1 << 27) | (1 << 25))
++
+ #define REG_CP_IB1_BASE                  0x0458
+ #define REG_CP_IB1_BUFSZ                 0x0459
+ #define REG_CP_IB2_BASE                  0x045A
+diff --git a/drivers/gpu/msm/adreno_a2xx.c b/drivers/gpu/msm/adreno_a2xx.c
+index 805829c..e4888c8 100644
+--- a/drivers/gpu/msm/adreno_a2xx.c
++++ b/drivers/gpu/msm/adreno_a2xx.c
+@@ -2088,6 +2088,8 @@ static void a2xx_start(struct adreno_device *adreno_dev)
+ 	kgsl_regwrite(device, REG_SQ_INT_CNTL, 0);
+ 
+ 	a2xx_gmeminit(adreno_dev);
++
++	kgsl_regwrite(device, REG_CP_DEBUG, A2XX_CP_DEBUG_DEFAULT);
+ }
+ 
+ static void a2xx_postmortem_dump(struct adreno_device *adreno_dev)
+diff --git a/drivers/gpu/msm/adreno_a3xx.c b/drivers/gpu/msm/adreno_a3xx.c
+index c00376d..8147d26 100644
+--- a/drivers/gpu/msm/adreno_a3xx.c
++++ b/drivers/gpu/msm/adreno_a3xx.c
+@@ -4005,6 +4005,9 @@ static void a3xx_start(struct adreno_device *adreno_dev)
+ 	/* Turn on the GPU busy counter and let it run free */
+ 
+ 	adreno_dev->gpu_cycles = 0;
++
++	/* the CP_DEBUG register offset and value are same as A2XX */
++	kgsl_regwrite(device, REG_CP_DEBUG, A2XX_CP_DEBUG_DEFAULT);
+ }
+ 
+ /**
+diff --git a/drivers/gpu/msm/adreno_ringbuffer.c b/drivers/gpu/msm/adreno_ringbuffer.c
+index 16e927a..9defc7f 100644
+--- a/drivers/gpu/msm/adreno_ringbuffer.c
++++ b/drivers/gpu/msm/adreno_ringbuffer.c
+@@ -30,14 +30,6 @@
+ 
+ #define GSL_RB_NOP_SIZEDWORDS				2
+ 
+-/*
+- * CP DEBUG settings for all cores:
+- * DYNAMIC_CLK_DISABLE [27] - turn off the dynamic clock control
+- * PROG_END_PTR_ENABLE [25] - Allow 128 bit writes to the VBIF
+- */
+-
+-#define CP_DEBUG_DEFAULT ((1 << 27) | (1 << 25))
+-
+ void adreno_ringbuffer_submit(struct adreno_ringbuffer *rb)
+ {
+ 	struct adreno_device *adreno_dev = ADRENO_DEVICE(rb->device);
+@@ -234,7 +226,6 @@ int adreno_ringbuffer_load_pm4_ucode(struct kgsl_device *device,
+ 	KGSL_DRV_INFO(device, "loading pm4 ucode version: %d\n",
+ 		adreno_dev->pm4_fw_version);
+ 
+-	adreno_writereg(adreno_dev, ADRENO_REG_CP_DEBUG, CP_DEBUG_DEFAULT);
+ 	adreno_writereg(adreno_dev, ADRENO_REG_CP_ME_RAM_WADDR, addr);
+ 	for (i = start; i < adreno_dev->pm4_fw_size; i++)
+ 		adreno_writereg(adreno_dev, ADRENO_REG_CP_ME_RAM_DATA,
+-- 
+1.7.9.5
+

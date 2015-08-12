@@ -1,0 +1,64 @@
+From b350a1316bf553211ba91d1be8b3aa009ea65b4b Mon Sep 17 00:00:00 2001
+From: Stephen Boyd <sboyd@codeaurora.org>
+Date: Mon, 17 Jun 2013 15:40:58 -0700
+Subject: [PATCH 299/517] ARM: sched_clock: Load cycle count after epoch
+ stabilizes
+
+There is a small race between when the cycle count is read from
+the hardware and when the epoch stabilizes. Consider this
+scenario:
+
+ CPU0                           CPU1
+ ----                           ----
+ cyc = read_sched_clock()
+ cyc_to_sched_clock()
+                                 update_sched_clock()
+                                  ...
+                                  cd.epoch_cyc = cyc;
+  epoch_cyc = cd.epoch_cyc;
+  ...
+  epoch_ns + cyc_to_ns((cyc - epoch_cyc)
+
+The cyc on cpu0 was read before the epoch changed. But we
+calculate the nanoseconds based on the new epoch by subtracting
+the new epoch from the old cycle count. Since epoch is most likely
+larger than the old cycle count we calculate a large number that
+will be converted to nanoseconds and added to epoch_ns, causing
+time to jump forward too much.
+
+Fix this problem by reading the hardware after the epoch has
+stabilized.
+
+Change-Id: I995133b229b2c2fedd5091406d1dc366d8bfff7b
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: John Stultz <john.stultz@linaro.org>
+Git-commit: 336ae1180df5f69b9e0fb6561bec01c5f64361cf
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+[sboyd: reworked for file movement kernel/time -> arm/kernel]
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/kernel/sched_clock.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+index ad9dfb2..bb97140 100644
+--- a/arch/arm/kernel/sched_clock.c
++++ b/arch/arm/kernel/sched_clock.c
+@@ -68,7 +68,9 @@ static unsigned long long cyc_to_sched_clock(u32 cyc, u32 mask)
+ 		smp_rmb();
+ 	} while (epoch_cyc != cd.epoch_cyc_copy);
+ 
+-	return epoch_ns + cyc_to_ns((cyc - epoch_cyc) & mask, cd.mult, cd.shift);
++	cyc = read_sched_clock();
++	cyc = (cyc - epoch_cyc) & sched_clock_mask;
++	return epoch_ns + cyc_to_ns(cyc, cd.mult, cd.shift);
+ }
+ 
+ /*
+-- 
+1.7.9.5
+

@@ -1,0 +1,109 @@
+From 122cf7d9d1b5619030334f0e75bb9f01f8f221ef Mon Sep 17 00:00:00 2001
+From: Minchan Kim <minchan@kernel.org>
+Date: Tue, 31 Jul 2012 16:43:01 -0700
+Subject: [PATCH 400/517] mm: clean up __count_immobile_pages()
+
+The __count_immobile_pages() naming is rather awkward.  Choose a more
+clear name and add a comment.
+
+Change-Id: Ic1d8573bbc7eaa82dd5e3f9a1199ee6dd4ac9fc0
+Signed-off-by: Minchan Kim <minchan@kernel.org>
+Cc: Andrea Arcangeli <aarcange@redhat.com>
+Cc: Mel Gorman <mgorman@suse.de>
+Cc: Michal Hocko <mhocko@suse.cz>
+Acked-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: 80934513b230bfcf70265f2ef0fdae89fb391633
+Git-repo: git://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/page_alloc.c |   34 ++++++++++++++++++----------------
+ 1 file changed, 18 insertions(+), 16 deletions(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 5308b27..021817e 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5638,26 +5638,28 @@ void set_pageblock_flags_group(struct page *page, unsigned long flags,
+ }
+ 
+ /*
+- * This is designed as sub function...plz see page_isolation.c also.
+- * set/clear page block's type to be ISOLATE.
+- * page allocater never alloc memory from ISOLATE block.
++ * This function checks whether pageblock includes unmovable pages or not.
++ * If @count is not zero, it is okay to include less @count unmovable pages
++ *
++ * PageLRU check wihtout isolation or lru_lock could race so that
++ * MIGRATE_MOVABLE block might include unmovable pages. It means you can't
++ * expect this function should be exact.
+  */
+-
+-static int
+-__count_immobile_pages(struct zone *zone, struct page *page, int count)
++static bool
++__has_unmovable_pages(struct zone *zone, struct page *page, int count)
+ {
+ 	unsigned long pfn, iter, found;
+ 	int mt;
+ 
+ 	/*
+ 	 * For avoiding noise data, lru_add_drain_all() should be called
+-	 * If ZONE_MOVABLE, the zone never contains immobile pages
++	 * If ZONE_MOVABLE, the zone never contains unmovable pages
+ 	 */
+ 	if (zone_idx(zone) == ZONE_MOVABLE)
+-		return true;
++		return false;
+ 	mt = get_pageblock_migratetype(page);
+ 	if (mt == MIGRATE_MOVABLE || is_migrate_cma(mt))
+-		return true;
++		return false;
+ 
+ 	pfn = page_to_pfn(page);
+ 	for (found = 0, iter = 0; iter < pageblock_nr_pages; iter++) {
+@@ -5695,9 +5697,9 @@ __count_immobile_pages(struct zone *zone, struct page *page, int count)
+ 		 * page at boot.
+ 		 */
+ 		if (found > count)
+-			return false;
++			return true;
+ 	}
+-	return true;
++	return false;
+ }
+ 
+ bool is_pageblock_removable_nolock(struct page *page)
+@@ -5721,7 +5723,7 @@ bool is_pageblock_removable_nolock(struct page *page)
+ 			zone->zone_start_pfn + zone->spanned_pages <= pfn)
+ 		return false;
+ 
+-	return __count_immobile_pages(zone, page, 0);
++	return !__has_unmovable_pages(zone, page, 0);
+ }
+ 
+ int set_migratetype_isolate(struct page *page)
+@@ -5760,12 +5762,12 @@ int set_migratetype_isolate(struct page *page)
+ 	 * FIXME: Now, memory hotplug doesn't call shrink_slab() by itself.
+ 	 * We just check MOVABLE pages.
+ 	 */
+-	if (__count_immobile_pages(zone, page, arg.pages_found))
++	if (!__has_unmovable_pages(zone, page, arg.pages_found))
+ 		ret = 0;
+-
+ 	/*
+-	 * immobile means "not-on-lru" paes. If immobile is larger than
+-	 * removable-by-driver pages reported by notifier, we'll fail.
++	 * Unmovable means "not-on-lru" pages. If Unmovable pages are
++	 * larger than removable-by-driver pages reported by notifier,
++	 * we'll fail.
+ 	 */
+ 
+ out:
+-- 
+1.7.9.5
+

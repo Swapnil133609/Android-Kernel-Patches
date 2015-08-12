@@ -1,0 +1,173 @@
+From 40094c02c31172775546d86047a861d56b7baa6d Mon Sep 17 00:00:00 2001
+From: Mitchel Humpherys <mitchelh@codeaurora.org>
+Date: Tue, 6 Aug 2013 15:08:23 -0700
+Subject: [PATCH 437/517] gpu: ion: Add buffer flag to skip page pooling on
+ free
+
+Currently, when we free a buffer it might actually just go back into a
+heap-specific page pool rather than going back to the system. This poses
+a problem because sometimes (like when we're running a shrinker in low
+memory conditions) we need to force the memory associated with the
+buffer to truly be relinquished to the system rather than just going
+back into a page pool.
+
+There isn't an obvious use case for this flag by Ion clients. The main
+use case right now is to provide a mechanism for the deferred free code
+to force stale buffers to bypass page pooling.
+
+Change-Id: I724f89cc037083fe8576784363caa18a34e8705a
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/ion/ion_heap.c        |   15 ++++++++++++++-
+ drivers/gpu/ion/ion_priv.h        |   29 ++++++++++++++++++++++++++++-
+ drivers/gpu/ion/ion_system_heap.c |   11 ++++++-----
+ include/linux/ion.h               |    8 ++++++++
+ 4 files changed, 56 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/gpu/ion/ion_heap.c b/drivers/gpu/ion/ion_heap.c
+index ee01646..5fce118 100644
+--- a/drivers/gpu/ion/ion_heap.c
++++ b/drivers/gpu/ion/ion_heap.c
+@@ -168,7 +168,8 @@ size_t ion_heap_freelist_size(struct ion_heap *heap)
+ 	return size;
+ }
+ 
+-size_t ion_heap_freelist_drain(struct ion_heap *heap, size_t size)
++static size_t _ion_heap_freelist_drain(struct ion_heap *heap, size_t size,
++				bool skip_pools)
+ {
+ 	struct ion_buffer *buffer, *tmp;
+ 	size_t total_drained = 0;
+@@ -186,6 +187,8 @@ size_t ion_heap_freelist_drain(struct ion_heap *heap, size_t size)
+ 		list_del(&buffer->list);
+ 		ion_buffer_destroy(buffer);
+ 		heap->free_list_size -= buffer->size;
++		if (skip_pools)
++			buffer->flags |= ION_FLAG_FREED_FROM_SHRINKER;
+ 		total_drained += buffer->size;
+ 	}
+ 	rt_mutex_unlock(&heap->lock);
+@@ -193,6 +196,16 @@ size_t ion_heap_freelist_drain(struct ion_heap *heap, size_t size)
+ 	return total_drained;
+ }
+ 
++size_t ion_heap_freelist_drain(struct ion_heap *heap, size_t size)
++{
++	return _ion_heap_freelist_drain(heap, size, false);
++}
++
++size_t ion_heap_freelist_drain_from_shrinker(struct ion_heap *heap, size_t size)
++{
++	return _ion_heap_freelist_drain(heap, size, true);
++}
++
+ int ion_heap_deferred_free(void *data)
+ {
+ 	struct ion_heap *heap = data;
+diff --git a/drivers/gpu/ion/ion_priv.h b/drivers/gpu/ion/ion_priv.h
+index b60fd31..498c66c 100644
+--- a/drivers/gpu/ion/ion_priv.h
++++ b/drivers/gpu/ion/ion_priv.h
+@@ -90,7 +90,11 @@ void ion_buffer_destroy(struct ion_buffer *buffer);
+ /**
+  * struct ion_heap_ops - ops to operate on a given heap
+  * @allocate:		allocate memory
+- * @free:		free memory
++ * @free:		free memory. Will be called with
++ *			ION_FLAG_FREED_FROM_SHRINKER set in buffer flags when
++ *			called from a shrinker. In that case, the pages being
++ *			free'd must be truly free'd back to the system, not put
++ *			in a page pool or otherwise cached.
+  * @phys		get physical address of a buffer (only define on
+  *			physically contiguous heaps)
+  * @map_dma		map the memory for dma to a scatterlist
+@@ -259,6 +263,29 @@ void ion_heap_freelist_add(struct ion_heap *heap, struct ion_buffer *buffer);
+ size_t ion_heap_freelist_drain(struct ion_heap *heap, size_t size);
+ 
+ /**
++ * ion_heap_freelist_drain_from_shrinker - drain the deferred free
++ *				list, skipping any heap-specific
++ *				pooling or caching mechanisms
++ *
++ * @heap:		the heap
++ * @size:		amount of memory to drain in bytes
++ *
++ * Drains the indicated amount of memory from the deferred freelist immediately.
++ * Returns the total amount freed.  The total freed may be higher depending
++ * on the size of the items in the list, or lower if there is insufficient
++ * total memory on the freelist.
++ *
++ * Unlike with @ion_heap_freelist_drain, don't put any pages back into
++ * page pools or otherwise cache the pages. Everything must be
++ * genuinely free'd back to the system. If you're free'ing from a
++ * shrinker you probably want to use this. Note that this relies on
++ * the heap.ops.free callback honoring the
++ * ION_FLAG_FREED_FROM_SHRINKER flag.
++ */
++size_t ion_heap_freelist_drain_from_shrinker(struct ion_heap *heap,
++					size_t size);
++
++/**
+  * ion_heap_freelist_size - returns the size of the freelist in bytes
+  * @heap:		the heap
+  */
+diff --git a/drivers/gpu/ion/ion_system_heap.c b/drivers/gpu/ion/ion_system_heap.c
+index eff52d0..5f41811 100644
+--- a/drivers/gpu/ion/ion_system_heap.c
++++ b/drivers/gpu/ion/ion_system_heap.c
+@@ -107,7 +107,7 @@ static void free_buffer_page(struct ion_system_heap *heap,
+ 	bool split_pages = ion_buffer_fault_user_mappings(buffer);
+ 	int i;
+ 
+-	if (!cached) {
++	if (!cached && !(buffer->flags & ION_FLAG_FREED_FROM_SHRINKER)) {
+ 		struct ion_page_pool *pool = heap->pools[order_to_index(order)];
+ 		ion_page_pool_free(pool, page);
+ 	} else if (split_pages) {
+@@ -233,7 +233,7 @@ void ion_system_heap_free(struct ion_buffer *buffer)
+ 
+ 	/* uncached pages come from the page pools, zero them before returning
+ 	   for security purposes (other allocations are zerod at alloc time */
+-	if (!cached)
++	if (!cached && !(buffer->flags & ION_FLAG_FREED_FROM_SHRINKER))
+ 		ion_heap_buffer_zero(buffer);
+ 
+ 	for_each_sg(table->sgl, sg, table->nents, i)
+@@ -281,9 +281,10 @@ static int ion_system_heap_shrink(struct shrinker *shrinker,
+ 		goto end;
+ 
+ 	/* shrink the free list first, no point in zeroing the memory if
+-	   we're just going to reclaim it */
+-	nr_freed += ion_heap_freelist_drain(heap, sc->nr_to_scan * PAGE_SIZE) /
+-		PAGE_SIZE;
++	   we're just going to reclaim it. Also, skip any possible
++	   page pooling */
++	nr_freed += ion_heap_freelist_drain_from_shrinker(
++		heap, sc->nr_to_scan * PAGE_SIZE) / PAGE_SIZE;
+ 
+ 	if (nr_freed >= sc->nr_to_scan)
+ 		goto end;
+diff --git a/include/linux/ion.h b/include/linux/ion.h
+index 4983316..f36298b 100644
+--- a/include/linux/ion.h
++++ b/include/linux/ion.h
+@@ -58,6 +58,14 @@ enum ion_heap_type {
+ #define ION_FLAG_CACHED_NEEDS_SYNC 2	/* mappings of this buffer will created
+ 					   at mmap time, if this is set
+ 					   caches must be managed manually */
++#define ION_FLAG_FREED_FROM_SHRINKER 4	/* Skip any possible
++					   heap-specific caching
++					   mechanism (e.g. page
++					   pools). Guarantees that any
++					   buffer storage that came
++					   from the system allocator
++					   will be returned to the
++					   system allocator. */
+ 
+ #ifdef __KERNEL__
+ #include <linux/err.h>
+-- 
+1.7.9.5
+

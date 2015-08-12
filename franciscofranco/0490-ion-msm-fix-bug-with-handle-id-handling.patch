@@ -1,0 +1,32 @@
+From 384622310f871287b97487a0786437e2c1845633 Mon Sep 17 00:00:00 2001
+From: Mitchel Humpherys <mitchelh@codeaurora.org>
+Date: Fri, 20 Dec 2013 10:46:08 -0800
+Subject: [PATCH 490/517] ion: msm: fix bug with handle id handling
+
+0 is not a valid handle id value. If we get a 0 we should try to do the
+dma_buf import.
+
+Change-Id: I2b9355a5ad65c91247c0369047f921cf02908b1c
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/ion/msm/msm_ion.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/ion/msm/msm_ion.c b/drivers/gpu/ion/msm/msm_ion.c
+index 51e50ac..0336621 100644
+--- a/drivers/gpu/ion/msm/msm_ion.c
++++ b/drivers/gpu/ion/msm/msm_ion.c
+@@ -921,7 +921,7 @@ static long msm_ion_custom_ioctl(struct ion_client *client,
+ 					sizeof(struct ion_flush_data)))
+ 			return -EFAULT;
+ 
+-		if (data.handle >= 0) {
++		if (data.handle > 0) {
+ 			handle = ion_handle_get_by_id(client, (int)data.handle);
+ 			if (IS_ERR(handle)) {
+ 				pr_info("%s: Could not find handle: %d\n",
+-- 
+1.7.9.5
+

@@ -1,0 +1,36 @@
+From a468a44ce037be835aa6829ce7ecdb168afb2b03 Mon Sep 17 00:00:00 2001
+From: Saravana Kannan <skannan@codeaurora.org>
+Date: Fri, 28 Jun 2013 12:23:12 -0700
+Subject: [PATCH 162/517] msm: clock: Don't update clk->parent in
+ clk_set_parent()
+
+Any change to the parent field has to be done between __clk_pre_reparent()
+and __clk_post_reparent() to avoid race conditions. So, stop setting the
+parent field and leave it to the ops->set_parent() implementations to
+update the parent field. All current implementations of ops->set_parent()
+already do so.
+
+Change-Id: Idc41bee306881a885335ecb322a21509231048cc
+Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/clock.c |    2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
+index 582bccf..c774d2b 100644
+--- a/arch/arm/mach-msm/clock.c
++++ b/arch/arm/mach-msm/clock.c
+@@ -544,8 +544,6 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+ 	if (clk->parent == parent)
+ 		goto out;
+ 	rc = clk->ops->set_parent(clk, parent);
+-	if (!rc)
+-		clk->parent = parent;
+ out:
+ 	mutex_unlock(&clk->prepare_lock);
+ 
+-- 
+1.7.9.5
+

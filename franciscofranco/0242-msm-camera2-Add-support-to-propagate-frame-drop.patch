@@ -1,0 +1,94 @@
+From 87f681a1773d57dcbb093f1f075b755a84e73857 Mon Sep 17 00:00:00 2001
+From: Shuzhen Wang <shuzhenw@codeaurora.org>
+Date: Tue, 12 Nov 2013 22:54:51 -0800
+Subject: [PATCH 242/517] msm: camera2: Add support to propagate frame drop
+
+Send ISP event in case of frame drop.
+
+Bug: 11293776
+Signed-off-by: Nagesh Subba Reddy <nageshsreddy@codeaurora.org>
+Signed-off-by: Shuzhen Wang <shuzhenw@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ .../platform/msm/camera_v2/isp/msm_isp_axi_util.c  |   27 ++++++++++++++++++++
+ include/media/msmb_isp.h                           |    4 ++-
+ 2 files changed, 30 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/media/platform/msm/camera_v2/isp/msm_isp_axi_util.c b/drivers/media/platform/msm/camera_v2/isp/msm_isp_axi_util.c
+index 1773642..d452b0c 100644
+--- a/drivers/media/platform/msm/camera_v2/isp/msm_isp_axi_util.c
++++ b/drivers/media/platform/msm/camera_v2/isp/msm_isp_axi_util.c
+@@ -755,6 +755,25 @@ buf_error:
+ 	return rc;
+ }
+ 
++static void msm_isp_process_frame_drop(struct vfe_device *vfe_dev,
++	struct msm_vfe_axi_stream *stream_info,
++	struct msm_isp_timestamp *ts)
++{
++	struct msm_isp_event_data buf_event;
++	uint32_t frame_id = vfe_dev->axi_data.
++		src_info[SRC_TO_INTF(stream_info->stream_src)].frame_id;
++
++	buf_event.frame_id = frame_id;
++	buf_event.timestamp = ts->buf_time;
++	buf_event.u.buf_done.session_id =
++		stream_info->session_id;
++	buf_event.u.buf_done.stream_id =
++		stream_info->stream_id;
++	buf_event.u.buf_done.handle = 0;
++	buf_event.u.buf_done.buf_idx = 0;
++	msm_isp_send_event(vfe_dev, ISP_EVENT_FRAME_DROP, &buf_event);
++}
++
+ static void msm_isp_process_done_buf(struct vfe_device *vfe_dev,
+ 	struct msm_vfe_axi_stream *stream_info, struct msm_isp_buffer *buf,
+ 	struct msm_isp_timestamp *ts)
+@@ -1277,6 +1296,10 @@ void msm_isp_process_axi_irq(struct vfe_device *vfe_dev,
+ 				if (done_buf && !rc)
+ 					msm_isp_process_done_buf(vfe_dev,
+ 					stream_info, done_buf, ts);
++				if (done_buf && rc)
++					/* Propagate frame drop */
++					msm_isp_process_frame_drop(vfe_dev,
++					stream_info, ts);
+ 			}
+ 		}
+ 		wm_mask &= ~(comp_info->stream_composite_mask);
+@@ -1322,6 +1345,10 @@ void msm_isp_process_axi_irq(struct vfe_device *vfe_dev,
+ 				if (done_buf && !rc)
+ 					msm_isp_process_done_buf(vfe_dev,
+ 					stream_info, done_buf, ts);
++				if (done_buf && rc)
++					/* Propagate frame drop */
++					msm_isp_process_frame_drop(vfe_dev,
++					stream_info, ts);
+ 			}
+ 		}
+ 	}
+diff --git a/include/media/msmb_isp.h b/include/media/msmb_isp.h
+index 7ec538f..d7ce405 100644
+--- a/include/media/msmb_isp.h
++++ b/include/media/msmb_isp.h
+@@ -297,7 +297,8 @@ enum msm_isp_event_idx {
+ 	ISP_CAMIF_ERROR     = 6,
+ 	ISP_SOF             = 7,
+ 	ISP_EOF             = 8,
+-	ISP_EVENT_MAX       = 9
++	ISP_FRAME_DROP      = 9,
++	ISP_EVENT_MAX       = 10
+ };
+ 
+ #define ISP_EVENT_OFFSET          8
+@@ -313,6 +314,7 @@ enum msm_isp_event_idx {
+ #define ISP_EVENT_CAMIF_ERROR     (ISP_EVENT_BASE + ISP_CAMIF_ERROR)
+ #define ISP_EVENT_SOF             (ISP_EVENT_BASE + ISP_SOF)
+ #define ISP_EVENT_EOF             (ISP_EVENT_BASE + ISP_EOF)
++#define ISP_EVENT_FRAME_DROP      (ISP_EVENT_BASE + ISP_FRAME_DROP)
+ #define ISP_EVENT_BUF_DIVERT      (ISP_BUF_EVENT_BASE)
+ #define ISP_EVENT_STATS_NOTIFY    (ISP_STATS_EVENT_BASE)
+ #define ISP_EVENT_COMP_STATS_NOTIFY (ISP_EVENT_STATS_NOTIFY + MSM_ISP_STATS_MAX)
+-- 
+1.7.9.5
+

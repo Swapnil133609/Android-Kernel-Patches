@@ -1,0 +1,145 @@
+From f63a24ff05a71519bd45b67de5535afe0641bc0b Mon Sep 17 00:00:00 2001
+From: Adrian Salido-Moreno <adrianm@codeaurora.org>
+Date: Thu, 31 Oct 2013 20:16:14 -0700
+Subject: [PATCH 218/517] msm: mdss: account for peak bandwidth due to SMP
+ fetch
+
+At beginning of vsync, all pipes can start fetching at the same time in
+order to fill their allocated SMP blocks, which is usually only enough
+to hold first few lines of the layer. Account for this behavior and
+ensure that there is enough bandwidth to fill these in the blanking
+period.
+
+Change-Id: Ic23e31813fe67958f741d52ab504ed683d23dd45
+Signed-off-by: Adrian Salido-Moreno <adrianm@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_mdp.h      |    1 +
+ drivers/video/msm/mdss/mdss_mdp_ctl.c  |   52 +++++++++++++++++---------------
+ drivers/video/msm/mdss/mdss_mdp_pipe.c |   11 +++++++
+ 3 files changed, 39 insertions(+), 25 deletions(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_mdp.h b/drivers/video/msm/mdss/mdss_mdp.h
+index d047b5a..edfcc54 100644
+--- a/drivers/video/msm/mdss/mdss_mdp.h
++++ b/drivers/video/msm/mdss/mdss_mdp.h
+@@ -552,6 +552,7 @@ int mdss_mdp_pipe_map(struct mdss_mdp_pipe *pipe);
+ void mdss_mdp_pipe_unmap(struct mdss_mdp_pipe *pipe);
+ struct mdss_mdp_pipe *mdss_mdp_pipe_alloc_dma(struct mdss_mdp_mixer *mixer);
+ 
++u32 mdss_mdp_smp_get_size(struct mdss_mdp_pipe *pipe);
+ int mdss_mdp_smp_reserve(struct mdss_mdp_pipe *pipe);
+ void mdss_mdp_smp_unreserve(struct mdss_mdp_pipe *pipe);
+ void mdss_mdp_smp_release(struct mdss_mdp_pipe *pipe);
+diff --git a/drivers/video/msm/mdss/mdss_mdp_ctl.c b/drivers/video/msm/mdss/mdss_mdp_ctl.c
+index a530a1e..2f34e3d 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_ctl.c
++++ b/drivers/video/msm/mdss/mdss_mdp_ctl.c
+@@ -243,12 +243,14 @@ static void mdss_mdp_perf_calc_mixer(struct mdss_mdp_mixer *mixer,
+ 	struct mdss_mdp_pipe *pipe;
+ 	struct mdss_panel_info *pinfo = NULL;
+ 	int fps = DEFAULT_FRAME_RATE;
+-	u32 v_total;
++	u32 v_total = 0;
+ 	int i;
+ 	u32 max_clk_rate = 0, ab_total = 0;
+-	u32 ib_max = 0, ib_max_smp = 0;
++	u32 ib_max = 0;
+ 	u32 ib_quota[MDSS_MDP_MAX_STAGE];
+ 	u32 v_region[MDSS_MDP_MAX_STAGE * 2];
++	u32 smp_bytes = 0;
++	u64 smp_bw = 0;
+ 
+ 	memset(perf, 0, sizeof(*perf));
+ 
+@@ -287,6 +289,8 @@ static void mdss_mdp_perf_calc_mixer(struct mdss_mdp_mixer *mixer,
+ 		if (mdss_mdp_perf_calc_pipe(pipe, &tmp))
+ 			continue;
+ 
++		smp_bytes += mdss_mdp_smp_get_size(pipe);
++
+ 		ab_total += tmp.ab_quota >> MDSS_MDP_BUS_FACTOR_SHIFT;
+ 		ib_quota[i] = tmp.ib_quota >> MDSS_MDP_BUS_FACTOR_SHIFT;
+ 		v_region[2*i] = pipe->dst.y;
+@@ -326,34 +330,32 @@ static void mdss_mdp_perf_calc_mixer(struct mdss_mdp_mixer *mixer,
+ 		ib_max = max(ib_max, ib_max_region);
+ 	}
+ 
+-	/*
+-	 * bw due to the smp concurrent fetching. Since this is the
+-	 * time that all pipes fetching lines, scaling is not a factor.
+-	 */
+-	for (i = 0; i < MDSS_MDP_MAX_STAGE; i++) {
+-		u32 src_h, dst_h;
+-		u32 ib_smp = 0;
+-		if (!ib_quota[i])
+-			continue;
+-		pipe = mixer->stage_pipe[i];
+-		src_h = pipe->src.h >> pipe->vert_deci;
+-		dst_h = pipe->dst.h;
+-		ib_smp = (src_h && src_h > dst_h) ?
+-			mult_frac(ib_quota[i], dst_h, src_h) : ib_quota[i];
+-		ib_max_smp += ib_smp;
+-		pr_debug("src_h=%d dst_h=%d ib_q=%d ib_s=%d ib_max_smp=%d\n",
+-			src_h, dst_h, ib_quota[i], ib_smp, ib_max_smp);
+-	}
+-	pr_debug("ib_max_region=%d ib_max_smp=%d\n", ib_max, ib_max_smp);
+-	ib_max = max(ib_max, ib_max_smp);
+-
+ 	perf->ab_quota += ab_total << MDSS_MDP_BUS_FACTOR_SHIFT;
+ 	perf->ib_quota += ib_max << MDSS_MDP_BUS_FACTOR_SHIFT;
+ 	if (max_clk_rate > perf->mdp_clk_rate)
+ 		perf->mdp_clk_rate = max_clk_rate;
+ 
+-	pr_debug("final mixer=%d clk_rate=%u bus ab=%llu ib=%llu\n", mixer->num,
+-		 perf->mdp_clk_rate, perf->ab_quota, perf->ib_quota);
++	if (pinfo) {
++		int vbp;
++
++		/*
++		 * need to be able to at least fill the shared memory pool
++		 * during blanking period
++		 */
++		vbp = pinfo->lcdc.v_back_porch + pinfo->lcdc.v_pulse_width;
++		smp_bw = smp_bytes * v_total * fps;
++		do_div(smp_bw, vbp);
++
++		if (smp_bw > perf->ib_quota) {
++			pr_debug("replacing ib_quota=%llu with smp_bw=%llu\n",
++					perf->ib_quota, smp_bw);
++			perf->ib_quota = smp_bw;
++		}
++	}
++
++	pr_debug("final mixer=%d clk_rate=%u bus ab=%llu ib=%llu smp=%llu\n",
++			mixer->num, perf->mdp_clk_rate,
++			perf->ab_quota, perf->ib_quota, smp_bw);
+ }
+ 
+ static void mdss_mdp_perf_calc_ctl(struct mdss_mdp_ctl *ctl,
+diff --git a/drivers/video/msm/mdss/mdss_mdp_pipe.c b/drivers/video/msm/mdss/mdss_mdp_pipe.c
+index 36833ac..5b029ed 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_pipe.c
++++ b/drivers/video/msm/mdss/mdss_mdp_pipe.c
+@@ -102,6 +102,17 @@ static int __mdss_mdp_pipe_smp_mmb_is_empty(unsigned long *smp)
+ 	return bitmap_weight(smp, SMP_MB_CNT) == 0;
+ }
+ 
++u32 mdss_mdp_smp_get_size(struct mdss_mdp_pipe *pipe)
++{
++	int i, mb_cnt = 0;
++
++	for (i = 0; i < MAX_PLANES; i++) {
++		mb_cnt += bitmap_weight(pipe->smp_map[i].allocated, SMP_MB_CNT);
++	}
++
++	return mb_cnt * SMP_MB_SIZE;
++}
++
+ static void mdss_mdp_smp_set_wm_levels(struct mdss_mdp_pipe *pipe, int mb_cnt)
+ {
+ 	u32 fetch_size, val, wm[3];
+-- 
+1.7.9.5
+

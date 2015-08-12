@@ -1,0 +1,55 @@
+From a79f3a1a30120b27620140cf673953cdf7fbe32d Mon Sep 17 00:00:00 2001
+From: Devin Kim <dojip.kim@lge.com>
+Date: Wed, 30 Oct 2013 18:56:32 -0700
+Subject: [PATCH 202/517] msm8974_pwm_vibrator: Fix the negative remaining
+ timeout
+
+It's possible that hrtimer_get_remaining() returns the nagative value.
+It causes the unintended behavior in the delayed workqueue scheduling.
+So if the value is native, it means the timer has been already expired.
+We just set the delay to 0 in this case.
+
+And use the monotonic timer for the time stamp.
+
+Change-Id: Ia16433d6c2715875f2d6f9da14e8e39824c15aa7
+Signed-off-by: Devin Kim <dojip.kim@lge.com>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/misc/msm8974_pwm_vibrator.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/misc/msm8974_pwm_vibrator.c b/drivers/misc/msm8974_pwm_vibrator.c
+index 76da51f..1a32332 100644
+--- a/drivers/misc/msm8974_pwm_vibrator.c
++++ b/drivers/misc/msm8974_pwm_vibrator.c
+@@ -361,6 +361,8 @@ static int vibrator_get_time(struct timed_output_dev *dev)
+ 	if (hrtimer_active(&vib->timer)) {
+ 		ktime_t r = hrtimer_get_remaining(&vib->timer);
+ 		ms = ktime_to_ms(r);
++		if (ms < 0)
++			ms = 0;
+ 		return min(ms, vib->ms_time);
+ 	}
+ 	return 0;
+@@ -375,7 +377,7 @@ static void vibrator_enable(struct timed_output_dev *dev, int value)
+ 
+ 	spin_lock_irqsave(&vib->spinlock, flags);
+ 
+-	now = ktime_get();
++	now = ktime_get_boottime();
+ 	if (value > 0) {
+ 		int delay = 0;
+ 		if (value > vib->max_timeout)
+@@ -388,6 +390,8 @@ static void vibrator_enable(struct timed_output_dev *dev, int value)
+ 			if (hrtimer_active(&vib->timer)) {
+ 				ktime_t r = hrtimer_get_remaining(&vib->timer);
+ 				delay = ktime_to_ms(r);
++				if (delay < 0)
++					delay = 0;
+ 			}
+ 		}
+ 
+-- 
+1.7.9.5
+

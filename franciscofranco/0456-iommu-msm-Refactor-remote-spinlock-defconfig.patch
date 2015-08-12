@@ -1,0 +1,114 @@
+From 8e3742150c29a134908bc76d1ba11485d8103421 Mon Sep 17 00:00:00 2001
+From: Olav Haugan <ohaugan@codeaurora.org>
+Date: Mon, 30 Sep 2013 16:56:54 -0700
+Subject: [PATCH 456/517] iommu: msm: Refactor remote spinlock defconfig
+
+Refactor the remote spinlock defconfig to allow it to be used with
+subsystems other than GPU. This will enhance the usability of this
+feature and minimize the chance of errors when enabling this feature.
+
+CRs-fixed: 517873
+Change-Id: I609cd77ece4e8d2e15e1a24d87a23be05a61b60f
+Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/include/mach/iommu.h |   15 +--------------
+ drivers/iommu/Kconfig                  |   14 +++++++++++++-
+ drivers/iommu/msm_iommu-v0.c           |    8 +++++---
+ 3 files changed, 19 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm/mach-msm/include/mach/iommu.h b/arch/arm/mach-msm/include/mach/iommu.h
+index 33de57c..1165011 100644
+--- a/arch/arm/mach-msm/include/mach/iommu.h
++++ b/arch/arm/mach-msm/include/mach/iommu.h
+@@ -250,7 +250,7 @@ static inline struct iommu_access_ops *msm_get_iommu_access_ops(void)
+ }
+ #endif
+ 
+-#ifdef CONFIG_MSM_IOMMU_GPU_SYNC
++#ifdef CONFIG_MSM_IOMMU_SYNC
+ void msm_iommu_remote_p0_spin_lock(void);
+ void msm_iommu_remote_p0_spin_unlock(void);
+ 
+@@ -263,19 +263,6 @@ void msm_iommu_remote_p0_spin_unlock(void);
+ #define msm_iommu_remote_spin_unlock()
+ #endif
+ 
+-/* Allows kgsl iommu driver to acquire lock */
+-#define msm_iommu_lock() \
+-	do { \
+-		msm_iommu_mutex_lock(); \
+-		msm_iommu_remote_spin_lock(); \
+-	} while (0)
+-
+-#define msm_iommu_unlock() \
+-	do { \
+-		msm_iommu_remote_spin_unlock(); \
+-		msm_iommu_mutex_unlock(); \
+-	} while (0)
+-
+ #ifdef CONFIG_MSM_IOMMU
+ /*
+  * Look up an IOMMU context device by its context name. NULL if none found.
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index 318b98f..2fa71ac 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -45,10 +45,22 @@ config MSM_IOMMU_V1
+ 
+ 	  If unsure, say N here.
+ 
++# MSM IOMMU sync lock support
++config MSM_IOMMU_SYNC
++	bool "MSM IOMMU Sync Lock Support"
++	depends on (ARCH_MSM8X60 || ARCH_MSM8960 || ARCH_APQ8064 || ARCH_MSM8930 || ARCH_MSM8610) && MSM_IOMMU_V0
++	help
++	  Say Y here if you want the IOMMU to grab a remote spinlock to ensure
++	  synchronization between IOMMU accesses by CPU and other exectution
++	  environments in the SoC.
++
++	  If unsure, say N here.
++
+ # MSM IOMMU CPU-GPU sync programming support
+ config MSM_IOMMU_GPU_SYNC
+ 	bool "MSM IOMMU CPU-GPU Sync Support"
+-	depends on (ARCH_MSM8X60 || ARCH_MSM8960 || ARCH_APQ8064 || ARCH_MSM8930) && MSM_IOMMU_V0 && MSM_REMOTE_SPINLOCK_SFPB
++	depends on (ARCH_MSM8X60 || ARCH_MSM8960 || ARCH_APQ8064 || ARCH_MSM8930) && MSM_IOMMU_V0
++	select  MSM_IOMMU_SYNC
+ 	help
+ 	  Say Y here if you want to synchronize access to IOMMU configuration
+ 	  port between CPU and GPU. CPU will grab a remote spinlock before
+diff --git a/drivers/iommu/msm_iommu-v0.c b/drivers/iommu/msm_iommu-v0.c
+index 49bfdb8..56aa7b2 100644
+--- a/drivers/iommu/msm_iommu-v0.c
++++ b/drivers/iommu/msm_iommu-v0.c
+@@ -83,7 +83,7 @@ struct msm_iommu_remote_lock {
+ 
+ static struct msm_iommu_remote_lock msm_iommu_remote_lock;
+ 
+-#ifdef CONFIG_MSM_IOMMU_GPU_SYNC
++#ifdef CONFIG_MSM_IOMMU_SYNC
+ static void _msm_iommu_remote_spin_lock_init(void)
+ {
+ 	msm_iommu_remote_lock.lock = smem_alloc(SMEM_SPINLOCK_ARRAY, 32);
+@@ -202,12 +202,14 @@ static void *_iommu_lock_initialize(void)
+ 
+ static void _iommu_lock_acquire(void)
+ {
+-	msm_iommu_lock();
++	msm_iommu_mutex_lock();
++	msm_iommu_remote_spin_lock();
+ }
+ 
+ static void _iommu_lock_release(void)
+ {
+-	msm_iommu_unlock();
++	msm_iommu_remote_spin_unlock();
++	msm_iommu_mutex_unlock();
+ }
+ 
+ struct iommu_access_ops iommu_access_ops_v0 = {
+-- 
+1.7.9.5
+

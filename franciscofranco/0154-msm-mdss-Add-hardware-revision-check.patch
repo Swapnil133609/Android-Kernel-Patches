@@ -1,0 +1,69 @@
+From 3a716fcb3f3f89fd9100217174c8ce7666f21ea1 Mon Sep 17 00:00:00 2001
+From: myfluxi <linflux@arcor.de>
+Date: Tue, 3 Dec 2013 20:20:40 +0100
+Subject: [PATCH 154/517] msm: mdss: Add hardware revision check
+
+Our gamma interface works with both current hardware revisions,
+11 and 11j, although all testing was carried out on 11. As we
+don't know about possible future revisions, let's bail out until
+correct offsets for panel commands have been added.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_dsi_panel.c |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/drivers/video/msm/mdss/mdss_dsi_panel.c b/drivers/video/msm/mdss/mdss_dsi_panel.c
+index 47ad8be..de9a747 100644
+--- a/drivers/video/msm/mdss/mdss_dsi_panel.c
++++ b/drivers/video/msm/mdss/mdss_dsi_panel.c
+@@ -26,9 +26,12 @@
+ #include <linux/ctype.h>
+ #endif
+ 
++#include <asm/system_info.h>
++
+ #include "mdss_dsi.h"
+ 
+ #define DT_CMD_HDR 6
++#define GAMMA_COMPAT 11
+ 
+ static bool mdss_panel_flip_ud = false;
+ static int mdss_panel_id = PANEL_QCOM;
+@@ -1068,6 +1071,11 @@ static int read_local_on_cmds(char *buf, size_t cmd)
+ 	int i, len = 0;
+ 	int dlen;
+ 
++	if (system_rev != GAMMA_COMPAT) {
++		pr_err("Incompatible hardware revision: %d\n", system_rev);
++		return -EINVAL;
++	}
++
+ 	dlen = local_pdata->on_cmds.cmds[cmd].dchdr.dlen - 1;
+ 	if (!dlen)
+ 		return -ENOMEM;
+@@ -1099,6 +1107,11 @@ static int write_local_on_cmds(struct device *dev, const char *buf,
+ 		return -EINVAL;
+ 	}
+ 
++	if (system_rev != GAMMA_COMPAT) {
++		pr_err("Incompatible hardware revision: %d\n", system_rev);
++		return -EINVAL;
++	}
++
+ 	if (cmds_panel_data == NULL) {
+ 		pr_err("%s: Invalid input data\n", __func__);
+ 		return -EINVAL;
+@@ -1138,6 +1151,8 @@ static int write_local_on_cmds(struct device *dev, const char *buf,
+ 		cnt = strlen(tmp);
+ 	}
+ 
++	pr_info("%s\n", __func__);
++
+ 	return rc;
+ }
+ 
+-- 
+1.7.9.5
+

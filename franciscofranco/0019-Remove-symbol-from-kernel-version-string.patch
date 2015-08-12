@@ -1,0 +1,27 @@
+From 6f31c0f6b8d8fd6982287083ff282d83bb35b77b Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Mon, 19 Dec 2011 02:19:42 +0000
+Subject: [PATCH 019/517] Remove '+' symbol from kernel version string
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ scripts/setlocalversion |    1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/scripts/setlocalversion b/scripts/setlocalversion
+index 857ea4f..5e57025 100755
+--- a/scripts/setlocalversion
++++ b/scripts/setlocalversion
+@@ -184,7 +184,6 @@ else
+ 	# LOCALVERSION= is not specified
+ 	if test "${LOCALVERSION+set}" != "set"; then
+ 		scm=$(scm_version --short)
+-		res="$res${scm:++}"
+ 	fi
+ fi
+ 
+-- 
+1.7.9.5
+

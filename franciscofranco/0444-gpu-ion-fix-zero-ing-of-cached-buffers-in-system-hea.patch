@@ -1,0 +1,51 @@
+From dc374557f01097169e52da467fde84221a3018ca Mon Sep 17 00:00:00 2001
+From: Mitchel Humpherys <mitchelh@codeaurora.org>
+Date: Tue, 5 Nov 2013 16:55:22 -0800
+Subject: [PATCH 444/517] gpu: ion: fix zero'ing of cached buffers in system
+ heap
+
+Currently, in the system heap we zero out buffers at free-time when they
+came from uncached allocations. The reason for this is that uncached
+allocations come from the page pools, which require this free-time
+zero'ing. However, the assumption that a buffer came from the page pools
+iff it was an uncached allocation is no longer valid since [0204b38
+"gpu: ion: add page pooling to cached allocations from the system heap"]
+introduced page pooling for cached allocations as well. This results in
+us not zero'ing out cached buffers before putting them back in the page
+pools, which is a security bug (we could potentially leak sensitive
+information).
+
+Fix this by zero'ing out all buffers that are going back into the page
+pools (cached and uncached).
+
+Change-Id: I5c51eca75c8cc3b3823df1494bb0eef295c77b86
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/ion/ion_system_heap.c |    5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/ion/ion_system_heap.c b/drivers/gpu/ion/ion_system_heap.c
+index 0463ebe..1665892 100644
+--- a/drivers/gpu/ion/ion_system_heap.c
++++ b/drivers/gpu/ion/ion_system_heap.c
+@@ -218,14 +218,11 @@ void ion_system_heap_free(struct ion_buffer *buffer)
+ 							struct ion_system_heap,
+ 							heap);
+ 	struct sg_table *table = buffer->sg_table;
+-	bool cached = ion_buffer_cached(buffer);
+ 	struct scatterlist *sg;
+ 	LIST_HEAD(pages);
+ 	int i;
+ 
+-	/* uncached pages come from the page pools, zero them before returning
+-	   for security purposes (other allocations are zerod at alloc time */
+-	if (!cached && !(buffer->flags & ION_FLAG_FREED_FROM_SHRINKER))
++	if (!(buffer->flags & ION_FLAG_FREED_FROM_SHRINKER))
+ 		ion_heap_buffer_zero(buffer);
+ 
+ 	for_each_sg(table->sgl, sg, table->nents, i)
+-- 
+1.7.9.5
+

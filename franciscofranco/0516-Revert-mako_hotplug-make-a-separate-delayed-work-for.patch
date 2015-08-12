@@ -1,0 +1,110 @@
+From ded2d3dd0b07e0758db6e3992ed9e41f0c58042d Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Thu, 2 Jan 2014 16:29:49 +0000
+Subject: [PATCH 516/517] Revert "mako_hotplug: make a separate delayed work
+ for when the device is sleeping, but wakelocked,
+ and the device needs extra work that only one core
+ can't withstand, for example listening to music and
+ the GSM network changes from 2G to 3G or
+ vice-versa, or Wi-Fi going up/down. Previous of
+ this patch it would stutter the audio. With this
+ separate work it will online cpu1 if the load
+ justifies and so audio stutters are no more."
+
+ * This caused the watchdog to bark because the msm pm driver doesn't particulary enjoy when I online a core during power collapse.
+
+This reverts commit bde7929ff1c692dd494e3cbce6b97aadfdf05d12.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/kernel/mako_hotplug.c |   40 +---------------------------------------
+ 1 file changed, 1 insertion(+), 39 deletions(-)
+
+diff --git a/arch/arm/kernel/mako_hotplug.c b/arch/arm/kernel/mako_hotplug.c
+index 35bc539..b5da1bd 100644
+--- a/arch/arm/kernel/mako_hotplug.c
++++ b/arch/arm/kernel/mako_hotplug.c
+@@ -66,7 +66,6 @@ static DEFINE_PER_CPU(struct cpu_load_data, cpuload);
+ static struct workqueue_struct *wq;
+ static struct workqueue_struct *screen_on_off_wq;
+ static struct delayed_work decide_hotplug;
+-static struct delayed_work decide_hotplug_screen_off;
+ static struct work_struct suspend;
+ static struct work_struct resume;
+ 
+@@ -191,36 +190,6 @@ static void __ref decide_hotplug_func(struct work_struct *work)
+     queue_delayed_work(wq, &decide_hotplug, msecs_to_jiffies(TIMER));
+ }
+ 
+-static void __ref decide_hotplug_screen_off_func(struct work_struct *work)
+-{
+-	unsigned int cur_load;
+-
+-	cur_load = get_cpu_load(0);
+-
+-	if (cur_load >= stats.default_first_level)
+-	{
+-		if (likely(stats.counter[0] < HIGH_LOAD_COUNTER))    
+-			stats.counter[0] += 2;
+-
+-		if (cpu_is_offline(1) && stats.counter[0] >= 10)
+-			cpu_up(1);
+-	}
+-
+-	else
+-	{
+-		if (stats.counter[0])
+-			--stats.counter[0];
+-
+-		if (cpu_online(1) && stats.counter[0] < 10)
+-		{
+-			cpu_down(1);
+-			stats.counter[0] = 0;
+-		}
+-	}
+-
+-	queue_delayed_work(wq, &decide_hotplug_screen_off, msecs_to_jiffies(HZ));
+-}
+-
+ static void hotplug_suspend(struct work_struct *work)
+ {	 
+     int cpu;
+@@ -240,18 +209,12 @@ static void hotplug_suspend(struct work_struct *work)
+ 		if (cpu_online(cpu) && cpu)
+ 			cpu_down(cpu);
+ 	}
+-
+-	queue_delayed_work(wq, &decide_hotplug_screen_off, msecs_to_jiffies(HZ));
+ }
+ 
+ static void __ref hotplug_resume(struct work_struct *work)
+ {  
+     int cpu;
+ 
+-	/* First flush the WQ then cancel the hotplug work when the screen is off */
+-	flush_workqueue(wq);
+-    cancel_delayed_work(&decide_hotplug_screen_off);
+-
+ 	for_each_possible_cpu(cpu)
+ 	{
+ 		if (cpu_is_offline(cpu) && cpu)
+@@ -336,7 +299,7 @@ int __init mako_hotplug_init(void)
+ {
+ 	pr_info("Mako Hotplug driver started.\n");
+ 
+-    wq = alloc_ordered_workqueue("mako_hotplug_workqueue", WQ_FREEZABLE);
++    wq = alloc_ordered_workqueue("mako_hotplug_workqueue", 0);
+     
+     if (!wq)
+         return -ENOMEM;
+@@ -356,7 +319,6 @@ int __init mako_hotplug_init(void)
+ 	INIT_WORK(&suspend, hotplug_suspend);
+ 	INIT_WORK(&resume, hotplug_resume);
+     INIT_DELAYED_WORK(&decide_hotplug, decide_hotplug_func);
+-	INIT_DELAYED_WORK(&decide_hotplug_screen_off, decide_hotplug_screen_off_func);
+ 
+ 	queue_delayed_work(wq, &decide_hotplug, HZ * 20);
+     
+-- 
+1.7.9.5
+

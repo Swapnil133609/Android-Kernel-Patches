@@ -1,0 +1,43 @@
+From 9af3adb1d70e2778352455fcf8c15d23b86c10b1 Mon Sep 17 00:00:00 2001
+From: Olav Haugan <ohaugan@codeaurora.org>
+Date: Mon, 21 Oct 2013 17:42:25 -0700
+Subject: [PATCH 369/517] iommu: msm: Use ion_phys_addr_t for iova argument
+
+IOMMU mapping function is using the wrong type for its
+IO Virtual Address (IOVA) causing the returned address
+to contain garbage in the upper 32 bits when LPAE is enabled.
+
+CRs-fixed: 564365
+Change-Id: Ied592fe855a145b0ff32d2a6228ecfcf7fd0a53e
+Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/ion/msm/ion_iommu_map.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/ion/msm/ion_iommu_map.c b/drivers/gpu/ion/msm/ion_iommu_map.c
+index 3e1a7ee..c2b65ba 100644
+--- a/drivers/gpu/ion/msm/ion_iommu_map.c
++++ b/drivers/gpu/ion/msm/ion_iommu_map.c
+@@ -285,7 +285,7 @@ static void ion_iommu_heap_unmap_iommu(struct ion_iommu_map *data)
+ static struct ion_iommu_map *__ion_iommu_map(struct ion_iommu_meta *meta,
+ 		int domain_num, int partition_num, unsigned long align,
+ 		unsigned long iova_length, unsigned long flags,
+-		unsigned long *iova)
++		ion_phys_addr_t *iova)
+ {
+ 	struct ion_iommu_map *data;
+ 	int ret;
+@@ -367,7 +367,7 @@ static void ion_iommu_meta_put(struct ion_iommu_meta *meta)
+ 
+ int ion_map_iommu(struct ion_client *client, struct ion_handle *handle,
+ 			int domain_num, int partition_num, unsigned long align,
+-			unsigned long iova_length, unsigned long *iova,
++			unsigned long iova_length, ion_phys_addr_t *iova,
+ 			unsigned long *buffer_size,
+ 			unsigned long flags, unsigned long iommu_flags)
+ {
+-- 
+1.7.9.5
+

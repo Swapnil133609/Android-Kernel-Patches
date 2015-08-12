@@ -1,0 +1,31 @@
+From f385233f58e10321fb5a767e784c3f8095e32bb6 Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Thu, 2 Jan 2014 16:32:44 +0000
+Subject: [PATCH 517/517] cpufreq: interactive: decrease timer_slack to 70ms
+
+4 * timer_rate could lead to enourmous defferable timer and sometimes,
+even during screen off we might need cpufreq to react fast so lowered
+timer_slack will help with that. This is specific to interactive, other
+governors handle their routines differently.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index 10f14c4..0846bd4 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -118,7 +118,7 @@ static int boostpulse_duration_val = DEFAULT_BOOSTPULSE_DURATION;
+  * Max additional time to wait in idle, beyond timer_rate, at speeds above
+  * minimum before wakeup to reduce speed, or -1 if unnecessary.
+  */
+-#define DEFAULT_TIMER_SLACK (4 * DEFAULT_TIMER_RATE)
++#define DEFAULT_TIMER_SLACK (70000)
+ static int timer_slack_val = DEFAULT_TIMER_SLACK;
+ 
+ static bool io_is_busy = true;
+-- 
+1.7.9.5
+

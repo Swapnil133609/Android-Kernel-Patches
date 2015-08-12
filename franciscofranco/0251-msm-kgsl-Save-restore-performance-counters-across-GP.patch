@@ -1,0 +1,292 @@
+From 1cbc4211120610622e1bf56f0ad7abcc9e237e29 Mon Sep 17 00:00:00 2001
+From: Harshdeep Dhatt <hdhatt@codeaurora.org>
+Date: Fri, 22 Nov 2013 08:47:06 -0700
+Subject: [PATCH 251/517] msm: kgsl: Save/restore performance counters across
+ GPU power collapse
+
+Physical performance counters are reset on GPU power collapse.
+Save the values of the performance counters when the GPU goes to
+power collapse and restore them on restart.
+
+Change-Id: I63bec7b20e7fe516bbac4901cac0af3a1c1f4959
+Signed-off-by: Harshdeep Dhatt <hdhatt@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/msm/adreno.c      |   39 ++++++++++++
+ drivers/gpu/msm/adreno.h      |    6 ++
+ drivers/gpu/msm/adreno_a3xx.c |  133 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 178 insertions(+)
+
+diff --git a/drivers/gpu/msm/adreno.c b/drivers/gpu/msm/adreno.c
+index a0a3df6..055602d 100644
+--- a/drivers/gpu/msm/adreno.c
++++ b/drivers/gpu/msm/adreno.c
+@@ -565,6 +565,33 @@ int adreno_perfcounter_put(struct adreno_device *adreno_dev,
+ 	return -EINVAL;
+ }
+ 
++/**
++ * adreno_perfcounter_restore() - Restore performance counters
++ * @adreno_dev: adreno device to configure
++ *
++ * Load the physical performance counters with 64 bit value which are
++ * saved on GPU power collapse.
++ */
++static inline void adreno_perfcounter_restore(struct adreno_device *adreno_dev)
++{
++	if (adreno_dev->gpudev->perfcounter_restore)
++		adreno_dev->gpudev->perfcounter_restore(adreno_dev);
++}
++
++/**
++ * adreno_perfcounter_save() - Save performance counters
++ * @adreno_dev: adreno device to configure
++ *
++ * Save the performance counter values before GPU power collapse.
++ * The saved values are restored on restart.
++ * This ensures physical counters are coherent across power-collapse.
++ */
++static inline void adreno_perfcounter_save(struct adreno_device *adreno_dev)
++{
++	if (adreno_dev->gpudev->perfcounter_save)
++		adreno_dev->gpudev->perfcounter_save(adreno_dev);
++}
++
+ static irqreturn_t adreno_irq_handler(struct kgsl_device *device)
+ {
+ 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+@@ -1739,6 +1766,9 @@ static int adreno_start(struct kgsl_device *device)
+ 		adreno_dev->gpudev->soft_reset(adreno_dev);
+ 	}
+ 
++	/* Restore performance counter registers with saved values */
++	adreno_perfcounter_restore(adreno_dev);
++
+ 	/* Start the GPU */
+ 	adreno_dev->gpudev->start(adreno_dev);
+ 
+@@ -1796,6 +1826,9 @@ static int adreno_stop(struct kgsl_device *device)
+ 
+ 	adreno_ocmem_gmem_free(adreno_dev);
+ 
++	/* Save physical performance counter values before GPU power down*/
++	adreno_perfcounter_save(adreno_dev);
++
+ 	/* Power down the device */
+ 	kgsl_pwrctrl_disable(device);
+ 
+@@ -2325,9 +2358,15 @@ int adreno_soft_reset(struct kgsl_device *device)
+ 	/* Make sure we are totally awake */
+ 	kgsl_pwrctrl_enable(device);
+ 
++	/* save physical performance counter values before GPU soft reset */
++	adreno_perfcounter_save(adreno_dev);
++
+ 	/* Reset the GPU */
+ 	adreno_dev->gpudev->soft_reset(adreno_dev);
+ 
++	/* Restore physical performance counter values after soft reset */
++	adreno_perfcounter_restore(adreno_dev);
++
+ 	/* Reinitialize the GPU */
+ 	adreno_dev->gpudev->start(adreno_dev);
+ 
+diff --git a/drivers/gpu/msm/adreno.h b/drivers/gpu/msm/adreno.h
+index 7014b56..7e7b552 100644
+--- a/drivers/gpu/msm/adreno.h
++++ b/drivers/gpu/msm/adreno.h
+@@ -216,6 +216,7 @@ enum adreno_device_flags {
+  * @offset: register hardware offset
+  * @load_bit: The bit number in LOAD register which corresponds to this counter
+  * @select: The countable register offset
++ * @value: The 64 bit countable register value
+  */
+ struct adreno_perfcount_register {
+ 	unsigned int countable;
+@@ -224,6 +225,7 @@ struct adreno_perfcount_register {
+ 	unsigned int offset;
+ 	int load_bit;
+ 	unsigned int select;
++	uint64_t value;
+ };
+ 
+ /**
+@@ -368,12 +370,16 @@ struct adreno_gpudev {
+ 	int (*rb_init)(struct adreno_device *, struct adreno_ringbuffer *);
+ 	int (*perfcounter_init)(struct adreno_device *);
+ 	void (*perfcounter_close)(struct adreno_device *);
++	void (*perfcounter_save)(struct adreno_device *);
++	void (*perfcounter_restore)(struct adreno_device *);
+ 	void (*start)(struct adreno_device *);
+ 	unsigned int (*busy_cycles)(struct adreno_device *);
+ 	int (*perfcounter_enable)(struct adreno_device *, unsigned int group,
+ 		unsigned int counter, unsigned int countable);
+ 	uint64_t (*perfcounter_read)(struct adreno_device *adreno_dev,
+ 		unsigned int group, unsigned int counter);
++	void (*perfcounter_write)(struct adreno_device *adreno_dev,
++		unsigned int group, unsigned int counter);
+ 	int (*coresight_enable) (struct kgsl_device *device);
+ 	void (*coresight_disable) (struct kgsl_device *device);
+ 	void (*coresight_config_debug_reg) (struct kgsl_device *device,
+diff --git a/drivers/gpu/msm/adreno_a3xx.c b/drivers/gpu/msm/adreno_a3xx.c
+index 8147d26..4642f8d 100644
+--- a/drivers/gpu/msm/adreno_a3xx.c
++++ b/drivers/gpu/msm/adreno_a3xx.c
+@@ -3402,6 +3402,136 @@ static uint64_t a3xx_perfcounter_read(struct adreno_device *adreno_dev,
+ 	return (((uint64_t) hi) << 32) | lo;
+ }
+ 
++/*
++ * values cannot be loaded into physical performance
++ * counters belonging to these groups.
++ */
++static inline int loadable_perfcounter_group(unsigned int groupid)
++{
++	return ((groupid == KGSL_PERFCOUNTER_GROUP_VBIF_PWR) ||
++		(groupid == KGSL_PERFCOUNTER_GROUP_VBIF) ||
++		(groupid == KGSL_PERFCOUNTER_GROUP_PWR)) ? 0 : 1;
++}
++
++/*
++ * Return true if the countable is used and not broken
++ */
++static inline int active_countable(unsigned int countable)
++{
++	return ((countable != KGSL_PERFCOUNTER_NOT_USED) &&
++		(countable != KGSL_PERFCOUNTER_BROKEN));
++}
++
++/**
++ * a3xx_perfcounter_save() - Save the physical performance counter values
++ * @adreno_dev -  Adreno device whose registers need to be saved
++ *
++ * Read all the physical performance counter's values and save them
++ * before GPU power collapse.
++ */
++static void a3xx_perfcounter_save(struct adreno_device *adreno_dev)
++{
++	struct adreno_perfcounters *counters = adreno_dev->gpudev->perfcounters;
++	struct adreno_perfcount_group *group;
++	unsigned int regid, groupid;
++
++	for (groupid = 0; groupid < counters->group_count; groupid++) {
++		if (!loadable_perfcounter_group(groupid))
++			continue;
++
++		group = &(counters->groups[groupid]);
++
++		/* group/counter iterator */
++		for (regid = 0; regid < group->reg_count; regid++) {
++			if (!active_countable(group->regs[regid].countable))
++				continue;
++
++			group->regs[regid].value =
++				adreno_dev->gpudev->perfcounter_read(
++				adreno_dev, groupid, regid);
++		}
++	}
++}
++
++/**
++ * a3xx_perfcounter_write() - Write the physical performance counter values.
++ * @adreno_dev -  Adreno device whose registers are to be written to.
++ * @group - group to which the physical counter belongs to.
++ * @counter - register id of the physical counter to which the value is
++ *		written to.
++ *
++ * This function loads the 64 bit saved value into the particular physical
++ * counter by enabling the corresponding bit in A3XX_RBBM_PERFCTR_LOAD_CMD*
++ * register.
++ */
++static void a3xx_perfcounter_write(struct adreno_device *adreno_dev,
++				unsigned int group, unsigned int counter)
++{
++	struct kgsl_device *device = &(adreno_dev->dev);
++	struct adreno_perfcount_register *reg;
++	unsigned int val;
++
++	reg = &(adreno_dev->gpudev->perfcounters->groups[group].regs[counter]);
++
++	/* Clear the load cmd registers */
++	kgsl_regwrite(device, A3XX_RBBM_PERFCTR_LOAD_CMD0, 0);
++	kgsl_regwrite(device, A3XX_RBBM_PERFCTR_LOAD_CMD1, 0);
++
++	/* Write the saved value to PERFCTR_LOAD_VALUE* registers. */
++	kgsl_regwrite(device, A3XX_RBBM_PERFCTR_LOAD_VALUE_LO,
++			(uint32_t)reg->value);
++	kgsl_regwrite(device, A3XX_RBBM_PERFCTR_LOAD_VALUE_HI,
++			(uint32_t)(reg->value >> 32));
++
++	/*
++	 * Set the load bit in PERFCTR_LOAD_CMD for the physical counter
++	 * we want to restore. The value in PERFCTR_LOAD_VALUE* is loaded
++	 * into the corresponding physical counter.
++	 */
++	if (reg->load_bit < 32)	{
++		val = 1 << reg->load_bit;
++		kgsl_regwrite(device, A3XX_RBBM_PERFCTR_LOAD_CMD0, val);
++	} else {
++		val  = 1 << (reg->load_bit - 32);
++		kgsl_regwrite(device, A3XX_RBBM_PERFCTR_LOAD_CMD1, val);
++	}
++}
++
++/**
++ * a3xx_perfcounter_restore() - Restore the physical performance counter values.
++ * @adreno_dev -  Adreno device whose registers are to be restored.
++ *
++ * This function together with a3xx_perfcounter_save make sure that performance
++ * counters are coherent across GPU power collapse.
++ */
++static void a3xx_perfcounter_restore(struct adreno_device *adreno_dev)
++{
++	struct kgsl_device *device = &adreno_dev->dev;
++	struct adreno_perfcounters *counters = adreno_dev->gpudev->perfcounters;
++	struct adreno_perfcount_group *group;
++	unsigned int regid, groupid;
++
++	for (groupid = 0; groupid < counters->group_count; groupid++) {
++		if (!loadable_perfcounter_group(groupid))
++			continue;
++
++		group = &(counters->groups[groupid]);
++
++		/* group/counter iterator */
++		for (regid = 0; regid < group->reg_count; regid++) {
++			if (!active_countable(group->regs[regid].countable))
++				continue;
++
++			a3xx_perfcounter_write(adreno_dev, groupid, regid);
++		}
++	}
++
++	/* Clear the load cmd registers */
++	kgsl_regwrite(device, A3XX_RBBM_PERFCTR_LOAD_CMD0, 0);
++	kgsl_regwrite(device, A3XX_RBBM_PERFCTR_LOAD_CMD1, 0);
++
++}
++
+ #define A3XX_IRQ_CALLBACK(_c) { .func = _c }
+ 
+ #define A3XX_INT_MASK \
+@@ -4378,6 +4508,8 @@ struct adreno_gpudev adreno_a3xx_gpudev = {
+ 	.rb_init = a3xx_rb_init,
+ 	.perfcounter_init = a3xx_perfcounter_init,
+ 	.perfcounter_close = a3xx_perfcounter_close,
++	.perfcounter_save = a3xx_perfcounter_save,
++	.perfcounter_restore = a3xx_perfcounter_restore,
+ 	.irq_control = a3xx_irq_control,
+ 	.irq_handler = a3xx_irq_handler,
+ 	.irq_pending = a3xx_irq_pending,
+@@ -4386,6 +4518,7 @@ struct adreno_gpudev adreno_a3xx_gpudev = {
+ 	.snapshot = a3xx_snapshot,
+ 	.perfcounter_enable = a3xx_perfcounter_enable,
+ 	.perfcounter_read = a3xx_perfcounter_read,
++	.perfcounter_write = a3xx_perfcounter_write,
+ 	.coresight_enable = a3xx_coresight_enable,
+ 	.coresight_disable = a3xx_coresight_disable,
+ 	.coresight_config_debug_reg = a3xx_coresight_config_debug_reg,
+-- 
+1.7.9.5
+

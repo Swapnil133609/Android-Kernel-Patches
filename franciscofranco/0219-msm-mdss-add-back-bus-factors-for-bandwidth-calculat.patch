@@ -1,0 +1,55 @@
+From 3094a1becf9284af9314b5abec6fd74f47be0bb4 Mon Sep 17 00:00:00 2001
+From: Adrian Salido-Moreno <adrianm@codeaurora.org>
+Date: Mon, 4 Nov 2013 21:08:21 -0800
+Subject: [PATCH 219/517] msm: mdss: add back bus factors for bandwidth
+ calculations
+
+Bus factors are needed to account for how system behaves. AB factors is
+needed due to the way bus driver is calculating the bandwidth by
+dividing it across 2x ports. IB factor is needed to account for DDR
+inefficiency and get the correct throughput.
+
+Change-Id: Iccf83dd25615de489d8e986c38a6d2e9175a965c
+Signed-off-by: Adrian Salido-Moreno <adrianm@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_mdp_ctl.c |   15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_mdp_ctl.c b/drivers/video/msm/mdss/mdss_mdp_ctl.c
+index 2f34e3d..236b919 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_ctl.c
++++ b/drivers/video/msm/mdss/mdss_mdp_ctl.c
+@@ -23,8 +23,17 @@
+ 
+ /* truncate at 1k */
+ #define MDSS_MDP_BUS_FACTOR_SHIFT 10
+-/* 1.5 bus fudge factor */
+-#define MDSS_MDP_BUS_FUDGE_FACTOR_AB(val) mult_frac(val, 5, 4)
++
++
++/*
++ * 2x factor on AB because bus driver will divide by 2
++ * due to 2x ports to BIMC
++ */
++#define MDSS_MDP_BUS_FUDGE_FACTOR_AB(val) ((val) << 1)
++
++/* 1.5 factor to account for DDR inefficiency */
++#define MDSS_MDP_BUS_FUDGE_FACTOR_IB(val) mult_frac((val), 3, 2)
++
+ #define MDSS_MDP_BUS_FLOOR_BW (1600000000ULL)
+ 
+ /* 1.25 clock fudge factor */
+@@ -106,6 +115,8 @@ static void __mdss_mdp_ctrl_perf_ovrd(struct mdss_data_type *mdata,
+ 		ovrd |= __mdss_mdp_ctrl_perf_ovrd_helper(
+ 				ctl->mixer_right, &npipe);
+ 	}
++
++	*ib_quota = MDSS_MDP_BUS_FUDGE_FACTOR_IB(*ib_quota);
+ 	*ab_quota = MDSS_MDP_BUS_FUDGE_FACTOR_AB(*ab_quota);
+ 	if (ovrd && (*ib_quota < MDSS_MDP_BUS_FLOOR_BW)) {
+ 		*ib_quota = MDSS_MDP_BUS_FLOOR_BW;
+-- 
+1.7.9.5
+

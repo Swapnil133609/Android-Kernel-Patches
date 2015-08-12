@@ -1,0 +1,84 @@
+From f869cfa6a6878d2316b7840e2260473a34a0a031 Mon Sep 17 00:00:00 2001
+From: Maya Erez <merez@codeaurora.org>
+Date: Sat, 28 Sep 2013 22:25:53 +0300
+Subject: [PATCH 496/517] mmc: block: flush request requeue after timeout.
+
+On some eMMC cards cache flush is taking longer than 30 sec timeout
+after HPI issued and -EIO reported to the upper layers. This may result
+into journaling issues as flush calls are issued by the file system
+joulrnaling code.
+
+This change increases flash cache timeout to 90 sec, in case of timeout
+occurs, after HPI issued, flash request re-queued to the block layer queue
+to execute it later and keep journaling logic valid.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+
+Conflicts:
+	drivers/mmc/card/block.c
+
+Change-Id: I1e968c07056062fd9c8e14e5bc3e62b3b4b99c64
+Signed-off-by: Panwar Vivek <vpanwa@codeaurora.org>
+
+Conflicts:
+
+	drivers/mmc/card/block.c
+
+Signed-off-by: Maya Erez <merez@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/mmc/card/block.c |   15 +++++++++++----
+ drivers/mmc/core/core.c  |    2 +-
+ 2 files changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+index 8431fed..668cc7a 100644
+--- a/drivers/mmc/card/block.c
++++ b/drivers/mmc/card/block.c
+@@ -1401,18 +1401,25 @@ out:
+ static int mmc_blk_issue_flush(struct mmc_queue *mq, struct request *req)
+ {
+ 	struct mmc_blk_data *md = mq->data;
++	struct request_queue *q = mq->queue;
+ 	struct mmc_card *card = md->queue.card;
+ 	int ret = 0;
+ 
+ 	ret = mmc_flush_cache(card);
+-	if (ret) {
+-		pr_err("%s: %s: notify flush error to upper layers",
+-				req->rq_disk->disk_name, __func__);
++	if (ret == -ETIMEDOUT) {
++		pr_info("%s: requeue flush request after timeout", __func__);
++		spin_lock_irq(q->queue_lock);
++		blk_requeue_request(q, req);
++		spin_unlock_irq(q->queue_lock);
++		ret = 0;
++		goto exit;
++	} else if (ret) {
++		pr_err("%s: notify flush error to upper layers", __func__);
+ 		ret = -EIO;
+ 	}
+ 
+ 	blk_end_request_all(req, ret);
+-
++exit:
+ 	return ret ? 0 : 1;
+ }
+ 
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 210b012..2a6e43f 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -60,7 +60,7 @@ static void mmc_clk_scaling(struct mmc_host *host, bool from_wq);
+ #define MMC_BKOPS_MAX_TIMEOUT	(30 * 1000) /* max time to wait in ms */
+ 
+ /* Flushing a large amount of cached data may take a long time. */
+-#define MMC_FLUSH_REQ_TIMEOUT_MS 30000 /* msec */
++#define MMC_FLUSH_REQ_TIMEOUT_MS 90000 /* msec */
+ 
+ static struct workqueue_struct *workqueue;
+ 
+-- 
+1.7.9.5
+

@@ -1,0 +1,98 @@
+From 7a3262dac24eb1707f87e965cce1353dc53be11c Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Fri, 6 Dec 2013 17:30:19 +0000
+Subject: [PATCH 179/517] Revert "net: wireless: bcmdhd: fixed power
+ consumption issue of P2P."
+
+This reverts commit 837961187ec3ecf82a11b89d7cf8fb267d3ed9ce.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/net/wireless/bcmdhd/dhd.h         |    3 ---
+ drivers/net/wireless/bcmdhd/dhd_linux.c   |   17 -----------------
+ drivers/net/wireless/bcmdhd/wl_cfg80211.c |    6 +-----
+ 3 files changed, 1 insertion(+), 25 deletions(-)
+
+diff --git a/drivers/net/wireless/bcmdhd/dhd.h b/drivers/net/wireless/bcmdhd/dhd.h
+index ee0e19e..e844f90 100644
+--- a/drivers/net/wireless/bcmdhd/dhd.h
++++ b/drivers/net/wireless/bcmdhd/dhd.h
+@@ -415,7 +415,6 @@ extern int dhd_os_wake_unlock(dhd_pub_t *pub);
+ extern int dhd_os_wake_lock_timeout(dhd_pub_t *pub);
+ extern int dhd_os_wake_lock_rx_timeout_enable(dhd_pub_t *pub, int val);
+ extern int dhd_os_wake_lock_ctrl_timeout_enable(dhd_pub_t *pub, int val);
+-extern int dhd_os_wake_lock_ctrl_timeout_cancel(dhd_pub_t *pub);
+ extern int dhd_os_wd_wake_lock(dhd_pub_t *pub);
+ extern int dhd_os_wd_wake_unlock(dhd_pub_t *pub);
+ 
+@@ -449,8 +448,6 @@ inline static void MUTEX_UNLOCK_SOFTAP_SET(dhd_pub_t * dhdp)
+ 	dhd_os_wake_lock_rx_timeout_enable(pub, val)
+ #define DHD_OS_WAKE_LOCK_CTRL_TIMEOUT_ENABLE(pub, val) \
+ 	dhd_os_wake_lock_ctrl_timeout_enable(pub, val)
+-#define DHD_OS_WAKE_LOCK_CTRL_TIMEOUT_CANCEL(pub) \
+-	dhd_os_wake_lock_ctrl_timeout_cancel(pub)
+ #define DHD_PACKET_TIMEOUT_MS	1000
+ #define DHD_EVENT_TIMEOUT_MS	1500
+ 
+diff --git a/drivers/net/wireless/bcmdhd/dhd_linux.c b/drivers/net/wireless/bcmdhd/dhd_linux.c
+index 4ef7c70..4d04ccd 100644
+--- a/drivers/net/wireless/bcmdhd/dhd_linux.c
++++ b/drivers/net/wireless/bcmdhd/dhd_linux.c
+@@ -5824,23 +5824,6 @@ int dhd_os_wake_lock_ctrl_timeout_enable(dhd_pub_t *pub, int val)
+ 	return 0;
+ }
+ 
+-int dhd_os_wake_lock_ctrl_timeout_cancel(dhd_pub_t *pub)
+-{
+-	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
+-	unsigned long flags;
+-
+-	if (dhd) {
+-		spin_lock_irqsave(&dhd->wakelock_spinlock, flags);
+-		dhd->wakelock_ctrl_timeout_enable = 0;
+-#ifdef CONFIG_HAS_WAKELOCK
+-		if (wake_lock_active(&dhd->wl_ctrlwake))
+-			wake_unlock(&dhd->wl_ctrlwake);
+-#endif
+-		spin_unlock_irqrestore(&dhd->wakelock_spinlock, flags);
+-	}
+-	return 0;
+-}
+-
+ int net_os_wake_lock_rx_timeout_enable(struct net_device *dev, int val)
+ {
+ 	dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev);
+diff --git a/drivers/net/wireless/bcmdhd/wl_cfg80211.c b/drivers/net/wireless/bcmdhd/wl_cfg80211.c
+index 0bdaf4e..7bb07b9 100644
+--- a/drivers/net/wireless/bcmdhd/wl_cfg80211.c
++++ b/drivers/net/wireless/bcmdhd/wl_cfg80211.c
+@@ -1409,9 +1409,6 @@ wl_cfg80211_del_virtual_iface(struct wiphy *wiphy, bcm_struct_cfgdev *cfgdev)
+ 				WL_ERR(("IFDEL didn't complete properly\n"));
+ 			}
+ 			ret = dhd_del_monitor(dev);
+-			if (wl_get_mode_by_netdev(wl, dev) == WL_MODE_AP) {
+-				DHD_OS_WAKE_LOCK_CTRL_TIMEOUT_CANCEL((dhd_pub_t *)(wl->pub));
+-			}
+ 		}
+ 	}
+ 	return ret;
+@@ -2198,6 +2195,7 @@ __wl_cfg80211_scan(struct wiphy *wiphy, struct net_device *ndev,
+ 	}
+ #endif /* WL_CFG80211_VSDB_PRIORITIZE_SCAN_REQUEST */
+ 
++
+ 	/* Arm scan timeout timer */
+ 	mod_timer(&wl->scan_timeout, jiffies + msecs_to_jiffies(WL_SCAN_TIMER_INTERVAL_MS));
+ 	iscan_req = false;
+@@ -6155,8 +6153,6 @@ wl_cfg80211_stop_ap(
+ 		}
+ 	} else {
+ 		WL_DBG(("Stopping P2P GO \n"));
+-		DHD_OS_WAKE_LOCK_CTRL_TIMEOUT_ENABLE((dhd_pub_t *)(wl->pub), DHD_EVENT_TIMEOUT_MS*3);
+-		DHD_OS_WAKE_LOCK_TIMEOUT((dhd_pub_t *)(wl->pub));
+ 	}
+ 
+ exit:
+-- 
+1.7.9.5
+

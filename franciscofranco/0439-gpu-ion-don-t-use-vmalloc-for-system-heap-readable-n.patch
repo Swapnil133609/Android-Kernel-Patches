@@ -1,0 +1,49 @@
+From 4289e8e04a7c52e1c397f88b5038dee6ab65b46b Mon Sep 17 00:00:00 2001
+From: Mitchel Humpherys <mitchelh@codeaurora.org>
+Date: Fri, 4 Oct 2013 16:07:56 -0700
+Subject: [PATCH 439/517] gpu: ion: don't use "vmalloc" for system heap
+ readable name
+
+The human-readable name of the system heap is currently "vmalloc", which
+is misleading since we don't use vmalloc at all for that heap, we use
+alloc_pages. Make the human-readable name of the heap "system".
+
+Change-Id: Iefb92ea8adc8d76b8eccc504010aa9bc2fa5c50c
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/ion/msm/msm_ion.c |    2 +-
+ include/linux/msm_ion.h       |    3 ++-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/ion/msm/msm_ion.c b/drivers/gpu/ion/msm/msm_ion.c
+index f990ada..ad9c0e2 100644
+--- a/drivers/gpu/ion/msm/msm_ion.c
++++ b/drivers/gpu/ion/msm/msm_ion.c
+@@ -52,7 +52,7 @@ static struct ion_heap_desc ion_heap_meta[] = {
+ 	{
+ 		.id	= ION_SYSTEM_HEAP_ID,
+ 		.type	= ION_HEAP_TYPE_SYSTEM,
+-		.name	= ION_VMALLOC_HEAP_NAME,
++		.name	= ION_SYSTEM_HEAP_NAME,
+ 	},
+ 	{
+ 		.id	= ION_SYSTEM_CONTIG_HEAP_ID,
+diff --git a/include/linux/msm_ion.h b/include/linux/msm_ion.h
+index 16a1000..e9194d3 100644
+--- a/include/linux/msm_ion.h
++++ b/include/linux/msm_ion.h
+@@ -90,7 +90,8 @@ enum cp_mem_usage {
+ #define ION_HEAP(bit) (1 << (bit))
+ 
+ #define ION_ADSP_HEAP_NAME	"adsp"
+-#define ION_VMALLOC_HEAP_NAME	"vmalloc"
++#define ION_SYSTEM_HEAP_NAME	"system"
++#define ION_VMALLOC_HEAP_NAME	ION_SYSTEM_HEAP_NAME
+ #define ION_KMALLOC_HEAP_NAME	"kmalloc"
+ #define ION_AUDIO_HEAP_NAME	"audio"
+ #define ION_SF_HEAP_NAME	"sf"
+-- 
+1.7.9.5
+

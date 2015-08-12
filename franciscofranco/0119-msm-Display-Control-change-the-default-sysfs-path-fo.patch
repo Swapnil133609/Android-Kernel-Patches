@@ -1,0 +1,44 @@
+From 163a1d6dc4ef40e339b173522d76970ebe1a6b1e Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Tue, 26 Nov 2013 22:27:15 +0000
+Subject: [PATCH 119/517] msm: Display Control: change the default sysfs path
+ for something more readable.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_dsi_panel.c |   10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_dsi_panel.c b/drivers/video/msm/mdss/mdss_dsi_panel.c
+index d389553..fa6b8b0 100644
+--- a/drivers/video/msm/mdss/mdss_dsi_panel.c
++++ b/drivers/video/msm/mdss/mdss_dsi_panel.c
+@@ -1226,6 +1226,8 @@ static struct attribute_group dsi_panel_attribute_group = {
+ 
+ /**************************** sysfs end **************************/
+ 
++static struct kobject *ex_kobj;
++
+ static int __devinit mdss_dsi_panel_probe(struct platform_device *pdev)
+ {
+ 	int rc = 0;
+@@ -1263,9 +1265,13 @@ static int __devinit mdss_dsi_panel_probe(struct platform_device *pdev)
+ 	debug_fs_init(&vendor_pdata);
+ #endif
+ 
+-	rc = sysfs_create_group(&pdev->dev.kobj, &dsi_panel_attribute_group);
++	ex_kobj = kobject_create_and_add("gamma", kernel_kobj);
++	if (!ex_kobj)
++		return -EINVAL;
++
++	rc = sysfs_create_group(ex_kobj, &dsi_panel_attribute_group);
+ 	if (rc)
+-		pr_err("%s: sysfs create failed: %d\n", panel_name, rc);
++		kobject_put(ex_kobj);
+ 
+ 	return rc;
+ }
+-- 
+1.7.9.5
+

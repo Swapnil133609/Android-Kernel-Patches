@@ -1,0 +1,29 @@
+From 00870d8c647f6d0aa1ff8c892a26135d6c7f2257 Mon Sep 17 00:00:00 2001
+From: myfluxi <linflux@arcor.de>
+Date: Sat, 21 Dec 2013 22:52:02 +0100
+Subject: [PATCH 471/517] arm/dt: msm8974: Lower GPU voltage constraints
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/boot/dts/msm8974-regulator.dtsi |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/msm8974-regulator.dtsi b/arch/arm/boot/dts/msm8974-regulator.dtsi
+index 6a38980..7e09efa 100644
+--- a/arch/arm/boot/dts/msm8974-regulator.dtsi
++++ b/arch/arm/boot/dts/msm8974-regulator.dtsi
+@@ -135,8 +135,8 @@
+ 	rpm-regulator-smpb4 {
+ 		status = "okay";
+ 		pm8841_s4: regulator-s4 {
+-			regulator-min-microvolt = <815000>;
+-			regulator-max-microvolt = <900000>;
++			regulator-min-microvolt = <675000>;
++			regulator-max-microvolt = <815000>;
+ 			status = "okay";
+ 		};
+ 		pm8841_s4_corner: regulator-s4-corner {
+-- 
+1.7.9.5
+

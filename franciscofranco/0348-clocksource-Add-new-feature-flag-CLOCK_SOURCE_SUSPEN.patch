@@ -1,0 +1,39 @@
+From ce7b46ccce970faf81b28a1b2ff09547ac503e2a Mon Sep 17 00:00:00 2001
+From: Feng Tang <feng.tang@intel.com>
+Date: Tue, 12 Mar 2013 11:56:46 +0800
+Subject: [PATCH 348/517] clocksource: Add new feature flag
+ CLOCK_SOURCE_SUSPEND_NONSTOP
+
+Some x86 processors have a TSC clocksource, which continues to run
+even when system is suspended. Also most OMAP platforms have a
+32 KHz timer which has similar capability. Add a feature flag so that
+it could be utilized.
+
+CRs-fixed: 536881
+Change-Id: I863678fec5a3021158240f2c5b144c552ba0b16a
+Signed-off-by: Feng Tang <feng.tang@intel.com>
+Signed-off-by: John Stultz <john.stultz@linaro.org>
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Git-commit: 5caf4636259ae3af0efbb9bfc4cd97874b547c7d
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/clocksource.h |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
+index fbe89e1..eba0157 100644
+--- a/include/linux/clocksource.h
++++ b/include/linux/clocksource.h
+@@ -206,6 +206,7 @@ struct clocksource {
+ #define CLOCK_SOURCE_WATCHDOG			0x10
+ #define CLOCK_SOURCE_VALID_FOR_HRES		0x20
+ #define CLOCK_SOURCE_UNSTABLE			0x40
++#define CLOCK_SOURCE_SUSPEND_NONSTOP		0x80
+ 
+ /* simplify initialization of mask field */
+ #define CLOCKSOURCE_MASK(bits) (cycle_t)((bits) < 64 ? ((1ULL<<(bits))-1) : -1)
+-- 
+1.7.9.5
+

@@ -1,0 +1,77 @@
+From cf2df18a209208054d709eb70fe2badcea3b8bcc Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Thu, 26 Dec 2013 18:02:57 +0000
+Subject: [PATCH 478/517] arm/dt: add back 389MHz slot for the GPU, also bump
+ bus requirement of 200MHz one step higher.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/boot/dts/msm8974-gpu.dtsi  |    6 +++---
+ arch/arm/boot/dts/msm8974-v2.2.dtsi |   17 ++++++++++++-----
+ 2 files changed, 15 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/boot/dts/msm8974-gpu.dtsi b/arch/arm/boot/dts/msm8974-gpu.dtsi
+index d34053f..c8693f3 100644
+--- a/arch/arm/boot/dts/msm8974-gpu.dtsi
++++ b/arch/arm/boot/dts/msm8974-gpu.dtsi
+@@ -22,8 +22,8 @@
+ 
+ 		qcom,chipid = <0x03030000>;
+ 
+-		qcom,initial-pwrlevel = <2>;
+-		qcom,step-pwrlevel = <2>;
++		qcom,initial-pwrlevel = <1>;
++		qcom,step-pwrlevel = <1>;
+ 
+ 		qcom,idle-timeout = <8>; //<HZ/12>
+ 		qcom,strtstp-sleepwake;
+@@ -81,7 +81,7 @@
+ 			qcom,gpu-pwrlevel@2 {
+ 				reg = <2>;
+ 				qcom,gpu-freq = <200000000>;
+-				qcom,bus-freq = <1>;
++				qcom,bus-freq = <2>;
+ 				qcom,io-fraction = <100>;
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/msm8974-v2.2.dtsi b/arch/arm/boot/dts/msm8974-v2.2.dtsi
+index 59a217a..5bf89f8 100644
+--- a/arch/arm/boot/dts/msm8974-v2.2.dtsi
++++ b/arch/arm/boot/dts/msm8974-v2.2.dtsi
+@@ -55,20 +55,27 @@
+ 
+ 		qcom,gpu-pwrlevel@1 {
+ 			reg = <1>;
+-			qcom,gpu-freq = <320000000>;
++			qcom,gpu-freq = <389000000>;
+ 			qcom,bus-freq = <4>;
+-			qcom,io-fraction = <66>;
++			qcom,io-fraction = <33>;
+ 		};
+ 
+ 		qcom,gpu-pwrlevel@2 {
+ 			reg = <2>;
+-			qcom,gpu-freq = <200000000>;
+-			qcom,bus-freq = <1>;
+-			qcom,io-fraction = <100>;
++			qcom,gpu-freq = <320000000>;
++			qcom,bus-freq = <4>;
++			qcom,io-fraction = <66>;
+ 		};
+ 
+ 		qcom,gpu-pwrlevel@3 {
+ 			reg = <3>;
++			qcom,gpu-freq = <200000000>;
++			qcom,bus-freq = <2>;
++			qcom,io-fraction = <100>;
++		};
++
++		qcom,gpu-pwrlevel@4 {
++			reg = <4>;
+ 			qcom,gpu-freq = <27000000>;
+ 			qcom,bus-freq = <0>;
+ 			qcom,io-fraction = <0>;
+-- 
+1.7.9.5
+

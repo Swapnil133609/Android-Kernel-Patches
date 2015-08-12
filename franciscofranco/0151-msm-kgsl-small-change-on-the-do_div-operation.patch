@@ -1,0 +1,28 @@
+From 721598a742763b03cd6078f306776f7f063416f3 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Tue, 3 Dec 2013 03:23:37 +0000
+Subject: [PATCH 151/517] msm: kgsl: small change on the do_div operation.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/msm/kgsl_pwrscale_trustzone.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/msm/kgsl_pwrscale_trustzone.c b/drivers/gpu/msm/kgsl_pwrscale_trustzone.c
+index 589d110..c5344f4 100644
+--- a/drivers/gpu/msm/kgsl_pwrscale_trustzone.c
++++ b/drivers/gpu/msm/kgsl_pwrscale_trustzone.c
+@@ -156,7 +156,8 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
+ 		return;
+ 
+ 	gpu_stats.total_time_ms = jiffies_to_msecs((long)jiffies - (long)window_time);
+-	gpu_stats.busy_time_ms = do_div(priv->bin.busy_time, USEC_PER_MSEC);
++	do_div(priv->bin.busy_time, USEC_PER_MSEC);
++	gpu_stats.busy_time_ms = priv->bin.busy_time;
+ 
+ 	/* if busy time is 0 and we're already on the lowest pwrlevel, bail early */
+ 	if (!gpu_stats.busy_time_ms && pwr->active_pwrlevel == pwr->min_pwrlevel)
+-- 
+1.7.9.5
+

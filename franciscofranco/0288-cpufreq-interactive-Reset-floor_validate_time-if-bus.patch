@@ -1,0 +1,87 @@
+From 38bc0e3a9d75e35f5e4c5af1eab5f0666f379129 Mon Sep 17 00:00:00 2001
+From: Rohit Gupta <rohgup@codeaurora.org>
+Date: Wed, 27 Nov 2013 17:08:55 -0800
+Subject: [PATCH 288/517] cpufreq: interactive: Reset floor_validate_time if
+ busy at max for 100ms
+
+When the interactive governor selects to run at max frequency it doesn't
+re-schedule the timer until it hits an idle. This change checks if the CPU
+has been continuously busy for last 100ms on hitting an idle start. If yes,
+then floor_validate_time is reset so that the CPU stays at max frequency
+for at least another 100 ms before stepping down.
+This is an important feature for detecting CPU intensive workloads which
+require high frequencies for achieving better performance.
+
+Change-Id: I7d48ffbc3d50a80af9be3bf94667ee3d0120b763
+Signed-off-by: Rohit Gupta <rohgup@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c      |   18 +++++++++++++++++-
+ include/trace/events/cpufreq_interactive.h |    6 ++++++
+ 2 files changed, 23 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index 68c07b8..94a6aad 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -95,6 +95,9 @@ static unsigned long min_sample_time = DEFAULT_MIN_SAMPLE_TIME;
+ #define DEFAULT_TIMER_RATE (30 * USEC_PER_MSEC)
+ static unsigned long timer_rate = DEFAULT_TIMER_RATE;
+ 
++/* Busy SDF parameters*/
++#define MIN_BUSY_TIME (100 * USEC_PER_MSEC)
++
+ /*
+  * Wait this long before raising speed above hispeed, by default a single
+  * timer interval.
+@@ -488,6 +491,8 @@ static void cpufreq_interactive_idle_start(void)
+ 	struct cpufreq_interactive_cpuinfo *pcpu =
+ 		&per_cpu(cpuinfo, smp_processor_id());
+ 	int pending;
++	int cpu = pcpu->policy->cpu;
++	u64 now;
+ 
+ 	if (!down_read_trylock(&pcpu->enable_sem))
+ 		return;
+@@ -507,8 +512,19 @@ static void cpufreq_interactive_idle_start(void)
+ 		 * min indefinitely.  This should probably be a quirk of
+ 		 * the CPUFreq driver.
+ 		 */
+-		if (!pending)
++		if (!pending) {
+ 			cpufreq_interactive_timer_resched(pcpu);
++
++			now = ktime_to_us(ktime_get());
++			if ((pcpu->policy->cur == pcpu->policy->max) &&
++				(now - pcpu->hispeed_validate_time) >
++							MIN_BUSY_TIME) {
++				pcpu->floor_validate_time = now;
++				trace_cpufreq_interactive_idle_start(cpu,
++					pcpu->target_freq, pcpu->policy->cur);
++			}
++
++		}
+ 	}
+ 
+ 	up_read(&pcpu->enable_sem);
+diff --git a/include/trace/events/cpufreq_interactive.h b/include/trace/events/cpufreq_interactive.h
+index 951e6ca..507ba97 100644
+--- a/include/trace/events/cpufreq_interactive.h
++++ b/include/trace/events/cpufreq_interactive.h
+@@ -34,6 +34,12 @@ DEFINE_EVENT(set, cpufreq_interactive_setspeed,
+ 	TP_ARGS(cpu_id, targfreq, actualfreq)
+ );
+ 
++DEFINE_EVENT(set, cpufreq_interactive_idle_start,
++	TP_PROTO(u32 cpu_id, unsigned long targfreq,
++	     unsigned long actualfreq),
++	TP_ARGS(cpu_id, targfreq, actualfreq)
++);
++
+ DECLARE_EVENT_CLASS(loadeval,
+ 	    TP_PROTO(unsigned long cpu_id, unsigned long load,
+ 		     unsigned long curtarg, unsigned long curactual,
+-- 
+1.7.9.5
+

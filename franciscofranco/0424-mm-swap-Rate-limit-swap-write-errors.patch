@@ -1,0 +1,64 @@
+From 80edb70de8c08e973410b26b034c5ce560fcfb88 Mon Sep 17 00:00:00 2001
+From: Olav Haugan <ohaugan@codeaurora.org>
+Date: Thu, 14 Nov 2013 09:14:11 -0800
+Subject: [PATCH 424/517] mm: swap: Rate limit swap write errors
+
+If an error occurs in the swap subsystem when writing pages
+out to a swap device the system might get overflowed with
+logging errors because the mm subsystem will continously try
+to swap out pages even in the event of error on the swap
+device.
+
+Reduce the amount of logging to prevent the kernel log
+from being filled with these error messages.
+
+Change-Id: Iddaf6c32ae87132817482cc4cb68b909a1c527e6
+Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/page_io.c |   12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/mm/page_io.c b/mm/page_io.c
+index e60e43f..1499e1c 100644
+--- a/mm/page_io.c
++++ b/mm/page_io.c
+@@ -20,8 +20,15 @@
+ #include <linux/swapops.h>
+ #include <linux/writeback.h>
+ #include <linux/blkdev.h>
++#include <linux/ratelimit.h>
+ #include <asm/pgtable.h>
+ 
++/*
++ * We don't need to see swap errors more than once every 1 second to know
++ * that a problem is occurring.
++ */
++#define SWAP_ERROR_LOG_RATE_MS 1000
++
+ static struct bio *get_swap_bio(gfp_t gfp_flags,
+ 				struct page *page, bio_end_io_t end_io)
+ {
+@@ -46,6 +53,7 @@ static void end_swap_bio_write(struct bio *bio, int err)
+ {
+ 	const int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
+ 	struct page *page = bio->bi_io_vec[0].bv_page;
++	static unsigned long swap_error_rs_time;
+ 
+ 	if (!uptodate) {
+ 		SetPageError(page);
+@@ -58,7 +66,9 @@ static void end_swap_bio_write(struct bio *bio, int err)
+ 		 * Also clear PG_reclaim to avoid rotate_reclaimable_page()
+ 		 */
+ 		set_page_dirty(page);
+-		printk(KERN_ALERT "Write-error on swap-device (%u:%u:%Lu)\n",
++		if (printk_timed_ratelimit(&swap_error_rs_time,
++					   SWAP_ERROR_LOG_RATE_MS))
++			printk(KERN_ALERT "Write-error on swap-device (%u:%u:%Lu)\n",
+ 				imajor(bio->bi_bdev->bd_inode),
+ 				iminor(bio->bi_bdev->bd_inode),
+ 				(unsigned long long)bio->bi_sector);
+-- 
+1.7.9.5
+

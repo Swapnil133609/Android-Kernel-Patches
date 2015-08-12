@@ -1,0 +1,51 @@
+From 0843b1ea374119304131efc56765ef2c5acce2b7 Mon Sep 17 00:00:00 2001
+From: Marek Szyprowski <m.szyprowski@samsung.com>
+Date: Thu, 20 Dec 2012 15:05:18 -0800
+Subject: [PATCH 398/517] mm: cma: WARN if freed memory is still in use
+
+Memory returned to free_contig_range() must have no other references.
+Let kernel to complain loudly if page reference count is not equal to 1.
+
+Change-Id: If1b84bb383d97eff441d7a1e18b874c64b7f5f85
+[rientjes@google.com: support sparsemem]
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
+Acked-by: Michal Nazarewicz <mina86@mina86.com>
+Signed-off-by: David Rientjes <rientjes@google.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: bcc2b02f4c1b36bc67272df7119b75bac78525ab
+Git-repo: git://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/page_alloc.c |   11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index f5ed56f..a8b00c5 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5997,8 +5997,15 @@ done:
+ 
+ void free_contig_range(unsigned long pfn, unsigned nr_pages)
+ {
+-	for (; nr_pages--; ++pfn)
+-		__free_page(pfn_to_page(pfn));
++	unsigned int count = 0;
++
++	for (; nr_pages--; pfn++) {
++		struct page *page = pfn_to_page(pfn);
++
++		count += page_count(page) != 1;
++		__free_page(page);
++	}
++	WARN(count != 0, "%d pages are still in use!\n", count);
+ }
+ #endif
+ 
+-- 
+1.7.9.5
+

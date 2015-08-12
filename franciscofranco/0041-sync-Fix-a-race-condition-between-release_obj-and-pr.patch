@@ -1,0 +1,54 @@
+From 34af9626d7ad6085540f5137ff00399078361273 Mon Sep 17 00:00:00 2001
+From: Alistair Strachan <alistair.strachan@imgtec.com>
+Date: Wed, 10 Apr 2013 16:35:14 -0700
+Subject: [PATCH 041/517] sync: Fix a race condition between release_obj and
+ print_obj
+
+Before this change, a timeline would only be removed from the timeline
+list *after* the sync driver had its release_obj() called. However, the
+driver's release_obj() may free resources needed by print_obj().
+
+Although the timeline list is locked when print_obj() is called, it is
+not locked when release_obj() is called. If one CPU was in print_obj()
+when another was in release_obj(), the print_obj() may make unsafe
+accesses.
+
+It is not actually necessary to hold the timeline list lock when calling
+release_obj() if the call is made after the timeline is unlinked from
+the list, since there is no possibility another thread could be in --
+or enter -- print_obj() for that timeline.
+
+This change moves the release_obj() call to after the timeline is
+unlinked, preventing the above race from occurring.
+
+Signed-off-by: Alistair Strachan <alistair.strachan@imgtec.com>
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/base/sync.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/base/sync.c b/drivers/base/sync.c
+index 2e35996..45657a0 100644
+--- a/drivers/base/sync.c
++++ b/drivers/base/sync.c
+@@ -79,13 +79,13 @@ static void sync_timeline_free(struct kref *kref)
+ 		container_of(kref, struct sync_timeline, kref);
+ 	unsigned long flags;
+ 
+-	if (obj->ops->release_obj)
+-		obj->ops->release_obj(obj);
+-
+ 	spin_lock_irqsave(&sync_timeline_list_lock, flags);
+ 	list_del(&obj->sync_timeline_list);
+ 	spin_unlock_irqrestore(&sync_timeline_list_lock, flags);
+ 
++	if (obj->ops->release_obj)
++		obj->ops->release_obj(obj);
++
+ 	kfree(obj);
+ }
+ 
+-- 
+1.7.9.5
+

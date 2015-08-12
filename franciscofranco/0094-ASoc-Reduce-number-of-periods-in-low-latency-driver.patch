@@ -1,0 +1,35 @@
+From 6522900c4b6d380eb8becfa9367a099a289b5ba4 Mon Sep 17 00:00:00 2001
+From: SathishKumar Mani <smani@codeaurora.org>
+Date: Wed, 29 Aug 2012 16:37:08 -0700
+Subject: [PATCH 094/517] ASoc: Reduce number of periods in low latency
+ driver.
+
+- Reduce number of periods to 2 from 4.
+
+Signed-off-by: SathishKumar Mani <smani@codeaurora.org>
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ sound/soc/msm/msm-lowlatency-pcm-q6.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/sound/soc/msm/msm-lowlatency-pcm-q6.c b/sound/soc/msm/msm-lowlatency-pcm-q6.c
+index 28e112c..b0f2c8e 100644
+--- a/sound/soc/msm/msm-lowlatency-pcm-q6.c
++++ b/sound/soc/msm/msm-lowlatency-pcm-q6.c
+@@ -44,10 +44,10 @@ struct snd_msm_volume {
+ 	unsigned volume;
+ };
+ 
+-#define PLAYBACK_NUM_PERIODS		4
++#define PLAYBACK_NUM_PERIODS		2
+ #define PLAYBACK_MAX_PERIOD_SIZE	1024
+ #define PLAYBACK_MIN_PERIOD_SIZE	512
+-#define CAPTURE_NUM_PERIODS		4
++#define CAPTURE_NUM_PERIODS		2
+ #define CAPTURE_MIN_PERIOD_SIZE		128
+ #define CAPTURE_MAX_PERIOD_SIZE		1024
+ 
+-- 
+1.7.9.5
+

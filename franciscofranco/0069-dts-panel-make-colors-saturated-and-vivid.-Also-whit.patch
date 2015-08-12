@@ -1,0 +1,28 @@
+From 6747c5003dba8fda142b7a4041db3033dda6d036 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Wed, 13 Nov 2013 04:03:12 +0000
+Subject: [PATCH 069/517] dts: panel: make colors saturated and vivid. Also
+ whites are whiter.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ .../msm8974-hammerhead-panel.dtsi                  |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-panel.dtsi b/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-panel.dtsi
+index 15630fa..c97f306 100644
+--- a/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-panel.dtsi
++++ b/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-panel.dtsi
+@@ -1106,7 +1106,7 @@
+ 		qcom,panel-on-cmds = [
+ 			15 01 00 00 00 00 02 00 00
+ 			39 01 00 00 00 00 05
+-			FF 19 02 01 00
++			77 19 02 01 00
+ 			15 01 00 00 00 00 02 00 80
+ 			39 01 00 00 00 00 03
+ 			FF 19 02
+-- 
+1.7.9.5
+

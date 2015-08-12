@@ -1,0 +1,35 @@
+From d22608f36b49a34239c56e63bb2516ad53060400 Mon Sep 17 00:00:00 2001
+From: SathishKumar Mani <smani@codeaurora.org>
+Date: Tue, 11 Sep 2012 14:41:37 -0700
+Subject: [PATCH 095/517] ASoc: msm: Increase max buffer size to 4k for
+ lowlatency playback
+
+- Small buffersize is resulting in scheduling issues.
+- Increase max buffer size so that user space can
+  configure large buffer size to avoid scheduling
+  issues.
+
+bug-id: 6865729
+Signed-off-by: SathishKumar Mani <smani@codeaurora.org>
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ sound/soc/msm/msm-lowlatency-pcm-q6.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sound/soc/msm/msm-lowlatency-pcm-q6.c b/sound/soc/msm/msm-lowlatency-pcm-q6.c
+index b0f2c8e..1630d66 100644
+--- a/sound/soc/msm/msm-lowlatency-pcm-q6.c
++++ b/sound/soc/msm/msm-lowlatency-pcm-q6.c
+@@ -45,7 +45,7 @@ struct snd_msm_volume {
+ };
+ 
+ #define PLAYBACK_NUM_PERIODS		2
+-#define PLAYBACK_MAX_PERIOD_SIZE	1024
++#define PLAYBACK_MAX_PERIOD_SIZE	4096
+ #define PLAYBACK_MIN_PERIOD_SIZE	512
+ #define CAPTURE_NUM_PERIODS		2
+ #define CAPTURE_MIN_PERIOD_SIZE		128
+-- 
+1.7.9.5
+

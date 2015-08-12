@@ -1,0 +1,41 @@
+From ff0d138c6c039cfa7f32fcbda623bd0de72f1fc0 Mon Sep 17 00:00:00 2001
+From: Laura Abbott <lauraa@codeaurora.org>
+Date: Fri, 11 Oct 2013 18:28:47 -0700
+Subject: [PATCH 483/517] gpu: ion: Don't recursively take secure chunk lock
+
+During allocation, the chunk_lock is taken to protect the chunk
+list. dma_alloc_coherent may invoke the shrinker which also tries
+to take the chunk_lock. This leads to a deadlock. If the mutex is
+already locked in the shrinker, just return -1 as specifed by the
+shrinker API to signal this condition.
+
+Change-Id: I5525ecfcdc6deea61024f0008c62026103728571
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/ion/ion_cma_secure_heap.c |    8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/ion/ion_cma_secure_heap.c b/drivers/gpu/ion/ion_cma_secure_heap.c
+index 000c637..94fdf8c 100644
+--- a/drivers/gpu/ion/ion_cma_secure_heap.c
++++ b/drivers/gpu/ion/ion_cma_secure_heap.c
+@@ -357,7 +357,13 @@ static int ion_secure_cma_shrinker(struct shrinker *shrinker,
+ 	if (!(sc->gfp_mask & __GFP_MOVABLE))
+ 		return atomic_read(&sheap->total_pool_size);
+ 
+-	mutex_lock(&sheap->chunk_lock);
++	/*
++	 * Allocation path may recursively call the shrinker. Don't shrink if
++	 * that happens.
++	 */
++	if (!mutex_trylock(&sheap->chunk_lock))
++		return -1;
++
+ 	list_for_each_safe(entry, _n, &sheap->chunks) {
+ 		struct ion_cma_alloc_chunk *chunk = container_of(entry,
+ 					struct ion_cma_alloc_chunk, entry);
+-- 
+1.7.9.5
+

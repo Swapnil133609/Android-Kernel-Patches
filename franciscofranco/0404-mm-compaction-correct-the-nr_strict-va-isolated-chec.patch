@@ -1,0 +1,51 @@
+From 3e93426acdfc40c825ebb8bb22152fb1b40b90a6 Mon Sep 17 00:00:00 2001
+From: Mel Gorman <mgorman@suse.de>
+Date: Fri, 19 Oct 2012 13:56:57 -0700
+Subject: [PATCH 404/517] mm: compaction: correct the nr_strict va isolated
+ check for CMA
+
+Thierry reported that the "iron out" patch for isolate_freepages_block()
+had problems due to the strict check being too strict with "mm:
+compaction: Iron out isolate_freepages_block() and
+isolate_freepages_range() -fix1".  It's possible that more pages than
+necessary are isolated but the check still fails and I missed that this
+fix was not picked up before RC1.  This same problem has been identified
+in 3.7-RC1 by Tony Prisk and should be addressed by the following patch.
+
+Change-Id: I2aefac60b55ee48cf3f9f31dbd7894c024e64f28
+Signed-off-by: Mel Gorman <mgorman@suse.de>
+Tested-by: Tony Prisk <linux@prisktech.co.nz>
+Reported-by: Thierry Reding <thierry.reding@avionic-design.de>
+Acked-by: Rik van Riel <riel@redhat.com>
+Acked-by: Minchan Kim <minchan@kernel.org>
+Cc: Richard Davies <richard@arachsys.com>
+Cc: Shaohua Li <shli@kernel.org>
+Cc: Avi Kivity <avi@redhat.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: 0db63d7e25f96e2c6da925c002badf6f144ddf30
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/compaction.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mm/compaction.c b/mm/compaction.c
+index 87bfdd9..7240d56 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -346,7 +346,7 @@ static unsigned long isolate_freepages_block(struct compact_control *cc,
+ 	 * pages requested were isolated. If there were any failures, 0 is
+ 	 * returned and CMA will fail.
+ 	 */
+-	if (strict && nr_strict_required != total_isolated)
++	if (strict && nr_strict_required > total_isolated)
+ 		total_isolated = 0;
+ 
+ 	if (locked)
+-- 
+1.7.9.5
+

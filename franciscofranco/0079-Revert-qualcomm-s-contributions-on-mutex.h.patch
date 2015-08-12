@@ -1,0 +1,58 @@
+From 843a551140ede6638b70d6858a7a5b6062fdc1ae Mon Sep 17 00:00:00 2001
+From: Devin Kim <dojip.kim@lge.com>
+Date: Fri, 16 Nov 2012 16:01:52 -0800
+Subject: [PATCH 079/517] Revert qualcomm's contributions on mutex.h
+
+Related commit is 3f2bc4d6eb5.
+
+Change-Id: Ia92b90b44bf92b7e40ec984e428379ee1a6c047b
+Signed-off-by: Iliyan Malchev <malchev@google.com>
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/include/asm/mutex.h |    8 --------
+ 1 file changed, 8 deletions(-)
+
+diff --git a/arch/arm/include/asm/mutex.h b/arch/arm/include/asm/mutex.h
+index fd3f17e..93226cf 100644
+--- a/arch/arm/include/asm/mutex.h
++++ b/arch/arm/include/asm/mutex.h
+@@ -41,8 +41,6 @@ __mutex_fastpath_lock(atomic_t *count, void (*fail_fn)(atomic_t *))
+ 	__res |= __ex_flag;
+ 	if (unlikely(__res != 0))
+ 		fail_fn(count);
+-	else
+-		smp_rmb();
+ }
+ 
+ static inline int
+@@ -63,9 +61,6 @@ __mutex_fastpath_lock_retval(atomic_t *count, int (*fail_fn)(atomic_t *))
+ 	__res |= __ex_flag;
+ 	if (unlikely(__res != 0))
+ 		__res = fail_fn(count);
+-	else
+-		smp_rmb();
+-
+ 	return __res;
+ }
+ 
+@@ -79,7 +74,6 @@ __mutex_fastpath_unlock(atomic_t *count, void (*fail_fn)(atomic_t *))
+ {
+ 	int __ex_flag, __res, __orig;
+ 
+-	smp_wmb();
+ 	__asm__ (
+ 
+ 		"ldrex	%0, [%3]	\n\t"
+@@ -125,8 +119,6 @@ __mutex_fastpath_trylock(atomic_t *count, int (*fail_fn)(atomic_t *))
+ 		: "=&r" (__orig), "=&r" (__res), "=&r" (__ex_flag)
+ 		: "r" (&count->counter)
+ 		: "cc", "memory" );
+-	if (__orig)
+-		smp_rmb();
+ 
+ 	return __orig;
+ }
+-- 
+1.7.9.5
+

@@ -1,0 +1,89 @@
+From cde9eec81d9a9700c4d2ad0e8a2304397c7f22c4 Mon Sep 17 00:00:00 2001
+From: Vincent Guittot <vincent.guittot@linaro.org>
+Date: Wed, 5 Jun 2013 10:13:11 +0200
+Subject: [PATCH 153/517] sched: Fix clear NOHZ_BALANCE_KICK
+
+I have faced a sequence where the Idle Load Balance was sometime not
+triggered for a while on my platform, in the following scenario:
+
+ CPU 0 and CPU 1 are running tasks and CPU 2 is idle
+
+ CPU 1 kicks the Idle Load Balance
+ CPU 1 selects CPU 2 as the new Idle Load Balancer
+ CPU 2 sets NOHZ_BALANCE_KICK for CPU 2
+ CPU 2 sends a reschedule IPI to CPU 2
+
+ While CPU 3 wakes up, CPU 0 or CPU 1 migrates a waking up task A on CPU 2
+
+ CPU 2 finally wakes up, runs task A and discards the Idle Load Balance
+       task A quickly goes back to sleep (before a tick occurs on CPU 2)
+ CPU 2 goes back to idle with NOHZ_BALANCE_KICK set
+
+Whenever CPU 2 will be selected as the ILB, no reschedule IPI will be sent
+because NOHZ_BALANCE_KICK is already set and no Idle Load Balance will be
+performed.
+
+We must wait for the sched softirq to be raised on CPU 2 thanks to another
+part the kernel to come back to clear NOHZ_BALANCE_KICK.
+
+The proposed solution clears NOHZ_BALANCE_KICK in schedule_ipi if
+we can't raise the sched_softirq for the Idle Load Balance.
+
+Change since V1:
+
+- move the clear of NOHZ_BALANCE_KICK in got_nohz_idle_kick if the ILB
+  can't run on this CPU (as suggested by Peter)
+
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+Signed-off-by: Peter Zijlstra <peterz@infradead.org>
+Link: http://lkml.kernel.org/r/1370419991-13870-1-git-send-email-vincent.guittot@linaro.org
+Signed-off-by: Ingo Molnar <mingo@kernel.org>
+Git-commit: 873b4c65b519fd769940eb281f77848227d4e5c1
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+[smuckle@codeaurora.org: minor merge resolution for 3.4 in scheduler_ipi()]
+Signed-off-by: Steve Muckle <smuckle@codeaurora.org>
+Change-Id: I3548612057cccc2ecc29429c129c44183083831f
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/sched/core.c |   16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 1e68c20..ee6b249 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -621,7 +621,19 @@ void wake_up_idle_cpu(int cpu)
+ static inline bool got_nohz_idle_kick(void)
+ {
+ 	int cpu = smp_processor_id();
+-	return idle_cpu(cpu) && test_bit(NOHZ_BALANCE_KICK, nohz_flags(cpu));
++
++	if (!test_bit(NOHZ_BALANCE_KICK, nohz_flags(cpu)))
++		return false;
++
++	if (idle_cpu(cpu) && !need_resched())
++		return true;
++
++	/*
++	 * We can't run Idle Load Balance on this CPU for this time so we
++	 * cancel it and clear NOHZ_BALANCE_KICK
++	 */
++	clear_bit(NOHZ_BALANCE_KICK, nohz_flags(cpu));
++	return false;
+ }
+ 
+ #else /* CONFIG_NO_HZ */
+@@ -1517,7 +1529,7 @@ void scheduler_ipi(void)
+ 	/*
+ 	 * Check if someone kicked us for doing the nohz idle load balance.
+ 	 */
+-	if (unlikely(got_nohz_idle_kick() && !need_resched())) {
++	if (unlikely(got_nohz_idle_kick())) {
+ 		this_rq()->idle_balance = 1;
+ 		raise_softirq_irqoff(SCHED_SOFTIRQ);
+ 	}
+-- 
+1.7.9.5
+

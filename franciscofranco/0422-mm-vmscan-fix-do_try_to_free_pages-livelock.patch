@@ -1,0 +1,362 @@
+From e212cd7106a265e9464e08a3ef6b8cc50dd89173 Mon Sep 17 00:00:00 2001
+From: Lisa Du <cldu@marvell.com>
+Date: Wed, 11 Sep 2013 14:22:36 -0700
+Subject: [PATCH 422/517] mm: vmscan: fix do_try_to_free_pages() livelock
+
+This patch is based on KOSAKI's work and I add a little more description,
+please refer https://lkml.org/lkml/2012/6/14/74.
+
+Currently, I found system can enter a state that there are lots of free
+pages in a zone but only order-0 and order-1 pages which means the zone is
+heavily fragmented, then high order allocation could make direct reclaim
+path's long stall(ex, 60 seconds) especially in no swap and no compaciton
+enviroment.  This problem happened on v3.4, but it seems issue still lives
+in current tree, the reason is do_try_to_free_pages enter live lock:
+
+kswapd will go to sleep if the zones have been fully scanned and are still
+not balanced.  As kswapd thinks there's little point trying all over again
+to avoid infinite loop.  Instead it changes order from high-order to
+0-order because kswapd think order-0 is the most important.  Look at
+73ce02e9 in detail.  If watermarks are ok, kswapd will go back to sleep
+and may leave zone->all_unreclaimable =3D 0.  It assume high-order users
+can still perform direct reclaim if they wish.
+
+Direct reclaim continue to reclaim for a high order which is not a
+COSTLY_ORDER without oom-killer until kswapd turn on
+zone->all_unreclaimble= .  This is because to avoid too early oom-kill.
+So it means direct_reclaim depends on kswapd to break this loop.
+
+In worst case, direct-reclaim may continue to page reclaim forever when
+kswapd sleeps forever until someone like watchdog detect and finally kill
+the process.  As described in:
+http://thread.gmane.org/gmane.linux.kernel.mm/103737
+
+We can't turn on zone->all_unreclaimable from direct reclaim path because
+direct reclaim path don't take any lock and this way is racy.  Thus this
+patch removes zone->all_unreclaimable field completely and recalculates
+zone reclaimable state every time.
+
+Note: we can't take the idea that direct-reclaim see zone->pages_scanned
+directly and kswapd continue to use zone->all_unreclaimable.  Because, it
+is racy.  commit 929bea7c71 (vmscan: all_unreclaimable() use
+zone->all_unreclaimable as a name) describes the detail.
+
+Change-Id: I49970a0fa751cf33af293fd1ee784e36422785b1
+[akpm@linux-foundation.org: uninline zone_reclaimable_pages() and zone_reclaimable()]
+Cc: Aaditya Kumar <aaditya.kumar.30@gmail.com>
+Cc: Ying Han <yinghan@google.com>
+Cc: Nick Piggin <npiggin@gmail.com>
+Acked-by: Rik van Riel <riel@redhat.com>
+Cc: Mel Gorman <mel@csn.ul.ie>
+Cc: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+Cc: Christoph Lameter <cl@linux.com>
+Cc: Bob Liu <lliubbo@gmail.com>
+Cc: Neil Zhang <zhangwm@marvell.com>
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Reviewed-by: Michal Hocko <mhocko@suse.cz>
+Acked-by: Minchan Kim <minchan@kernel.org>
+Acked-by: Johannes Weiner <hannes@cmpxchg.org>
+Signed-off-by: KOSAKI Motohiro <kosaki.motohiro@jp.fujitsu.com>
+Signed-off-by: Lisa Du <cldu@marvell.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Git-commit: 6e543d5780e36ff5ee56c44d7e2e30db3457a7ed
+[lauraa@codeaurora.org: Some context fixups and variable name changes due
+to backporting. Dropped parts that don't apply to older kernels]
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/mm_inline.h |    1 +
+ include/linux/mmzone.h    |    1 -
+ include/linux/vmstat.h    |    1 -
+ mm/internal.h             |    2 ++
+ mm/page-writeback.c       |    3 +++
+ mm/page_alloc.c           |    5 ++--
+ mm/vmscan.c               |   63 ++++++++++++++++++++++-----------------------
+ mm/vmstat.c               |    5 +++-
+ 8 files changed, 43 insertions(+), 38 deletions(-)
+
+diff --git a/include/linux/mm_inline.h b/include/linux/mm_inline.h
+index 227fd3e..9a584c0 100644
+--- a/include/linux/mm_inline.h
++++ b/include/linux/mm_inline.h
+@@ -2,6 +2,7 @@
+ #define LINUX_MM_INLINE_H
+ 
+ #include <linux/huge_mm.h>
++#include <linux/swap.h>
+ 
+ /**
+  * page_is_file_cache - should the page be on a file LRU or anon LRU?
+diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+index 124168e..7aa1662 100644
+--- a/include/linux/mmzone.h
++++ b/include/linux/mmzone.h
+@@ -375,7 +375,6 @@ struct zone {
+ 	 * free areas of different sizes
+ 	 */
+ 	spinlock_t		lock;
+-	int                     all_unreclaimable; /* All pages pinned */
+ #if defined CONFIG_COMPACTION || defined CONFIG_CMA
+ 	/* Set to true when the PG_migrate_skip bits should be cleared */
+ 	bool			compact_blockskip_flush;
+diff --git a/include/linux/vmstat.h b/include/linux/vmstat.h
+index 1d10474..2d59889 100644
+--- a/include/linux/vmstat.h
++++ b/include/linux/vmstat.h
+@@ -140,7 +140,6 @@ static inline unsigned long zone_page_state_snapshot(struct zone *zone,
+ }
+ 
+ extern unsigned long global_reclaimable_pages(void);
+-extern unsigned long zone_reclaimable_pages(struct zone *zone);
+ 
+ #ifdef CONFIG_NUMA
+ /*
+diff --git a/mm/internal.h b/mm/internal.h
+index 3439ef4..f5369cc 100644
+--- a/mm/internal.h
++++ b/mm/internal.h
+@@ -90,6 +90,8 @@ extern unsigned long highest_memmap_pfn;
+  */
+ extern int isolate_lru_page(struct page *page);
+ extern void putback_lru_page(struct page *page);
++extern unsigned long zone_reclaimable_pages(struct zone *zone);
++extern bool zone_reclaimable(struct zone *zone);
+ 
+ /*
+  * in mm/page_alloc.c
+diff --git a/mm/page-writeback.c b/mm/page-writeback.c
+index 3b60ab8..489e27f 100644
+--- a/mm/page-writeback.c
++++ b/mm/page-writeback.c
+@@ -34,8 +34,11 @@
+ #include <linux/syscalls.h>
+ #include <linux/buffer_head.h> /* __set_page_dirty_buffers */
+ #include <linux/pagevec.h>
++#include <linux/mm_inline.h>
+ #include <trace/events/writeback.h>
+ 
++#include "internal.h"
++
+ /*
+  * Sleep at most 200ms at a time in balance_dirty_pages().
+  */
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 48b85a3..6fd1c04 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -57,6 +57,7 @@
+ #include <linux/ftrace_event.h>
+ #include <linux/memcontrol.h>
+ #include <linux/prefetch.h>
++#include <linux/mm_inline.h>
+ #include <linux/migrate.h>
+ #include <linux/page-debug-flags.h>
+ 
+@@ -647,7 +648,6 @@ static void free_pcppages_bulk(struct zone *zone, int count,
+ 	int mt = 0;
+ 
+ 	spin_lock(&zone->lock);
+-	zone->all_unreclaimable = 0;
+ 	zone->pages_scanned = 0;
+ 
+ 	while (to_free) {
+@@ -693,7 +693,6 @@ static void free_one_page(struct zone *zone, struct page *page, int order,
+ 				int migratetype)
+ {
+ 	spin_lock(&zone->lock);
+-	zone->all_unreclaimable = 0;
+ 	zone->pages_scanned = 0;
+ 
+ 	__free_one_page(page, zone, order, migratetype);
+@@ -3004,7 +3003,7 @@ void show_free_areas(unsigned int filter)
+ 			K(zone_page_state(zone, NR_FREE_CMA_PAGES)),
+ 			K(zone_page_state(zone, NR_WRITEBACK_TEMP)),
+ 			zone->pages_scanned,
+-			(zone->all_unreclaimable ? "yes" : "no")
++			(!zone_reclaimable(zone) ? "yes" : "no")
+ 			);
+ 		printk("lowmem_reserve[]:");
+ 		for (i = 0; i < MAX_NR_ZONES; i++)
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 2636bdf..79161f7 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -158,8 +158,28 @@ static struct zone_reclaim_stat *get_reclaim_stat(struct mem_cgroup_zone *mz)
+ 	return &mz->zone->reclaim_stat;
+ }
+ 
++unsigned long zone_reclaimable_pages(struct zone *zone)
++{
++	int nr;
++
++	nr = zone_page_state(zone, NR_ACTIVE_FILE) +
++	     zone_page_state(zone, NR_INACTIVE_FILE);
++
++	if (get_nr_swap_pages() > 0)
++		nr += zone_page_state(zone, NR_ACTIVE_ANON) +
++		      zone_page_state(zone, NR_INACTIVE_ANON);
++
++	return nr;
++}
++
++bool zone_reclaimable(struct zone *zone)
++{
++	return zone->pages_scanned < zone_reclaimable_pages(zone) * 6;
++}
++
+ static unsigned long zone_nr_lru_pages(struct mem_cgroup_zone *mz,
+ 				       enum lru_list lru)
++
+ {
+ 	if (!mem_cgroup_disabled())
+ 		return mem_cgroup_zone_nr_lru_pages(mz->mem_cgroup,
+@@ -1648,7 +1668,7 @@ static void get_scan_count(struct mem_cgroup_zone *mz, struct scan_control *sc,
+ 	 * latencies, so it's better to scan a minimum amount there as
+ 	 * well.
+ 	 */
+-	if (current_is_kswapd() && mz->zone->all_unreclaimable)
++	if (current_is_kswapd() && !zone_reclaimable(mz->zone))
+ 		force_scan = true;
+ 	if (!global_reclaim(sc))
+ 		force_scan = true;
+@@ -1995,8 +2015,8 @@ static bool shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
+ 		if (global_reclaim(sc)) {
+ 			if (!cpuset_zone_allowed_hardwall(zone, GFP_KERNEL))
+ 				continue;
+-			if (zone->all_unreclaimable &&
+-					sc->priority != DEF_PRIORITY)
++			if (sc->priority != DEF_PRIORITY &&
++			    !zone_reclaimable(zone))
+ 				continue;	/* Let kswapd poll it */
+ 			if (COMPACTION_BUILD) {
+ 				/*
+@@ -2034,11 +2054,6 @@ static bool shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
+ 	return aborted_reclaim;
+ }
+ 
+-static bool zone_reclaimable(struct zone *zone)
+-{
+-	return zone->pages_scanned < zone_reclaimable_pages(zone) * 6;
+-}
+-
+ /* All zones in zonelist are unreclaimable? */
+ static bool all_unreclaimable(struct zonelist *zonelist,
+ 		struct scan_control *sc)
+@@ -2052,7 +2067,7 @@ static bool all_unreclaimable(struct zonelist *zonelist,
+ 			continue;
+ 		if (!cpuset_zone_allowed_hardwall(zone, GFP_KERNEL))
+ 			continue;
+-		if (!zone->all_unreclaimable)
++		if (zone_reclaimable(zone))
+ 			return false;
+ 	}
+ 
+@@ -2377,7 +2392,7 @@ static bool sleeping_prematurely(pg_data_t *pgdat, int order, long remaining,
+ 		 * they must be considered balanced here as well if kswapd
+ 		 * is to sleep
+ 		 */
+-		if (zone->all_unreclaimable) {
++		if (!zone_reclaimable(zone)) {
+ 			balanced += zone->present_pages;
+ 			continue;
+ 		}
+@@ -2470,8 +2485,8 @@ loop_again:
+ 			if (!populated_zone(zone))
+ 				continue;
+ 
+-			if (zone->all_unreclaimable &&
+-			    sc.priority != DEF_PRIORITY)
++			if (sc.priority != DEF_PRIORITY &&
++			    !zone_reclaimable(zone))
+ 				continue;
+ 
+ 			/*
+@@ -2525,8 +2540,8 @@ loop_again:
+ 			if (!populated_zone(zone))
+ 				continue;
+ 
+-			if (zone->all_unreclaimable &&
+-			    sc.priority != DEF_PRIORITY)
++			if (sc.priority != DEF_PRIORITY &&
++			    !zone_reclaimable(zone))
+ 				continue;
+ 
+ 			sc.nr_scanned = 0;
+@@ -2576,8 +2591,6 @@ loop_again:
+ 				sc.nr_reclaimed += reclaim_state->reclaimed_slab;
+ 				total_scanned += sc.nr_scanned;
+ 
+-				if (nr_slab == 0 && !zone_reclaimable(zone))
+-					zone->all_unreclaimable = 1;
+ 			}
+ 
+ 			/*
+@@ -2589,7 +2602,7 @@ loop_again:
+ 			    total_scanned > sc.nr_reclaimed + sc.nr_reclaimed / 2)
+ 				sc.may_writepage = 1;
+ 
+-			if (zone->all_unreclaimable) {
++			if (!zone_reclaimable(zone)) {
+ 				if (end_zone && end_zone == i)
+ 					end_zone--;
+ 				continue;
+@@ -2921,20 +2934,6 @@ unsigned long global_reclaimable_pages(void)
+ 	return nr;
+ }
+ 
+-unsigned long zone_reclaimable_pages(struct zone *zone)
+-{
+-	int nr;
+-
+-	nr = zone_page_state(zone, NR_ACTIVE_FILE) +
+-	     zone_page_state(zone, NR_INACTIVE_FILE);
+-
+-	if (nr_swap_pages > 0)
+-		nr += zone_page_state(zone, NR_ACTIVE_ANON) +
+-		      zone_page_state(zone, NR_INACTIVE_ANON);
+-
+-	return nr;
+-}
+-
+ #ifdef CONFIG_HIBERNATION
+ /*
+  * Try to free `nr_to_reclaim' of memory, system-wide, and return the number of
+@@ -3232,7 +3231,7 @@ int zone_reclaim(struct zone *zone, gfp_t gfp_mask, unsigned int order)
+ 	    zone_page_state(zone, NR_SLAB_RECLAIMABLE) <= zone->min_slab_pages)
+ 		return ZONE_RECLAIM_FULL;
+ 
+-	if (zone->all_unreclaimable)
++	if (!zone_reclaimable(zone))
+ 		return ZONE_RECLAIM_FULL;
+ 
+ 	/*
+diff --git a/mm/vmstat.c b/mm/vmstat.c
+index 959a558..9559032 100644
+--- a/mm/vmstat.c
++++ b/mm/vmstat.c
+@@ -19,6 +19,9 @@
+ #include <linux/math64.h>
+ #include <linux/writeback.h>
+ #include <linux/compaction.h>
++#include <linux/mm_inline.h>
++
++#include "internal.h"
+ 
+ #ifdef CONFIG_VM_EVENT_COUNTERS
+ DEFINE_PER_CPU(struct vm_event_state, vm_event_states) = {{0}};
+@@ -1027,7 +1030,7 @@ static void zoneinfo_show_print(struct seq_file *m, pg_data_t *pgdat,
+ 		   "\n  all_unreclaimable: %u"
+ 		   "\n  start_pfn:         %lu"
+ 		   "\n  inactive_ratio:    %u",
+-		   zone->all_unreclaimable,
++		   !zone_reclaimable(zone),
+ 		   zone->zone_start_pfn,
+ 		   zone->inactive_ratio);
+ 	seq_putc(m, '\n');
+-- 
+1.7.9.5
+

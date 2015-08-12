@@ -1,0 +1,52 @@
+From 3dc47cecd0eec9fb6c91043bd596c000360c4f89 Mon Sep 17 00:00:00 2001
+From: Larry Finger <Larry.Finger@lwfinger.net>
+Date: Mon, 4 Feb 2013 15:33:44 -0600
+Subject: [PATCH 156/517] cfg80211: Fix memory leak
+
+When a driver requests a specific regulatory domain after cfg80211 already
+has one, a struct ieee80211_regdomain is leaked.
+
+Change-Id: Id28fc9861b9c911a97bd242439eabca097d76258
+Reported-by: Larry Finger <Larry.Finger@lwfinger.net>
+Tested-by: Larry Finger <Larry.Finger@lwfinger.net>
+Signed-off-by: Larry Finger <Larry.Finger@lwfinger.net>
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+Git-commit: b7566fc363e23f0efd3fa1e1460f9421cdc0d77e
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+[mattw@codeaurora.org: trivially backport to the msm-3.4 kernel]
+Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ net/wireless/reg.c |    9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+ mode change 100644 => 100755 net/wireless/reg.c
+
+diff --git a/net/wireless/reg.c b/net/wireless/reg.c
+old mode 100644
+new mode 100755
+index e9a0ac8..b96094c
+--- a/net/wireless/reg.c
++++ b/net/wireless/reg.c
+@@ -2187,10 +2187,15 @@ static int __set_regdom(const struct ieee80211_regdomain *rd)
+ 		 * However if a driver requested this specific regulatory
+ 		 * domain we keep it for its private use
+ 		 */
+-		if (last_request->initiator == NL80211_REGDOM_SET_BY_DRIVER)
++		if (last_request->initiator == NL80211_REGDOM_SET_BY_DRIVER) {
++			const struct ieee80211_regdomain *tmp;
++
++			tmp = request_wiphy->regd;
+ 			request_wiphy->regd = rd;
+-		else
++			kfree(tmp);
++		} else {
+ 			kfree(rd);
++		}
+ 
+ 		rd = NULL;
+ 
+-- 
+1.7.9.5
+

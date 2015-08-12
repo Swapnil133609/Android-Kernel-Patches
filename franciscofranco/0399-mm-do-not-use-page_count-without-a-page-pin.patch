@@ -1,0 +1,60 @@
+From 219e7a24b029e355dc1bb70e8d9ffd0e2658999d Mon Sep 17 00:00:00 2001
+From: Minchan Kim <minchan@kernel.org>
+Date: Tue, 31 Jul 2012 16:42:59 -0700
+Subject: [PATCH 399/517] mm: do not use page_count() without a page pin
+
+d179e84ba ("mm: vmscan: do not use page_count without a page pin") fixed
+this problem in vmscan.c but same problem is in __count_immobile_pages().
+
+I copy and paste d179e84ba's contents for description.
+
+"It is unsafe to run page_count during the physical pfn scan because
+compound_head could trip on a dangling pointer when reading
+page->first_page if the compound page is being freed by another CPU."
+
+Change-Id: I2b620c07adfa2c5a0f56219a11c042dc97428085
+Signed-off-by: Minchan Kim <minchan@kernel.org>
+Cc: Andrea Arcangeli <aarcange@redhat.com>
+Cc: Mel Gorman <mgorman@suse.de>
+Cc: Michal Hocko <mhocko@suse.cz>
+Reviewed-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+Cc: Wanpeng Li <liwp.linux@gmail.com>
+Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: 97d255c816946388bab504122937730d3447c612
+Git-repo: git://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/page_alloc.c |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index a8b00c5..5308b27 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5667,11 +5667,18 @@ __count_immobile_pages(struct zone *zone, struct page *page, int count)
+ 			continue;
+ 
+ 		page = pfn_to_page(check);
+-		if (!page_count(page)) {
++		/*
++		 * We can't use page_count without pin a page
++		 * because another CPU can free compound page.
++		 * This check already skips compound tails of THP
++		 * because their page->_count is zero at all time.
++		 */
++		if (!atomic_read(&page->_count)) {
+ 			if (PageBuddy(page))
+ 				iter += (1 << page_order(page)) - 1;
+ 			continue;
+ 		}
++
+ 		if (!PageLRU(page))
+ 			found++;
+ 		/*
+-- 
+1.7.9.5
+

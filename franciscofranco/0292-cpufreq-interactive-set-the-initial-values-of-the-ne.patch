@@ -1,0 +1,31 @@
+From 6832d4ebfaa9218df006324b9ad0a0483ccd91c6 Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Fri, 13 Dec 2013 03:34:16 +0000
+Subject: [PATCH 292/517] cpufreq: interactive: set the initial values of the
+ new sync_freq_load_threshold and sync_freq
+ variables.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index 4f3a499..0eb8602 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -143,8 +143,8 @@ u32 boosted_time;
+  * If the max load among the other CPUs is higher than sync_freq_load_threshold
+  * then do not let the frequency to drop below sync_freq
+  */
+-static unsigned int sync_freq_load_threshold;
+-static unsigned int sync_freq;
++static unsigned int sync_freq_load_threshold = 50;
++static unsigned int sync_freq = CPU_SYNC_FREQ;
+ 
+ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
+ 		unsigned int event);
+-- 
+1.7.9.5
+

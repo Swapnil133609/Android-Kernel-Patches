@@ -1,0 +1,62 @@
+From f39b9ee4beb236c8e3f7ad4236334b87a8f53dce Mon Sep 17 00:00:00 2001
+From: Konstantin Dorfman <kdorfman@codeaurora.org>
+Date: Sun, 22 Sep 2013 15:43:24 +0300
+Subject: [PATCH 497/517] sdhci: sdhci_stop_request() returns error when no
+ request
+
+There is race between sdhci_tasklet_finish()
+and sdhci_stop_request(): when the request is finished before
+stop flow called, error returned.
+
+Change-Id: Ic036feae925b2e9e5435e44f97b24a179547bf49
+Signed-off-by: Konstantin Dorfman <kdorfman@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/mmc/host/sdhci.c |    7 +++++--
+ include/linux/mmc/card.h |    1 +
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index d705a23..829b8a1 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -2151,10 +2151,13 @@ static int sdhci_stop_request(struct mmc_host *mmc)
+ 	struct sdhci_host *host = mmc_priv(mmc);
+ 	unsigned long flags;
+ 	struct mmc_data *data;
++	int ret = 0;
+ 
+ 	spin_lock_irqsave(&host->lock, flags);
+-	if (!host->mrq || !host->data)
++	if (!host->mrq || !host->data) {
++		ret = MMC_BLK_NO_REQ_TO_STOP;
+ 		goto out;
++	}
+ 
+ 	data = host->data;
+ 
+@@ -2180,7 +2183,7 @@ static int sdhci_stop_request(struct mmc_host *mmc)
+ 	host->data = NULL;
+ out:
+ 	spin_unlock_irqrestore(&host->lock, flags);
+-	return 0;
++	return ret;
+ }
+ 
+ static unsigned int sdhci_get_xfer_remain(struct mmc_host *mmc)
+diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
+index 335ca93..f3630a9 100644
+--- a/include/linux/mmc/card.h
++++ b/include/linux/mmc/card.h
+@@ -218,6 +218,7 @@ enum mmc_blk_status {
+ 	MMC_BLK_NEW_REQUEST,
+ 	MMC_BLK_URGENT,
+ 	MMC_BLK_URGENT_DONE,
++	MMC_BLK_NO_REQ_TO_STOP,
+ };
+ 
+ struct mmc_wr_pack_stats {
+-- 
+1.7.9.5
+

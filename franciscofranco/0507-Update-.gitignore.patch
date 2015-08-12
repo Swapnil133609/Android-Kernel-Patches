@@ -1,0 +1,24 @@
+From 64c2f60dc9ab73a85b02bbcb8b8b2e922a6f521c Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Sun, 29 Dec 2013 02:23:28 +0000
+Subject: [PATCH 507/517] Update .gitignore
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ .gitignore |    1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/.gitignore b/.gitignore
+index 0b6f47a..fd16dba 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -90,5 +90,4 @@ build.sh
+ flash.sh
+ zip/
+ diff.diff
+-drivers/input/touchscreen/touchboost.c
+ touchboost.diff
+-- 
+1.7.9.5
+

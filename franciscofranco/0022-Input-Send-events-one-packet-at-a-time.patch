@@ -1,0 +1,468 @@
+From 7319e0205acc6ace4dd494bf90750f4b8d956b4f Mon Sep 17 00:00:00 2001
+From: Henrik Rydberg <rydberg@euromail.se>
+Date: Sat, 15 Sep 2012 15:23:35 +0200
+Subject: [PATCH 022/517] Input: Send events one packet at a time
+
+On heavy event loads, such as a multitouch driver, the irqsoff latency
+can be as high as 250 us.  By accumulating a frame worth of data
+before passing it on, the latency can be dramatically reduced.  As a
+side effect, the special EV_SYN handling can be removed, since the
+frame is now atomic.
+
+This patch adds the events() handler callback and uses it if it
+exists. The latency is improved by 50 us even without the callback.
+
+Change-Id: Iebd9b1868ae6300a922a45b6d104e7c2b38e4cf5
+Cc: Daniel Kurtz <djkurtz@chromium.org>
+Tested-by: Benjamin Tissoires <benjamin.tissoires@enac.fr>
+Tested-by: Ping Cheng <pingc@wacom.com>
+Tested-by: Sedat Dilek <sedat.dilek@gmail.com>
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+
+Input: Improve the events-per-packet estimate
+
+The events-per-packet estimate has so far been used by MT devices
+only. This patch adjusts the packet buffer size to also accomodate the
+KEY and MSC events.  Keyboards normally send one or two keys at a
+time. MT devices normally send a number of button keys along with the
+MT information.  The buffer size chosen here covers those cases, and
+matches the default buffer size in evdev. Since the input estimate is
+now preferred, remove the special input-mt estimate.
+
+Reviewed-and-tested-by: Ping Cheng <pingc@wacom.com>
+Tested-by: Benjamin Tissoires <benjamin.tissoires@enac.fr>
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/input-mt.c |    1 -
+ drivers/input/input.c    |  213 ++++++++++++++++++++++++++++++++--------------
+ include/linux/input.h    |   24 +++++-
+ 3 files changed, 169 insertions(+), 69 deletions(-)
+
+diff --git a/drivers/input/input-mt.c b/drivers/input/input-mt.c
+index f658086..92f801a 100644
+--- a/drivers/input/input-mt.c
++++ b/drivers/input/input-mt.c
+@@ -41,7 +41,6 @@ int input_mt_init_slots(struct input_dev *dev, unsigned int num_slots)
+ 	dev->mtsize = num_slots;
+ 	input_set_abs_params(dev, ABS_MT_SLOT, 0, num_slots - 1, 0, 0);
+ 	input_set_abs_params(dev, ABS_MT_TRACKING_ID, 0, TRKID_MAX, 0, 0);
+-	input_set_events_per_packet(dev, 6 * num_slots);
+ 
+ 	/* Mark slots as 'unused' */
+ 	for (i = 0; i < num_slots; i++)
+diff --git a/drivers/input/input.c b/drivers/input/input.c
+index 378b0d1..a79ac99 100644
+--- a/drivers/input/input.c
++++ b/drivers/input/input.c
+@@ -47,6 +47,8 @@ static DEFINE_MUTEX(input_mutex);
+ 
+ static struct input_handler *input_table[8];
+ 
++static const struct input_value input_value_sync = { EV_SYN, SYN_REPORT, 1 };
++
+ static inline int is_event_supported(unsigned int code,
+ 				     unsigned long *bm, unsigned int max)
+ {
+@@ -69,42 +71,102 @@ static int input_defuzz_abs_event(int value, int old_val, int fuzz)
+ 	return value;
+ }
+ 
++static void input_start_autorepeat(struct input_dev *dev, int code)
++{
++	if (test_bit(EV_REP, dev->evbit) &&
++	    dev->rep[REP_PERIOD] && dev->rep[REP_DELAY] &&
++	    dev->timer.data) {
++		dev->repeat_key = code;
++		mod_timer(&dev->timer,
++			  jiffies + msecs_to_jiffies(dev->rep[REP_DELAY]));
++	}
++}
++
++static void input_stop_autorepeat(struct input_dev *dev)
++{
++	del_timer(&dev->timer);
++}
++
+ /*
+  * Pass event first through all filters and then, if event has not been
+  * filtered out, through all open handles. This function is called with
+  * dev->event_lock held and interrupts disabled.
+  */
+-static void input_pass_event(struct input_dev *dev,
+-			     unsigned int type, unsigned int code, int value)
++static unsigned int input_to_handler(struct input_handle *handle,
++			struct input_value *vals, unsigned int count)
++{
++	struct input_handler *handler = handle->handler;
++	struct input_value *end = vals;
++	struct input_value *v;
++
++	for (v = vals; v != vals + count; v++) {
++		if (handler->filter &&
++		    handler->filter(handle, v->type, v->code, v->value))
++			continue;
++		if (end != v)
++			*end = *v;
++		end++;
++	}
++
++	count = end - vals;
++	if (!count)
++		return 0;
++
++	if (handler->events)
++		handler->events(handle, vals, count);
++	else if (handler->event)
++		for (v = vals; v != end; v++)
++			handler->event(handle, v->type, v->code, v->value);
++
++	return count;
++}
++
++/*
++ * Pass values first through all filters and then, if event has not been
++ * filtered out, through all open handles. This function is called with
++ * dev->event_lock held and interrupts disabled.
++ */
++static void input_pass_values(struct input_dev *dev,
++			      struct input_value *vals, unsigned int count)
+ {
+-	struct input_handler *handler;
+ 	struct input_handle *handle;
++	struct input_value *v;
++
++	if (!count)
++		return;
+ 
+ 	rcu_read_lock();
+ 
+ 	handle = rcu_dereference(dev->grab);
+-	if (handle)
+-		handle->handler->event(handle, type, code, value);
+-	else {
+-		bool filtered = false;
+-
+-		list_for_each_entry_rcu(handle, &dev->h_list, d_node) {
+-			if (!handle->open)
+-				continue;
++	if (handle) {
++		count = input_to_handler(handle, vals, count);
++	} else {
++		list_for_each_entry_rcu(handle, &dev->h_list, d_node)
++			if (handle->open)
++				count = input_to_handler(handle, vals, count);
++	}
+ 
+-			handler = handle->handler;
+-			if (!handler->filter) {
+-				if (filtered)
+-					break;
++	rcu_read_unlock();
+ 
+-				handler->event(handle, type, code, value);
++	add_input_randomness(vals->type, vals->code, vals->value);
+ 
+-			} else if (handler->filter(handle, type, code, value))
+-				filtered = true;
++	/* trigger auto repeat for key events */
++	for (v = vals; v != vals + count; v++) {
++		if (v->type == EV_KEY && v->value != 2) {
++			if (v->value)
++				input_start_autorepeat(dev, v->code);
++			else
++				input_stop_autorepeat(dev);
+ 		}
+ 	}
++}
+ 
+-	rcu_read_unlock();
++static void input_pass_event(struct input_dev *dev,
++			     unsigned int type, unsigned int code, int value)
++{
++	struct input_value vals[] = { { type, code, value } };
++
++	input_pass_values(dev, vals, ARRAY_SIZE(vals));
+ }
+ 
+ /*
+@@ -121,18 +183,12 @@ static void input_repeat_key(unsigned long data)
+ 
+ 	if (test_bit(dev->repeat_key, dev->key) &&
+ 	    is_event_supported(dev->repeat_key, dev->keybit, KEY_MAX)) {
++		struct input_value vals[] =  {
++			{ EV_KEY, dev->repeat_key, 2 },
++			input_value_sync
++		};
+ 
+-		input_pass_event(dev, EV_KEY, dev->repeat_key, 2);
+-
+-		if (dev->sync) {
+-			/*
+-			 * Only send SYN_REPORT if we are not in a middle
+-			 * of driver parsing a new hardware packet.
+-			 * Otherwise assume that the driver will send
+-			 * SYN_REPORT once it's done.
+-			 */
+-			input_pass_event(dev, EV_SYN, SYN_REPORT, 1);
+-		}
++		input_pass_values(dev, vals, ARRAY_SIZE(vals));
+ 
+ 		if (dev->rep[REP_PERIOD])
+ 			mod_timer(&dev->timer, jiffies +
+@@ -142,25 +198,11 @@ static void input_repeat_key(unsigned long data)
+ 	spin_unlock_irqrestore(&dev->event_lock, flags);
+ }
+ 
+-static void input_start_autorepeat(struct input_dev *dev, int code)
+-{
+-	if (test_bit(EV_REP, dev->evbit) &&
+-	    dev->rep[REP_PERIOD] && dev->rep[REP_DELAY] &&
+-	    dev->timer.data) {
+-		dev->repeat_key = code;
+-		mod_timer(&dev->timer,
+-			  jiffies + msecs_to_jiffies(dev->rep[REP_DELAY]));
+-	}
+-}
+-
+-static void input_stop_autorepeat(struct input_dev *dev)
+-{
+-	del_timer(&dev->timer);
+-}
+-
+ #define INPUT_IGNORE_EVENT	0
+ #define INPUT_PASS_TO_HANDLERS	1
+ #define INPUT_PASS_TO_DEVICE	2
++#define INPUT_SLOT		4
++#define INPUT_FLUSH		8
+ #define INPUT_PASS_TO_ALL	(INPUT_PASS_TO_HANDLERS | INPUT_PASS_TO_DEVICE)
+ 
+ static int input_handle_abs_event(struct input_dev *dev,
+@@ -207,14 +249,14 @@ static int input_handle_abs_event(struct input_dev *dev,
+ 	/* Flush pending "slot" event */
+ 	if (is_mt_event && dev->slot != input_abs_get_val(dev, ABS_MT_SLOT)) {
+ 		input_abs_set_val(dev, ABS_MT_SLOT, dev->slot);
+-		input_pass_event(dev, EV_ABS, ABS_MT_SLOT, dev->slot);
++		return INPUT_PASS_TO_HANDLERS | INPUT_SLOT;
+ 	}
+ 
+ 	return INPUT_PASS_TO_HANDLERS;
+ }
+ 
+-static void input_handle_event(struct input_dev *dev,
+-			       unsigned int type, unsigned int code, int value)
++static int input_get_disposition(struct input_dev *dev,
++			  unsigned int type, unsigned int code, int value)
+ {
+ 	int disposition = INPUT_IGNORE_EVENT;
+ 
+@@ -229,13 +271,9 @@ static void input_handle_event(struct input_dev *dev,
+ 			break;
+ 
+ 		case SYN_REPORT:
+-			if (!dev->sync) {
+-				dev->sync = true;
+-				disposition = INPUT_PASS_TO_HANDLERS;
+-			}
++			disposition = INPUT_PASS_TO_HANDLERS | INPUT_FLUSH;
+ 			break;
+ 		case SYN_MT_REPORT:
+-			dev->sync = false;
+ 			disposition = INPUT_PASS_TO_HANDLERS;
+ 			break;
+ 		}
+@@ -319,14 +357,48 @@ static void input_handle_event(struct input_dev *dev,
+ 		break;
+ 	}
+ 
+-	if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)
+-		dev->sync = false;
++	return disposition;
++}
++
++static void input_handle_event(struct input_dev *dev,
++			       unsigned int type, unsigned int code, int value)
++{
++	int disposition;
++
++	disposition = input_get_disposition(dev, type, code, value);
+ 
+ 	if ((disposition & INPUT_PASS_TO_DEVICE) && dev->event)
+ 		dev->event(dev, type, code, value);
+ 
+-	if (disposition & INPUT_PASS_TO_HANDLERS)
+-		input_pass_event(dev, type, code, value);
++	if (!dev->vals)
++		return;
++
++	if (disposition & INPUT_PASS_TO_HANDLERS) {
++		struct input_value *v;
++
++		if (disposition & INPUT_SLOT) {
++			v = &dev->vals[dev->num_vals++];
++			v->type = EV_ABS;
++			v->code = ABS_MT_SLOT;
++			v->value = dev->slot;
++		}
++
++		v = &dev->vals[dev->num_vals++];
++		v->type = type;
++		v->code = code;
++		v->value = value;
++	}
++
++	if (disposition & INPUT_FLUSH) {
++		if (dev->num_vals >= 2)
++			input_pass_values(dev, dev->vals, dev->num_vals);
++		dev->num_vals = 0;
++	} else if (dev->num_vals >= dev->max_vals - 2) {
++		dev->vals[dev->num_vals++] = input_value_sync;
++		input_pass_values(dev, dev->vals, dev->num_vals);
++		dev->num_vals = 0;
++	}
++
+ }
+ 
+ /**
+@@ -354,7 +426,6 @@ void input_event(struct input_dev *dev,
+ 	if (is_event_supported(type, dev->evbit, EV_MAX)) {
+ 
+ 		spin_lock_irqsave(&dev->event_lock, flags);
+-		add_input_randomness(type, code, value);
+ 		input_handle_event(dev, type, code, value);
+ 		spin_unlock_irqrestore(&dev->event_lock, flags);
+ 	}
+@@ -881,10 +952,12 @@ int input_set_keycode(struct input_dev *dev,
+ 	if (test_bit(EV_KEY, dev->evbit) &&
+ 	    !is_event_supported(old_keycode, dev->keybit, KEY_MAX) &&
+ 	    __test_and_clear_bit(old_keycode, dev->key)) {
++		struct input_value vals[] =  {
++			{ EV_KEY, old_keycode, 0 },
++			input_value_sync
++		};
+ 
+-		input_pass_event(dev, EV_KEY, old_keycode, 0);
+-		if (dev->sync)
+-			input_pass_event(dev, EV_SYN, SYN_REPORT, 1);
++		input_pass_values(dev, vals, ARRAY_SIZE(vals));
+ 	}
+ 
+  out:
+@@ -1500,6 +1573,7 @@ static void input_dev_release(struct device *device)
+ 	input_ff_destroy(dev);
+ 	input_mt_destroy_slots(dev);
+ 	kfree(dev->absinfo);
++	kfree(dev->vals);
+ 	kfree(dev);
+ 
+ 	module_put(THIS_MODULE);
+@@ -1862,6 +1936,9 @@ static unsigned int input_estimate_events_per_packet(struct input_dev *dev)
+ 		if (test_bit(i, dev->relbit))
+ 			events++;
+ 
++	/* Make room for KEY and MSC events */
++	events += 7;
++
+ 	return events;
+ }
+ 
+@@ -1900,6 +1977,7 @@ int input_register_device(struct input_dev *dev)
+ {
+ 	static atomic_t input_no = ATOMIC_INIT(0);
+ 	struct input_handler *handler;
++	unsigned int packet_size;
+ 	const char *path;
+ 	int error;
+ 
+@@ -1912,9 +1990,14 @@ int input_register_device(struct input_dev *dev)
+ 	/* Make sure that bitmasks not mentioned in dev->evbit are clean. */
+ 	input_cleanse_bitmasks(dev);
+ 
+-	if (!dev->hint_events_per_packet)
+-		dev->hint_events_per_packet =
+-				input_estimate_events_per_packet(dev);
++	packet_size = input_estimate_events_per_packet(dev);
++	if (dev->hint_events_per_packet < packet_size)
++		dev->hint_events_per_packet = packet_size;
++
++	dev->max_vals = max(dev->hint_events_per_packet, packet_size) + 2;
++	dev->vals = kcalloc(dev->max_vals, sizeof(*dev->vals), GFP_KERNEL);
++	if (!dev->vals)
++		return -ENOMEM;
+ 
+ 	/*
+ 	 * If delay and period are pre-set by the driver, then autorepeating
+diff --git a/include/linux/input.h b/include/linux/input.h
+index 3d45b48..4f49d2c 100644
+--- a/include/linux/input.h
++++ b/include/linux/input.h
+@@ -1174,6 +1174,18 @@ struct ff_effect {
+ #include <linux/mod_devicetable.h>
+ 
+ /**
++ * struct input_value - input value representation
++ * @type: type of value (EV_KEY, EV_ABS, etc)
++ * @code: the value code
++ * @value: the value
++ */
++struct input_value {
++	__u16 type;
++	__u16 code;
++	__s32 value;
++};
++
++/**
+  * struct input_dev - represents an input device
+  * @name: name of the device
+  * @phys: physical path to the device in the system hierarchy
+@@ -1249,7 +1261,6 @@ struct ff_effect {
+  *	last user closes the device
+  * @going_away: marks devices that are in a middle of unregistering and
+  *	causes input_open_device*() fail with -ENODEV.
+- * @sync: set to %true when there were no new events since last EV_SYN
+  * @dev: driver model's view of this device
+  * @h_list: list of input handles associated with the device. When
+  *	accessing the list dev->mutex must be held
+@@ -1319,12 +1330,14 @@ struct input_dev {
+ 	bool going_away;
+ 	bool disabled;
+ 
+-	bool sync;
+-
+ 	struct device dev;
+ 
+ 	struct list_head	h_list;
+ 	struct list_head	node;
++
++	unsigned int num_vals;
++	unsigned int max_vals;
++	struct input_value *vals;
+ };
+ #define to_input_dev(d) container_of(d, struct input_dev, dev)
+ 
+@@ -1385,6 +1398,9 @@ struct input_handle;
+  * @event: event handler. This method is being called by input core with
+  *	interrupts disabled and dev->event_lock spinlock held and so
+  *	it may not sleep
++ * @events: event sequence handler. This method is being called by
++ *	input core with interrupts disabled and dev->event_lock
++ *	spinlock held and so it may not sleep
+  * @filter: similar to @event; separates normal event handlers from
+  *	"filters".
+  * @match: called after comparing device's id with handler's id_table
+@@ -1421,6 +1437,8 @@ struct input_handler {
+ 	void *private;
+ 
+ 	void (*event)(struct input_handle *handle, unsigned int type, unsigned int code, int value);
++	void (*events)(struct input_handle *handle,
++		       const struct input_value *vals, unsigned int count);
+ 	bool (*filter)(struct input_handle *handle, unsigned int type, unsigned int code, int value);
+ 	bool (*match)(struct input_handler *handler, struct input_dev *dev);
+ 	int (*connect)(struct input_handler *handler, struct input_dev *dev, const struct input_device_id *id);
+-- 
+1.7.9.5
+

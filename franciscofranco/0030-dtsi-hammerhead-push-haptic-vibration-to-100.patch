@@ -1,0 +1,27 @@
+From 4e00f2dcf95436d498821953fa30b217626cf45a Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Wed, 6 Nov 2013 02:27:48 +0000
+Subject: [PATCH 030/517] dtsi: hammerhead: push haptic vibration to 100.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ .../msm8974-hammerhead-misc.dtsi                   |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-misc.dtsi b/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-misc.dtsi
+index 4678a8a..2e9229c 100644
+--- a/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-misc.dtsi
++++ b/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-misc.dtsi
+@@ -15,7 +15,7 @@
+ 		compatible = "msm,pwm_vibrator";
+ 		haptic-pwr-gpio = <&msmgpio 60 0x00>;
+ 		motor-pwm-gpio = <&msmgpio 27 0x00>;
+-		motor-amp = <63>;
++		motor-amp = <100>;
+ 		n-value = <127>;
+ 	};
+ 
+-- 
+1.7.9.5
+

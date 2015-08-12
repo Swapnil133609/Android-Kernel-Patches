@@ -1,0 +1,87 @@
+From 5c2ee12d49cab9699510a40608c470def74d7b74 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Thu, 14 Nov 2013 07:32:07 +0000
+Subject: [PATCH 070/517] sound_control: initial code push for Headphones gain
+ userspace interface.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/misc/Makefile      |    2 +-
+ sound/soc/codecs/wcd9320.c |   36 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 37 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+index af6851f..81ebc61 100644
+--- a/drivers/misc/Makefile
++++ b/drivers/misc/Makefile
+@@ -74,4 +74,4 @@ obj-$(CONFIG_TI_DRV2667) += ti_drv2667.o
+ obj-$(CONFIG_QPNP_MISC) += qpnp-misc.o
+ obj-$(CONFIG_EARJACK_DEBUGGER) += earjack_debugger.o
+ obj-$(CONFIG_FAN48632_BOOST) += fan48632_boost.o
+-obj-y += mako_hotplug_control.o
++obj-y += sound_control.o
+diff --git a/sound/soc/codecs/wcd9320.c b/sound/soc/codecs/wcd9320.c
+index 658f885..79ee533 100644
+--- a/sound/soc/codecs/wcd9320.c
++++ b/sound/soc/codecs/wcd9320.c
+@@ -6363,6 +6363,33 @@ static struct regulator *taiko_codec_find_regulator(struct snd_soc_codec *codec,
+ 	return NULL;
+ }
+ 
++struct sound_control {
++	unsigned int default_headphones_value;
++	struct snd_soc_codec *snd_control_codec;
++} soundcontrol;
++
++void update_headphones_volume_boost(int vol_boost)
++{
++	unsigned int default_val = soundcontrol.default_headphones_value;
++	unsigned int boosted_val = vol_boost != 0 ? 
++		default_val + vol_boost : default_val;
++
++	pr_info("Sound Control: Headphones default value %d\n", default_val);
++
++	taiko_write(soundcontrol.snd_control_codec,
++		TAIKO_A_CDC_RX1_VOL_CTL_B2_CTL, boosted_val);
++	taiko_write(soundcontrol.snd_control_codec,
++		TAIKO_A_CDC_RX2_VOL_CTL_B2_CTL, boosted_val);
++	
++	pr_info("Sound Control: Boosted Headphones RX1 value %d\n",
++		taiko_read(soundcontrol.snd_control_codec,
++		TAIKO_A_CDC_RX1_VOL_CTL_B2_CTL));
++
++	pr_info("Sound Control: Boosted Headphones RX2 value %d\n", 
++		taiko_read(soundcontrol.snd_control_codec, 
++		TAIKO_A_CDC_RX2_VOL_CTL_B2_CTL));
++}
++
+ static int taiko_codec_probe(struct snd_soc_codec *codec)
+ {
+ 	struct wcd9xxx *control;
+@@ -6375,6 +6402,8 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
+ 	void *ptr = NULL;
+ 	struct wcd9xxx *core = dev_get_drvdata(codec->dev->parent);
+ 
++	soundcontrol.snd_control_codec = codec;
++
+ 	codec->control_data = dev_get_drvdata(codec->dev->parent);
+ 	control = codec->control_data;
+ 
+@@ -6535,6 +6564,13 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
+ 	mutex_unlock(&dapm->codec->mutex);
+ 
+ 	codec->ignore_pmdown_time = 1;
++
++	/*
++	 * Get the default values during probe
++	 */
++	soundcontrol.default_headphones_value = taiko_read(codec, 
++		TAIKO_A_CDC_RX1_VOL_CTL_B2_CTL);
++
+ 	return ret;
+ 
+ err_irq:
+-- 
+1.7.9.5
+

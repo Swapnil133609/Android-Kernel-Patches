@@ -1,0 +1,37 @@
+From 8fec743fc31527b5a00b344e140ac2f9b98858a1 Mon Sep 17 00:00:00 2001
+From: Zaheerulla Meer <zmeer@codeaurora.org>
+Date: Fri, 11 Oct 2013 18:18:35 +0530
+Subject: [PATCH 474/517] msm: ipc: Possible memory corruption due to Sign
+ Conversion
+
+msm_ipc_router_skb_to_buf() takes an unsigned argument and assigns the
+same to a signed local variable. This might cause issues when the value
+of the argument is too high.
+
+Change the datatype of the local variable to unsigned.
+
+CRs-Fixed: 550606
+Change-Id: I257a095681dd82fba05367fd6faf25820e95c719
+Signed-off-by: Zaheerulla Meer <zmeer@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/ipc_router.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/ipc_router.c b/arch/arm/mach-msm/ipc_router.c
+index f2ffa54..be7f218 100644
+--- a/arch/arm/mach-msm/ipc_router.c
++++ b/arch/arm/mach-msm/ipc_router.c
+@@ -424,7 +424,7 @@ static void *msm_ipc_router_skb_to_buf(struct sk_buff_head *skb_head,
+ 				       unsigned int len)
+ {
+ 	struct sk_buff *temp;
+-	int offset = 0, buf_len = 0, copy_len;
++	unsigned int offset = 0, buf_len = 0, copy_len;
+ 	void *buf;
+ 
+ 	if (!skb_head) {
+-- 
+1.7.9.5
+

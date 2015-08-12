@@ -1,0 +1,107 @@
+From a847a80320f036c8ce3b642e6b909a3003fbecfe Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Fri, 6 Dec 2013 17:29:42 +0000
+Subject: [PATCH 175/517] Revert "net: wireless: bcmdhd: Change DTIM skip
+ policy in suspend"
+
+This reverts commit c8092f60419fcec95cc5c4b458de9d6be2fc60fc.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/net/wireless/bcmdhd/dhd.h        |    5 ++---
+ drivers/net/wireless/bcmdhd/dhd_common.c |   27 +++++++++++----------------
+ 2 files changed, 13 insertions(+), 19 deletions(-)
+
+diff --git a/drivers/net/wireless/bcmdhd/dhd.h b/drivers/net/wireless/bcmdhd/dhd.h
+index a6f587e..22dd810 100644
+--- a/drivers/net/wireless/bcmdhd/dhd.h
++++ b/drivers/net/wireless/bcmdhd/dhd.h
+@@ -791,9 +791,8 @@ extern uint dhd_force_tx_queueing;
+ #endif
+ #endif /* WLTDLS */
+ 
+-#define MAX_DTIM_SKIP_BEACON_INTERVAL	100 /* max allowed associated AP beacon for DTIM skip */
+-#define MAX_DTIM_ALLOWED_INTERVAL 300 /* max allowed total beacon interval for DTIM skip */
+-#define NO_DTIM_SKIP 1
++
++#define MAX_DTIM_SKIP_BEACON_ITERVAL	100 /* max allowed associated AP beacon for dtim skip */
+ 
+ #ifdef SDTEST
+ /* Echo packet generator (SDIO), pkts/s */
+diff --git a/drivers/net/wireless/bcmdhd/dhd_common.c b/drivers/net/wireless/bcmdhd/dhd_common.c
+index 57fc2d0..c8cb2f8 100644
+--- a/drivers/net/wireless/bcmdhd/dhd_common.c
++++ b/drivers/net/wireless/bcmdhd/dhd_common.c
+@@ -1860,9 +1860,9 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd)
+ {
+ 	int bcn_li_dtim = 1; /* deafult no dtim skip setting */
+ 	int ret = -1;
+-	int dtim_period = 0;
++	int dtim_assoc = 0;
+ 	int ap_beacon = 0;
+-	int allowed_skip_dtim_cnt = 0;
++
+ 	/* Check if associated */
+ 	if (dhd_is_associated(dhd, NULL, NULL) == FALSE) {
+ 		DHD_TRACE(("%s NOT assoc ret %d\n", __FUNCTION__, ret));
+@@ -1877,20 +1877,20 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd)
+ 	}
+ 
+ 	/* if associated APs Beacon more  that 100msec do no dtim skip */
+-	if (ap_beacon > MAX_DTIM_SKIP_BEACON_INTERVAL) {
++	if (ap_beacon > MAX_DTIM_SKIP_BEACON_ITERVAL) {
+ 		DHD_ERROR(("%s NO dtim skip for AP with beacon %d ms\n", __FUNCTION__, ap_beacon));
+ 		goto exit;
+ 	}
+ 
+ 	/* read associated ap's dtim setup */
+ 	if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_GET_DTIMPRD,
+-		&dtim_period, sizeof(dtim_period), FALSE, 0)) < 0) {
++		&dtim_assoc, sizeof(dtim_assoc), FALSE, 0)) < 0) {
+ 		DHD_ERROR(("%s failed code %d\n", __FUNCTION__, ret));
+ 		goto exit;
+ 	}
+ 
+ 	/* if not assocated just eixt */
+-	if (dtim_period == 0) {
++	if (dtim_assoc == 0) {
+ 		goto exit;
+ 	}
+ 
+@@ -1898,27 +1898,22 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd)
+ 	bcn_li_dtim = dhd->suspend_bcn_li_dtim;
+ 
+ 	/* check if sta listen interval fits into AP dtim */
+-	if (dtim_period > CUSTOM_LISTEN_INTERVAL) {
++	if (dtim_assoc > CUSTOM_LISTEN_INTERVAL) {
+ 		/* AP DTIM to big for our Listen Interval : no dtim skiping */
+-		bcn_li_dtim = NO_DTIM_SKIP;
++		bcn_li_dtim = 1;
+ 		DHD_ERROR(("%s DTIM=%d > Listen=%d : too big ...\n",
+-			__FUNCTION__, dtim_period, CUSTOM_LISTEN_INTERVAL));
++			__FUNCTION__, dtim_assoc, CUSTOM_LISTEN_INTERVAL));
+ 		goto exit;
+ 	}
+ 
+-	if ((dtim_period * ap_beacon * bcn_li_dtim) > MAX_DTIM_ALLOWED_INTERVAL) {
+-		 allowed_skip_dtim_cnt = MAX_DTIM_ALLOWED_INTERVAL / (dtim_period * ap_beacon);
+-		 bcn_li_dtim = (allowed_skip_dtim_cnt != 0) ? allowed_skip_dtim_cnt : NO_DTIM_SKIP;
+-	}
+-
+-	if ((bcn_li_dtim * dtim_period) > CUSTOM_LISTEN_INTERVAL) {
++	if ((bcn_li_dtim * dtim_assoc) > CUSTOM_LISTEN_INTERVAL) {
+ 		/* Round up dtim_skip to fit into STAs Listen Interval */
+-		bcn_li_dtim = (int)(CUSTOM_LISTEN_INTERVAL / dtim_period);
++		bcn_li_dtim = (int)(CUSTOM_LISTEN_INTERVAL / dtim_assoc);
+ 		DHD_TRACE(("%s agjust dtim_skip as %d\n", __FUNCTION__, bcn_li_dtim));
+ 	}
+ 
+ 	DHD_ERROR(("%s beacon=%d bcn_li_dtim=%d DTIM=%d Listen=%d\n",
+-		__FUNCTION__, ap_beacon, bcn_li_dtim, dtim_period, CUSTOM_LISTEN_INTERVAL));
++		__FUNCTION__, ap_beacon, bcn_li_dtim, dtim_assoc, CUSTOM_LISTEN_INTERVAL));
+ 
+ exit:
+ 	return bcn_li_dtim;
+-- 
+1.7.9.5
+

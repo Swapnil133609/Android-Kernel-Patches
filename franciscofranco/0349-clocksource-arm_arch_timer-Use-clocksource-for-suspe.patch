@@ -1,0 +1,38 @@
+From f0949306eb05ee0ebe726ea5d801a2878919d03f Mon Sep 17 00:00:00 2001
+From: Stephen Boyd <sboyd@codeaurora.org>
+Date: Thu, 26 Sep 2013 10:27:30 -0700
+Subject: [PATCH 349/517] clocksource: arm_arch_timer: Use clocksource for
+ suspend timekeeping
+
+The ARM architected timers keep counting during suspend so we can
+mark this clocksource with the CLOCK_SOURCE_SUSPEND_NONSTOP. This
+flag will indicate that this clocksource can be used for
+calculating suspend time and injecting sleep time into the
+timekeeping core. This will usually be more accurate than using
+an external RTC or architecture specific persistent clock.
+
+CRs-fixed: 536881
+Change-Id: I882bf19a87ceb642aa069bbf26802c66c96b4426
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/kernel/arch_timer.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+index 7cafd0a..ffc1ba2 100644
+--- a/arch/arm/kernel/arch_timer.c
++++ b/arch/arm/kernel/arch_timer.c
+@@ -357,7 +357,7 @@ static struct clocksource clocksource_counter = {
+ 	.rating	= 400,
+ 	.read	= arch_counter_read,
+ 	.mask	= CLOCKSOURCE_MASK(56),
+-	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
++	.flags	= CLOCK_SOURCE_IS_CONTINUOUS | CLOCK_SOURCE_SUSPEND_NONSTOP,
+ };
+ 
+ static u32 arch_counter_get_cntvct32(void)
+-- 
+1.7.9.5
+

@@ -1,0 +1,60 @@
+From ae0c5db0f9d1f6437e55a27a2eebecadd99b1faf Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Fri, 6 Dec 2013 17:29:05 +0000
+Subject: [PATCH 172/517] Revert "net: wireless: bcmdhd: Enable IPv6 RA filter
+ feature"
+
+This reverts commit a0f3f27d6716abf0648239c21c51dfdccd09a314.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/net/wireless/bcmdhd/dhd_linux.c |   19 -------------------
+ 1 file changed, 19 deletions(-)
+
+diff --git a/drivers/net/wireless/bcmdhd/dhd_linux.c b/drivers/net/wireless/bcmdhd/dhd_linux.c
+index e7680f2..5865b46 100644
+--- a/drivers/net/wireless/bcmdhd/dhd_linux.c
++++ b/drivers/net/wireless/bcmdhd/dhd_linux.c
+@@ -755,8 +755,6 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
+ #ifndef ENABLE_FW_ROAM_SUSPEND
+ 	uint roamvar = 1;
+ #endif /* ENABLE_FW_ROAM_SUSPEND */
+-	uint nd_ra_filter = 0;
+-	int ret = 0;
+ 
+ 	if (!dhd)
+ 		return -ENODEV;
+@@ -799,14 +797,6 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
+ 					iovbuf, sizeof(iovbuf));
+ 				dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+ #endif /* ENABLE_FW_ROAM_SUSPEND */
+-				if (FW_SUPPORTED(dhd, ndoe)) {
+-					/* enable IPv6 RA filter in  firmware during suspend */
+-					nd_ra_filter = 1;
+-					bcm_mkiovar("nd_ra_filter_enable", (char *)&nd_ra_filter, 4,
+-							iovbuf, sizeof(iovbuf));
+-					if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0)) < 0)
+-						DHD_ERROR(("failed to set nd_ra_filter (%d)\n", ret));
+-				}
+ 			} else {
+ #ifdef PKT_FILTER_SUPPORT
+ 				dhd->early_suspended = 0;
+@@ -835,15 +825,6 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
+ 					sizeof(iovbuf));
+ 				dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+ #endif /* ENABLE_FW_ROAM_SUSPEND */
+-				if (FW_SUPPORTED(dhd, ndoe)) {
+-					/* disable IPv6 RA filter in  firmware during suspend */
+-					nd_ra_filter = 0;
+-					bcm_mkiovar("nd_ra_filter_enable", (char *)&nd_ra_filter, 4,
+-							iovbuf, sizeof(iovbuf));
+-					if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0)) < 0)
+-						DHD_ERROR(("failed to set nd_ra_filter (%d)\n", ret));
+-				}
+-
+ 			}
+ 	}
+ 	dhd_suspend_unlock(dhd);
+-- 
+1.7.9.5
+

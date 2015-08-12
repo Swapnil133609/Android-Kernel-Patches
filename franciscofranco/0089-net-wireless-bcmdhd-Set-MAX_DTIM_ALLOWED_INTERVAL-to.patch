@@ -1,0 +1,30 @@
+From 06e9b4e2568daeb12f39ed69df9552e8f1117533 Mon Sep 17 00:00:00 2001
+From: Dmitry Shmidt <dimitrysh@google.com>
+Date: Fri, 15 Nov 2013 13:42:07 -0800
+Subject: [PATCH 089/517] net: wireless: bcmdhd: Set MAX_DTIM_ALLOWED_INTERVAL
+ to 600
+
+Change-Id: Ie4d9cac1e0828651a142d64762b251537431ea99
+Signed-off-by: Dmitry Shmidt <dimitrysh@google.com>
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/net/wireless/bcmdhd/dhd.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/wireless/bcmdhd/dhd.h b/drivers/net/wireless/bcmdhd/dhd.h
+index a6f587e..67e82a2 100644
+--- a/drivers/net/wireless/bcmdhd/dhd.h
++++ b/drivers/net/wireless/bcmdhd/dhd.h
+@@ -792,7 +792,7 @@ extern uint dhd_force_tx_queueing;
+ #endif /* WLTDLS */
+ 
+ #define MAX_DTIM_SKIP_BEACON_INTERVAL	100 /* max allowed associated AP beacon for DTIM skip */
+-#define MAX_DTIM_ALLOWED_INTERVAL 300 /* max allowed total beacon interval for DTIM skip */
++#define MAX_DTIM_ALLOWED_INTERVAL 600 /* max allowed total beacon interval for DTIM skip */
+ #define NO_DTIM_SKIP 1
+ 
+ #ifdef SDTEST
+-- 
+1.7.9.5
+

@@ -1,0 +1,33 @@
+From cad1f6dc205fa7740b11e0f03539e1b3dd78fe69 Mon Sep 17 00:00:00 2001
+From: Rohit Gupta <rohgup@codeaurora.org>
+Date: Thu, 21 Nov 2013 12:42:09 -0800
+Subject: [PATCH 332/517] cpufreq: interactive: Allow 1 ms error in
+ above_hispeed_delay comparisons
+
+Allow for an error of 1 ms while taking into account
+above_hispeed_delay for a frequency
+
+Change-Id: I744e44387152e4efb5978df4f2b9533bf79d4582
+Signed-off-by: Rohit Gupta <rohgup@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index 9c76acc..68c07b8 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -210,6 +210,8 @@ static unsigned int freq_to_above_hispeed_delay(unsigned int freq)
+ 		;
+ 
+ 	ret = above_hispeed_delay[i];
++	ret = (ret > (1 * USEC_PER_MSEC)) ? (ret - (1 * USEC_PER_MSEC)) : ret;
++
+ 	spin_unlock_irqrestore(&above_hispeed_delay_lock, flags);
+ 	return ret;
+ }
+-- 
+1.7.9.5
+

@@ -1,0 +1,43 @@
+From 4cfe15adba735ef0ca9bf9842b6c614a84222577 Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Wed, 11 Dec 2013 19:31:00 +0000
+Subject: [PATCH 268/517] cpufreq: interactive: to avoid a flurry of queued
+ works when we're constantly moving the finger in
+ the display let's add a small minimum interval
+ between input works of 100ms. This is probably
+ going to reduce the CPU usage during consecutive
+ input touches.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index 864b039..9c76acc 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -130,6 +130,8 @@ static bool io_is_busy = true;
+ static int input_boost_freq = DEFAULT_INPUT_BOOST_FREQ;
+ static struct workqueue_struct *input_wq;
+ static struct work_struct input_work;
++#define DEFAULT_BOOSTED_TIME_INTERVAL 100
++u32 boosted_time;
+ 
+ #define CPU_SYNC_FREQ 960000
+ 
+@@ -601,6 +603,10 @@ static void cpufreq_interactive_boost(struct work_struct *work)
+ 	int i;
+ 	struct cpufreq_interactive_cpuinfo *pcpu;
+ 
++	if (boosted_time + msecs_to_jiffies(DEFAULT_BOOSTED_TIME_INTERVAL) > jiffies)
++		return;
++
++	boosted_time = jiffies;
+ 
+ 	for_each_online_cpu(i) {
+ 		pcpu = &per_cpu(cpuinfo, i);
+-- 
+1.7.9.5
+

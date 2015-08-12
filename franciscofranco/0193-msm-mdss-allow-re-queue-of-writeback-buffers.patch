@@ -1,0 +1,88 @@
+From 3c90330aa11fa947b0d2a255c0db48bf33db87ad Mon Sep 17 00:00:00 2001
+From: Adrian Salido-Moreno <adrianm@codeaurora.org>
+Date: Tue, 29 Oct 2013 10:15:53 -0700
+Subject: [PATCH 193/517] msm: mdss: allow re-queue of writeback buffers
+
+When a buffer has been properly processed, user space may choose to use
+sync fence to acknowledge when buffer is complete. In such cases dequeue
+is not not necessary, allow this use case by allowing client to re-queue
+of writeback buffers as long as the buffer has been properly processed
+already.
+
+Change-Id: Ibac1eb9710477734e1ee2daf8136085d4439b0d4
+Signed-off-by: Adrian Salido-Moreno <adrianm@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_mdp_wb.c |   40 ++++++++++++++++++++++++++++------
+ 1 file changed, 33 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_mdp_wb.c b/drivers/video/msm/mdss/mdss_mdp_wb.c
+index b9aca69..07cc548 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_wb.c
++++ b/drivers/video/msm/mdss/mdss_mdp_wb.c
+@@ -51,7 +51,8 @@ enum mdss_mdp_wb_node_state {
+ 	REGISTERED,
+ 	IN_FREE_QUEUE,
+ 	IN_BUSY_QUEUE,
+-	WITH_CLIENT
++	WITH_CLIENT,
++	WB_BUFFER_READY,
+ };
+ 
+ struct mdss_mdp_wb_data {
+@@ -443,13 +444,37 @@ static int mdss_mdp_wb_queue(struct msm_fb_data_type *mfd,
+ 	if (node == NULL)
+ 		node = get_user_node(mfd, data);
+ 
+-	if (!node || node->state == IN_BUSY_QUEUE ||
+-	    node->state == IN_FREE_QUEUE) {
+-		pr_err("memory not registered or Buffer already with us\n");
+-		ret = -EINVAL;
++	if (!node) {
++		pr_err("memory not registered\n");
++		ret = -ENOENT;
+ 	} else {
+-		list_add_tail(&node->active_entry, &wb->free_queue);
+-		node->state = IN_FREE_QUEUE;
++		struct mdss_mdp_img_data *buf = &node->buf_data.p[0];
++
++		switch (node->state) {
++		case IN_FREE_QUEUE:
++			pr_err("node 0x%x was already queued before\n",
++					buf->addr);
++			ret = -EINVAL;
++			break;
++		case IN_BUSY_QUEUE:
++			pr_err("node 0x%x still in busy state\n", buf->addr);
++			ret = -EBUSY;
++			break;
++		case WB_BUFFER_READY:
++			pr_debug("node 0x%x re-queued without dequeue\n",
++				buf->addr);
++			list_del(&node->active_entry);
++		case WITH_CLIENT:
++		case REGISTERED:
++			list_add_tail(&node->active_entry, &wb->free_queue);
++			node->state = IN_FREE_QUEUE;
++			break;
++		default:
++			pr_err("Invalid node 0x%x state %d\n",
++				buf->addr, node->state);
++			ret = -EINVAL;
++			break;
++		}
+ 	}
+ 	mutex_unlock(&wb->lock);
+ 
+@@ -575,6 +600,7 @@ int mdss_mdp_wb_kickoff(struct msm_fb_data_type *mfd)
+ 	if (wb && node) {
+ 		mutex_lock(&wb->lock);
+ 		list_add_tail(&node->active_entry, &wb->busy_queue);
++		node->state = WB_BUFFER_READY;
+ 		mutex_unlock(&wb->lock);
+ 		wake_up(&wb->wait_q);
+ 	}
+-- 
+1.7.9.5
+

@@ -1,0 +1,98 @@
+From ec5eda2ab4c237096cf096282de72562bed909c4 Mon Sep 17 00:00:00 2001
+From: Devin Kim <dojip.kim@lge.com>
+Date: Fri, 25 Oct 2013 19:44:24 -0700
+Subject: [PATCH 190/517] msm_serial_hs: vote for clocks in tty functions
+
+to avoid accessing the unclocked registers.
+
+Change-Id: I17af31b54e2c6288a5284b51670506c44a344fe8
+Signed-off-by: Devin Kim <dojip.kim@lge.com>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/tty/serial/msm_serial_hs.c |   29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+diff --git a/drivers/tty/serial/msm_serial_hs.c b/drivers/tty/serial/msm_serial_hs.c
+index 96b16df..945f31e 100644
+--- a/drivers/tty/serial/msm_serial_hs.c
++++ b/drivers/tty/serial/msm_serial_hs.c
+@@ -929,6 +929,13 @@ static void msm_hs_set_termios(struct uart_port *uport,
+ 	struct msm_hs_rx *rx = &msm_uport->rx;
+ 	struct sps_pipe *sps_pipe_handle = rx->prod.pipe_handle;
+ 
++	ret = msm_hs_clock_vote(msm_uport);
++	if (ret) {
++		printk(KERN_ERR "%s: Error could not turn on UART clk\n",
++				__func__);
++		return;
++	}
++
+ 	mutex_lock(&msm_uport->clk_mutex);
+ 	msm_hs_write(uport, UARTDM_IMR_ADDR, 0);
+ 
+@@ -1064,6 +1071,8 @@ static void msm_hs_set_termios(struct uart_port *uport,
+ 	msm_hs_write(uport, UARTDM_IMR_ADDR, msm_uport->imr_reg);
+ 	mb();
+ 	mutex_unlock(&msm_uport->clk_mutex);
++
++	msm_hs_clock_unvote(msm_uport);
+ }
+ 
+ /*
+@@ -1136,6 +1145,9 @@ static void msm_hs_stop_rx_locked(struct uart_port *uport)
+ 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
+ 	unsigned int data;
+ 
++	if (msm_uport->clk_state <= MSM_HS_CLK_OFF)
++		return;
++
+ 	/* disable dlink */
+ 	data = msm_hs_read(uport, UARTDM_DMEN_ADDR);
+ 	if (is_blsp_uart(msm_uport))
+@@ -1503,6 +1515,9 @@ static void msm_hs_start_tx_locked(struct uart_port *uport )
+ {
+ 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
+ 
++	if (msm_uport->clk_state <= MSM_HS_CLK_OFF)
++		return;
++
+ 	if (msm_uport->tx.tx_ready_int_en == 0) {
+ 		msm_uport->tx.tx_ready_int_en = 1;
+ 		if (msm_uport->tx.dma_in_flight == 0)
+@@ -1728,6 +1743,9 @@ static void msm_hs_enable_ms_locked(struct uart_port *uport)
+ {
+ 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
+ 
++	if (msm_uport->clk_state <= MSM_HS_CLK_OFF)
++		return;
++
+ 	/* Enable DELTA_CTS Interrupt */
+ 	msm_uport->imr_reg |= UARTDM_ISR_DELTA_CTS_BMSK;
+ 	msm_hs_write(uport, UARTDM_IMR_ADDR, msm_uport->imr_reg);
+@@ -1752,11 +1770,22 @@ static void msm_hs_flush_buffer(struct uart_port *uport)
+ static void msm_hs_break_ctl(struct uart_port *uport, int ctl)
+ {
+ 	unsigned long flags;
++	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
++	int ret;
++
++	ret = msm_hs_clock_vote(msm_uport);
++	if (ret) {
++		printk(KERN_ERR "%s: Error could not turn on UART clk\n",
++				__func__);
++		return;
++	}
+ 
+ 	spin_lock_irqsave(&uport->lock, flags);
+ 	msm_hs_write(uport, UARTDM_CR_ADDR, ctl ? START_BREAK : STOP_BREAK);
+ 	mb();
+ 	spin_unlock_irqrestore(&uport->lock, flags);
++
++	msm_hs_clock_unvote(msm_uport);
+ }
+ 
+ static void msm_hs_config_port(struct uart_port *uport, int cfg_flags)
+-- 
+1.7.9.5
+

@@ -1,0 +1,63 @@
+From 86da87382aabd2ad770bc8a10f2827c70d8f9d8c Mon Sep 17 00:00:00 2001
+From: Mel Gorman <mgorman@suse.de>
+Date: Mon, 8 Oct 2012 16:32:30 -0700
+Subject: [PATCH 393/517] mm: compaction: move fatal signal check out of
+ compact_checklock_irqsave
+
+Commit c67fe3752abe ("mm: compaction: Abort async compaction if locks
+are contended or taking too long") addressed a lock contention problem
+in compaction by introducing compact_checklock_irqsave() that effecively
+aborting async compaction in the event of compaction.
+
+To preserve existing behaviour it also moved a fatal_signal_pending()
+check into compact_checklock_irqsave() but that is very misleading.  It
+"hides" the check within a locking function but has nothing to do with
+locking as such.  It just happens to work in a desirable fashion.
+
+This patch moves the fatal_signal_pending() check to
+isolate_migratepages_range() where it belongs.  Arguably the same check
+should also happen when isolating pages for freeing but it's overkill.
+
+Change-Id: I026ab765b4160bdb6bbb8b7359be24b6159e382c
+Signed-off-by: Mel Gorman <mgorman@suse.de>
+Cc: Rik van Riel <riel@redhat.com>
+Cc: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+Cc: Shaohua Li <shli@kernel.org>
+Cc: Minchan Kim <minchan@kernel.org>
+Cc: Andrea Arcangeli <aarcange@redhat.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: 3cc668f4e30fbd97b3c0574d8cac7a83903c9bc7
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/compaction.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/mm/compaction.c b/mm/compaction.c
+index c07d21f..c2f4170 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -75,8 +75,6 @@ static bool compact_checklock_irqsave(spinlock_t *lock, unsigned long *flags,
+ 		}
+ 
+ 		cond_resched();
+-		if (fatal_signal_pending(current))
+-			return false;
+ 	}
+ 
+ 	if (!locked)
+@@ -362,7 +360,7 @@ isolate_migratepages_range(struct zone *zone, struct compact_control *cc,
+ 		/* Check if it is ok to still hold the lock */
+ 		locked = compact_checklock_irqsave(&zone->lru_lock, &flags,
+ 								locked, cc);
+-		if (!locked)
++		if (!locked || fatal_signal_pending(current))
+ 			break;
+ 
+ 		/*
+-- 
+1.7.9.5
+

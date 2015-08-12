@@ -1,0 +1,28 @@
+From 47b6e964eb710ffc18d55682e3638e5f268398f1 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 10 Dec 2013 20:43:12 +0100
+Subject: [PATCH 329/517] dts: lm3630: lower min brightness to 1
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ .../msm8974-hammerhead-misc.dtsi                   |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-misc.dtsi b/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-misc.dtsi
+index c24bde5..8c062b4 100644
+--- a/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-misc.dtsi
++++ b/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-misc.dtsi
+@@ -56,7 +56,7 @@
+ 			lm3630,bank_sel = <0>;  /* BANK A */
+ 			lm3630,linear_map = <1>;
+ 			lm3630,max_current = <0x12>;
+-			lm3630,min_brightness = <0x05>;
++			lm3630,min_brightness = <0x01>;
+ 			lm3630,default_brightness = <0x20>;
+ 			lm3630,max_brightness = <0xFF>;
+ 			lm3630,pwm_enable = <0>;
+-- 
+1.7.9.5
+

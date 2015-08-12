@@ -1,0 +1,25 @@
+From c7889a96d22e6c40fb5bdd16d929220375e36ce9 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Sat, 2 Nov 2013 06:15:12 +0000
+Subject: [PATCH 002/517] Add .gitignore.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ .gitignore |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/.gitignore b/.gitignore
+index 57af07c..5e6a74d 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -84,3 +84,6 @@ GTAGS
+ *.orig
+ *~
+ \#*#
++arch/arm/mach-msm/smd_rpc_sym.c
++boot.img
++build.sh
+-- 
+1.7.9.5
+

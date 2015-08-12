@@ -1,0 +1,38 @@
+From eec93ab96a888551e339bdd3658ac1467f524920 Mon Sep 17 00:00:00 2001
+From: Andrei F <luxneb@gmail.com>
+Date: Thu, 22 Aug 2013 16:02:20 +0400
+Subject: [PATCH 032/517] logger: Add an enable toggle for entry storage
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/staging/android/logger.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/staging/android/logger.c b/drivers/staging/android/logger.c
+index eb3d4ca..e9bd267 100644
+--- a/drivers/staging/android/logger.c
++++ b/drivers/staging/android/logger.c
+@@ -29,6 +29,9 @@
+ 
+ #include <asm/ioctls.h>
+ 
++static unsigned int enabled = 1;
++module_param(enabled, uint, S_IWUSR | S_IRUGO);
++
+ /*
+  * struct logger_log - represents a specific log, such as 'main' or 'radio'
+  *
+@@ -452,6 +455,9 @@ ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
+ 	struct timespec now;
+ 	ssize_t ret = 0;
+ 
++	if (!enabled)
++		return 0;
++
+ 	now = current_kernel_time();
+ 
+ 	header.pid = current->tgid;
+-- 
+1.7.9.5
+

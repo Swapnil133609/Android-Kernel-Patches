@@ -1,0 +1,29 @@
+From c57f1bc99ffe5207162487fa11326a499e577132 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Fri, 29 Nov 2013 15:30:55 +0000
+Subject: [PATCH 138/517] Revert "lib: vsprintf: remove warning."
+
+This reverts commit 3041cc2167527419cecb9b3b11b073d1ef1c909e.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ lib/vsprintf.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/lib/vsprintf.c b/lib/vsprintf.c
+index 14d62a7..cf425cc 100644
+--- a/lib/vsprintf.c
++++ b/lib/vsprintf.c
+@@ -1719,6 +1719,9 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
+ 			 */
+ 			void *skip_arg;
+ 
++			WARN_ONCE(1, "Please remove ignored %%n in '%s'\n",
++					old_fmt);
++
+ 			skip_arg = va_arg(args, void *);
+ 			break;
+ 		}
+-- 
+1.7.9.5
+

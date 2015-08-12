@@ -1,0 +1,70 @@
+From ff03dba0ea519f0c1ce8abc0bd502a548f549bc3 Mon Sep 17 00:00:00 2001
+From: Marek Szyprowski <m.szyprowski@samsung.com>
+Date: Tue, 11 Dec 2012 16:02:57 -0800
+Subject: [PATCH 408/517] mm: cma: skip watermarks check for already isolated
+ blocks in split_free_page()
+
+Since commit 2139cbe627b8 ("cma: fix counting of isolated pages") free
+pages in isolated pageblocks are not accounted to NR_FREE_PAGES counters,
+so watermarks check is not required if one operates on a free page in
+isolated pageblock.
+
+Change-Id: Id9b38d2e4e504336e11274a30044e3aacbc37d03
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Mel Gorman <mel@csn.ul.ie>
+Acked-by: Michal Nazarewicz <mina86@mina86.com>
+Cc: Minchan Kim <minchan@kernel.org>
+Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: 2e30abd1730751d58463d88bc0844ab8fd7112a9
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+[lauraa@codeaurora.org: Context fixups due to being merged
+out of order. Bring over an added 'feature' where we don't
+obey watermarks for CMA pages]
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/page_alloc.c |   16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 42cf12c..2ff8f13 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -1459,20 +1459,20 @@ int capture_free_page(struct page *page, int alloc_order, int migratetype)
+ 	order = page_order(page);
+ 	mt = get_pageblock_migratetype(page);
+ 
+-	/* Obey watermarks as if the page was being allocated */
+-	watermark = low_wmark_pages(zone) + (1 << order);
+-	if (!is_migrate_cma(mt) && mt != MIGRATE_ISOLATE &&
+-	    !zone_watermark_ok(zone, 0, watermark, 0, 0))
+-		return 0;
++	if (mt != MIGRATE_ISOLATE && !is_migrate_cma(mt)) {
++		/* Obey watermarks as if the page was being allocated */
++		watermark = low_wmark_pages(zone) + (1 << order);
++		if (!zone_watermark_ok(zone, 0, watermark, 0, 0))
++			return 0;
++
++		__mod_zone_freepage_state(zone, -(1UL << alloc_order), mt);
++	}
+ 
+ 	/* Remove page from free list */
+ 	list_del(&page->lru);
+ 	zone->free_area[order].nr_free--;
+ 	rmv_page_order(page);
+ 
+-	if (unlikely(mt != MIGRATE_ISOLATE))
+-		__mod_zone_freepage_state(zone, -(1UL << order), mt);
+-
+ 	if (alloc_order != order)
+ 		expand(zone, page, alloc_order, order,
+ 			&zone->free_area[order], migratetype);
+-- 
+1.7.9.5
+

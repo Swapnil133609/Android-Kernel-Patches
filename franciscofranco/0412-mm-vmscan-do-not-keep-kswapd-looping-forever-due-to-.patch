@@ -1,0 +1,77 @@
+From aa77b47cd436481121fd5477b7d27c59b11c6740 Mon Sep 17 00:00:00 2001
+From: Johannes Weiner <hannes@cmpxchg.org>
+Date: Tue, 4 Dec 2012 11:11:31 -0500
+Subject: [PATCH 412/517] mm: vmscan: do not keep kswapd looping forever due
+ to individual uncompactable zones
+
+When a zone meets its high watermark and is compactable in case of
+higher order allocations, it contributes to the percentage of the node's
+memory that is considered balanced.
+
+This requirement, that a node be only partially balanced, came about
+when kswapd was desparately trying to balance tiny zones when all bigger
+zones in the node had plenty of free memory.  Arguably, the same should
+apply to compaction: if a significant part of the node is balanced
+enough to run compaction, do not get hung up on that tiny zone that
+might never get in shape.
+
+When the compaction logic in kswapd is reached, we know that at least
+25% of the node's memory is balanced properly for compaction (see
+zone_balanced and pgdat_balanced).  Remove the individual zone checks
+that restart the kswapd cycle.
+
+Otherwise, we may observe more endless looping in kswapd where the
+compaction code loops back to reclaim because of a single zone and
+reclaim does nothing because the node is considered balanced overall.
+
+See for example
+
+  https://bugzilla.redhat.com/show_bug.cgi?id=866988
+
+Change-Id: I9c8f180466fea814c3038fa019f317799ddc0bcb
+Signed-off-by: Johannes Weiner <hannes@cmpxchg.org>
+Reported-and-tested-by: Thorsten Leemhuis <fedora@leemhuis.info>
+Reported-by: Jiri Slaby <jslaby@suse.cz>
+Tested-by: John Ellson <john.ellson@comcast.net>
+Tested-by: Zdenek Kabelac <zkabelac@redhat.com>
+Tested-by: Bruno Wolff III <bruno@wolff.to>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: c702418f8a2fa6cc92e84a39880d458faf7af9cc
+Git-repo: https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/
+Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/vmscan.c |   16 ----------------
+ 1 file changed, 16 deletions(-)
+
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index af651a7..6f29d6a 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -2690,22 +2690,6 @@ out:
+ 			if (!populated_zone(zone))
+ 				continue;
+ 
+-			if (zone->all_unreclaimable &&
+-			    sc.priority != DEF_PRIORITY)
+-				continue;
+-
+-			/* Would compaction fail due to lack of free memory? */
+-			if (COMPACTION_BUILD &&
+-			    compaction_suitable(zone, order) == COMPACT_SKIPPED)
+-				goto loop_again;
+-
+-			/* Confirm the zone is balanced for order-0 */
+-			if (!zone_watermark_ok(zone, 0,
+-					high_wmark_pages(zone), 0, 0)) {
+-				order = sc.order = 0;
+-				goto loop_again;
+-			}
+-
+ 			/* Check if the memory needs to be defragmented. */
+ 			if (zone_watermark_ok(zone, order,
+ 				    low_wmark_pages(zone), *classzone_idx, 0))
+-- 
+1.7.9.5
+

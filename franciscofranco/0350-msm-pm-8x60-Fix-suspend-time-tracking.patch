@@ -1,0 +1,130 @@
+From 05f2fe1525dd3a282fbb346c08dee58dd6c1f062 Mon Sep 17 00:00:00 2001
+From: Stephen Boyd <sboyd@codeaurora.org>
+Date: Thu, 26 Sep 2013 14:33:27 -0700
+Subject: [PATCH 350/517] msm: pm-8x60: Fix suspend time tracking
+
+Calls to sched_clock() after syscore devices have been suspend
+will return the same value until the syscored devices are
+resumed. Furthermore, the value won't jump forward to account for
+the time left in suspend so we can't use it to calculate how much
+time we spent in suspend.
+
+We could expose the hardware directly to the pm code but it's
+better to use generic interfaces. Move to using the timekeeping
+APIs to determine how long we were in suspend. Unfortunately, we
+can't use the timekeeping APIs this early in the resume path, so
+we must read the current time of day before we suspend the
+timekeeping core and after we resume the timekeeping core. Move
+the calls to the suspend_late() and wake() callbacks so we can
+properly read the amount of suspend time.
+
+CRs-fixed: 536881
+Change-Id: I3b47511afb75926e51e82fc83929f405404fbf07
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/pm-8x60.c |   41 +++++++++++++++++++++++++++++------------
+ 1 file changed, 29 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/mach-msm/pm-8x60.c b/arch/arm/mach-msm/pm-8x60.c
+index b466d8a..6c1ae80 100644
+--- a/arch/arm/mach-msm/pm-8x60.c
++++ b/arch/arm/mach-msm/pm-8x60.c
+@@ -650,8 +650,11 @@ static int64_t msm_pm_timer_enter_suspend(int64_t *period)
+ {
+ 	int64_t time = 0;
+ 
+-	if (msm_pm_use_sync_timer)
+-		return sched_clock();
++	if (msm_pm_use_sync_timer) {
++		struct timespec ts;
++		getnstimeofday(&ts);
++		return timespec_to_ns(&ts);
++	}
+ 
+ 	time = msm_timer_get_sclk_time(period);
+ 	if (!time)
+@@ -662,8 +665,12 @@ static int64_t msm_pm_timer_enter_suspend(int64_t *period)
+ 
+ static int64_t msm_pm_timer_exit_suspend(int64_t time, int64_t period)
+ {
+-	if (msm_pm_use_sync_timer)
+-		return sched_clock() - time;
++	if (msm_pm_use_sync_timer) {
++		struct timespec ts;
++		getnstimeofday(&ts);
++
++		return timespec_to_ns(&ts) - time;
++	}
+ 
+ 	if (time != 0) {
+ 		int64_t end_time = msm_timer_get_sclk_time(NULL);
+@@ -1047,12 +1054,14 @@ void msm_pm_enable_retention(bool enable)
+ }
+ EXPORT_SYMBOL(msm_pm_enable_retention);
+ 
++static int64_t suspend_time, suspend_period;
++static int collapsed;
++static int suspend_power_collapsed;
++
+ static int msm_pm_enter(suspend_state_t state)
+ {
+ 	bool allow[MSM_PM_SLEEP_MODE_NR];
+ 	int i;
+-	int64_t period = 0;
+-	int64_t time = msm_pm_timer_enter_suspend(&period);
+ 	struct msm_pm_time_params time_param;
+ 
+ 	time_param.latency_us = -1;
+@@ -1080,7 +1089,6 @@ static int msm_pm_enter(suspend_state_t state)
+ 		int ret = -ENODEV;
+ 		uint32_t power;
+ 		uint32_t msm_pm_max_sleep_time = 0;
+-		int collapsed = 0;
+ 
+ 		if (MSM_PM_DEBUG_SUSPEND & msm_pm_debug_mask)
+ 			pr_info("%s: power collapse\n", __func__);
+@@ -1114,11 +1122,7 @@ static int msm_pm_enter(suspend_state_t state)
+ 			pr_err("%s: cannot find the lowest power limit\n",
+ 				__func__);
+ 		}
+-		time = msm_pm_timer_exit_suspend(time, period);
+-		if (collapsed)
+-			msm_pm_add_stat(MSM_PM_STAT_SUSPEND, time);
+-		else
+-			msm_pm_add_stat(MSM_PM_STAT_FAILED_SUSPEND, time);
++		suspend_power_collapsed = true;
+ 	} else if (allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE]) {
+ 		if (MSM_PM_DEBUG_SUSPEND & msm_pm_debug_mask)
+ 			pr_info("%s: standalone power collapse\n", __func__);
+@@ -1150,6 +1154,8 @@ int msm_suspend_prepare(void)
+ {
+ 	if (pnoc_clk != NULL)
+ 		clk_disable_unprepare(pnoc_clk);
++
++	suspend_time = msm_pm_timer_enter_suspend(&suspend_period);
+ 	return 0;
+ }
+ 
+@@ -1157,6 +1163,17 @@ void msm_suspend_wake(void)
+ {
+ 	if (pnoc_clk != NULL)
+ 		clk_prepare_enable(pnoc_clk);
++
++	if (suspend_power_collapsed) {
++		suspend_time = msm_pm_timer_exit_suspend(suspend_time,
++				suspend_period);
++		if (collapsed)
++			msm_pm_add_stat(MSM_PM_STAT_SUSPEND, suspend_time);
++		else
++			msm_pm_add_stat(MSM_PM_STAT_FAILED_SUSPEND,
++					suspend_time);
++		suspend_power_collapsed = false;
++	}
+ }
+ 
+ static const struct platform_suspend_ops msm_pm_ops = {
+-- 
+1.7.9.5
+

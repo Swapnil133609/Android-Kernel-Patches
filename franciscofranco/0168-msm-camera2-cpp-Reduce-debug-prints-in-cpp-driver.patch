@@ -1,0 +1,74 @@
+From 0c8035a0c13d34fdf2b7b9b54d1053d09f5e075c Mon Sep 17 00:00:00 2001
+From: Rajakumar Govindaram <rajakuma@codeaurora.org>
+Date: Tue, 8 Oct 2013 15:53:53 -0700
+Subject: [PATCH 168/517] msm: camera2: cpp: Reduce debug prints in cpp driver
+
+The cpp driver had prints to monitor the status when node
+is closed. This change makes them as pr_debug messages.
+
+Change-Id: I8a78e6b38d7a702ed38f980d8fa658f50439da0f
+Signed-off-by: Rajakumar Govindaram <rajakuma@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ .../platform/msm/camera_v2/pproc/cpp/msm_cpp.c     |   30 ++++++++++----------
+ 1 file changed, 15 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/media/platform/msm/camera_v2/pproc/cpp/msm_cpp.c b/drivers/media/platform/msm/camera_v2/pproc/cpp/msm_cpp.c
+index 30603aa..1411061 100644
+--- a/drivers/media/platform/msm/camera_v2/pproc/cpp/msm_cpp.c
++++ b/drivers/media/platform/msm/camera_v2/pproc/cpp/msm_cpp.c
+@@ -895,35 +895,35 @@ static int cpp_close_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
+ 
+ 	cpp_dev->cpp_open_cnt--;
+ 	if (cpp_dev->cpp_open_cnt == 0) {
+-		pr_err("%s: irq_status: 0x%x\n", __func__,
++		pr_debug("irq_status: 0x%x\n",
+ 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x4));
+-		pr_err("%s: DEBUG_SP: 0x%x\n", __func__,
++		pr_debug("DEBUG_SP: 0x%x\n",
+ 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x40));
+-		pr_err("%s: DEBUG_T: 0x%x\n", __func__,
++		pr_debug("DEBUG_T: 0x%x\n",
+ 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x44));
+-		pr_err("%s: DEBUG_N: 0x%x\n", __func__,
++		pr_debug("DEBUG_N: 0x%x\n",
+ 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x48));
+-		pr_err("%s: DEBUG_R: 0x%x\n", __func__,
++		pr_debug("DEBUG_R: 0x%x\n",
+ 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x4C));
+-		pr_err("%s: DEBUG_OPPC: 0x%x\n", __func__,
++		pr_debug("DEBUG_OPPC: 0x%x\n",
+ 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x50));
+-		pr_err("%s: DEBUG_MO: 0x%x\n", __func__,
++		pr_debug("DEBUG_MO: 0x%x\n",
+ 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x54));
+-		pr_err("%s: DEBUG_TIMER0: 0x%x\n", __func__,
++		pr_debug("DEBUG_TIMER0: 0x%x\n",
+ 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x60));
+-		pr_err("%s: DEBUG_TIMER1: 0x%x\n", __func__,
++		pr_debug("DEBUG_TIMER1: 0x%x\n",
+ 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x64));
+-		pr_err("%s: DEBUG_GPI: 0x%x\n", __func__,
++		pr_debug("DEBUG_GPI: 0x%x\n",
+ 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x70));
+-		pr_err("%s: DEBUG_GPO: 0x%x\n", __func__,
++		pr_debug("DEBUG_GPO: 0x%x\n",
+ 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x74));
+-		pr_err("%s: DEBUG_T0: 0x%x\n", __func__,
++		pr_debug("DEBUG_T0: 0x%x\n",
+ 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x80));
+-		pr_err("%s: DEBUG_R0: 0x%x\n", __func__,
++		pr_debug("DEBUG_R0: 0x%x\n",
+ 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x84));
+-		pr_err("%s: DEBUG_T1: 0x%x\n", __func__,
++		pr_debug("DEBUG_T1: 0x%x\n",
+ 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x88));
+-		pr_err("%s: DEBUG_R1: 0x%x\n", __func__,
++		pr_debug("DEBUG_R1: 0x%x\n",
+ 			msm_camera_io_r(cpp_dev->cpp_hw_base + 0x8C));
+ 		msm_camera_io_w(0x0, cpp_dev->base + MSM_CPP_MICRO_CLKEN_CTL);
+ 		cpp_deinit_mem(cpp_dev);
+-- 
+1.7.9.5
+

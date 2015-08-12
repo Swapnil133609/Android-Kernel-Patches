@@ -1,0 +1,28 @@
+From 057eaf3ed6fb760707c5428c9c78bfe52b9af9fb Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Sun, 15 Dec 2013 21:03:15 +0000
+Subject: [PATCH 353/517] Revert "msm: idle-v7: flush non secure L1 cache
+ lines for l2 GDHS LPM mode"
+
+This reverts commit 5d9d25dd25f41e527e6ee034e9c0f52e825413aa.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/idle-v7.S |    1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/idle-v7.S b/arch/arm/mach-msm/idle-v7.S
+index 07cd8f0..6840f1c 100644
+--- a/arch/arm/mach-msm/idle-v7.S
++++ b/arch/arm/mach-msm/idle-v7.S
+@@ -110,7 +110,6 @@ ENTRY(msm_pm_collapse)
+ 	mov	r2, #1
+ 	and	r1, r2, r1, ASR #30 /* Check if the cache is write back */
+ 	orr	r1, r0, r1
+-	and	r1, r1, #1
+ 	cmp	r1, #1
+ 	bne	skip
+ 	bl	v7_flush_dcache_all
+-- 
+1.7.9.5
+

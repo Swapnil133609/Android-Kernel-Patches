@@ -1,0 +1,42 @@
+From 1d3a9a4f218940a7a81fddf1a6f050c82dba6183 Mon Sep 17 00:00:00 2001
+From: Minchan Kim <minchan@kernel.org>
+Date: Tue, 21 Aug 2012 16:16:03 -0700
+Subject: [PATCH 388/517] mm/compaction.c: fix deferring compaction mistake
+
+Commit aff622495c9a ("vmscan: only defer compaction for failed order and
+higher") fixed bad deferring policy but made mistake about checking
+compact_order_failed in __compact_pgdat().  So it can't update
+compact_order_failed with the new order.  This ends up preventing
+correct operation of policy deferral.  This patch fixes it.
+
+Change-Id: I8d65a5511d90e6c02bb58cd7bc5743e4327271f9
+Signed-off-by: Minchan Kim <minchan@kernel.org>
+Reviewed-by: Rik van Riel <riel@redhat.com>
+Acked-by: Mel Gorman <mel@csn.ul.ie>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: c81758fbe0fdbbc0c74b37798f55bd9c91d5c068
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/compaction.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mm/compaction.c b/mm/compaction.c
+index 425bbfa..28ea823 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -811,7 +811,7 @@ static int __compact_pgdat(pg_data_t *pgdat, struct compact_control *cc)
+ 		if (cc->order > 0) {
+ 			int ok = zone_watermark_ok(zone, cc->order,
+ 						low_wmark_pages(zone), 0, 0);
+-			if (ok && cc->order > zone->compact_order_failed)
++			if (ok && cc->order >= zone->compact_order_failed)
+ 				zone->compact_order_failed = cc->order + 1;
+ 			/* Currently async compaction is never deferred. */
+ 			else if (!ok && cc->sync)
+-- 
+1.7.9.5
+

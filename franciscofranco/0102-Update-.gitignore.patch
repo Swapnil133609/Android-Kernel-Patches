@@ -1,0 +1,24 @@
+From 3dec8ea36acdb838ab0d90be41cd38002b78b2f3 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Mon, 25 Nov 2013 15:02:32 +0000
+Subject: [PATCH 102/517] Update .gitignore.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ .gitignore |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/.gitignore b/.gitignore
+index 5e6a74d..8d0ff18 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -87,3 +87,5 @@ GTAGS
+ arch/arm/mach-msm/smd_rpc_sym.c
+ boot.img
+ build.sh
++flash.sh
++zip/
+-- 
+1.7.9.5
+

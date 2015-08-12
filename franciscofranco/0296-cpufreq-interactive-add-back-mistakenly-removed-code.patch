@@ -1,0 +1,43 @@
+From 067acff651d953754d204304b4bf724def30187e Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Sat, 14 Dec 2013 15:51:44 +0000
+Subject: [PATCH 296/517] cpufreq: interactive: add back mistakenly removed
+ code, otherwise
+ bc73b24b2751d9a7d4facfef33ad245e48eef753would be
+ pretty much useless.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index 915a4ae..f434644 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -416,7 +416,12 @@ static void cpufreq_interactive_timer(unsigned long data)
+ 		if (pcpu->target_freq < hispeed_freq) 
+ 			new_freq = hispeed_freq;
+ 		else
++		{
+ 			new_freq = choose_freq(pcpu, loadadjfreq);
++
++			if (new_freq < hispeed_freq)
++				new_freq = hispeed_freq;
++		}
+ 	}
+ 	else if (boosted)
+ 	{
+@@ -441,6 +446,8 @@ static void cpufreq_interactive_timer(unsigned long data)
+ 		goto rearm;
+ 	}
+ 
++	pcpu->hispeed_validate_time = now;
++
+ 	if (cpufreq_frequency_table_target(pcpu->policy, pcpu->freq_table,
+ 					   new_freq, CPUFREQ_RELATION_L,
+ 					   &index))
+-- 
+1.7.9.5
+

@@ -1,0 +1,48 @@
+From e196775fdfad384e0f598d243bd5228c049e517e Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Fri, 6 Dec 2013 19:28:30 +0000
+Subject: [PATCH 250/517] cpufreq: interactive: Attempt to fix a Kernel Panic
+ introduced on r18 which was caused by a cpu core
+ going offline while a queued work was being
+ processed in that cpu. Fix is easy, the work is now
+ being queued to cpu0 and its bound to that cpu
+ until its finished.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |   11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index 10d7312..4bf9325 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -623,6 +623,15 @@ static void cpufreq_interactive_boost(struct work_struct *work)
+ 
+ 		pcpu->floor_freq = input_boost_freq;
+ 		pcpu->floor_validate_time = ktime_to_us(ktime_get());
++
++		/* 
++		 * Only boost cpu0 and cpu1 even if other cores are online. If there's
++		 * a task migration the thread migration notifier will boost the target
++		 * and make up for the lack of input boost on cpu2 and cpu3 during a
++		 * input interaction
++		 */
++		if (i)
++			break;
+ 	}
+ }
+ 
+@@ -1006,7 +1015,7 @@ static ssize_t store_boostpulse(struct kobject *kobj, struct attribute *attr,
+ 
+ 	boostpulse_endtime = ktime_to_us(ktime_get()) + boostpulse_duration_val;
+ 	trace_cpufreq_interactive_boost("pulse");
+-	queue_work(input_wq, &input_work);
++	queue_work_on(0, input_wq, &input_work);
+ 	return count;
+ }
+ 
+-- 
+1.7.9.5
+

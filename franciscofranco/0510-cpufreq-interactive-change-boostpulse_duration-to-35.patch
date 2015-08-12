@@ -1,0 +1,28 @@
+From b48decdb752c6a10fc355892794bbd18a8d723b5 Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Mon, 30 Dec 2013 02:53:41 +0000
+Subject: [PATCH 510/517] cpufreq: interactive: change boostpulse_duration to
+ 350ms
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index 3679b42..9207c8f 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -110,7 +110,7 @@ static unsigned int *above_hispeed_delay = default_above_hispeed_delay;
+ static int nabove_hispeed_delay = ARRAY_SIZE(default_above_hispeed_delay);
+ 
+ /* 1000ms - 1s */
+-#define DEFAULT_BOOSTPULSE_DURATION 250000
++#define DEFAULT_BOOSTPULSE_DURATION 350000
+ /* Duration of a boot pulse in usecs */
+ static int boostpulse_duration_val = DEFAULT_BOOSTPULSE_DURATION;
+ 
+-- 
+1.7.9.5
+

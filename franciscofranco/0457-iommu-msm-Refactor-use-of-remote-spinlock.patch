@@ -1,0 +1,553 @@
+From b9e8ea328284ce5b8f1c60e5f3f3594b46a5cfdd Mon Sep 17 00:00:00 2001
+From: Olav Haugan <ohaugan@codeaurora.org>
+Date: Tue, 1 Oct 2013 09:18:03 -0700
+Subject: [PATCH 457/517] iommu: msm: Refactor use of remote spinlock
+
+The remote spinlock was originally meant to synchronize access between
+GPU and CPU accessing SMMU. However, there are more use cases that
+this remote spinlock serves. This change decouples the spinlock from
+GPU and adds support for taking the spinlock only for SMMUs that are
+specified in the device tree.
+
+CRs-fixed: 517873
+Change-Id: Ic50992d0d1a102fbd05855e09e254e627f99ec33
+Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/include/mach/iommu.h |   18 ++++++------
+ drivers/iommu/msm_iommu-v0.c           |   49 +++++++++++++++++++-------------
+ drivers/iommu/msm_iommu-v1.c           |    4 +--
+ drivers/iommu/msm_iommu_perfmon-v0.c   |    4 +--
+ drivers/iommu/msm_iommu_perfmon-v1.c   |    4 +--
+ drivers/iommu/msm_iommu_perfmon.c      |   28 +++++++++---------
+ drivers/iommu/msm_iommu_sec.c          |   34 +++++++++++-----------
+ 7 files changed, 76 insertions(+), 65 deletions(-)
+
+diff --git a/arch/arm/mach-msm/include/mach/iommu.h b/arch/arm/mach-msm/include/mach/iommu.h
+index 1165011..3e458f3 100644
+--- a/arch/arm/mach-msm/include/mach/iommu.h
++++ b/arch/arm/mach-msm/include/mach/iommu.h
+@@ -146,8 +146,8 @@ struct iommu_access_ops {
+ 	int (*iommu_clk_on)(struct msm_iommu_drvdata *);
+ 	void (*iommu_clk_off)(struct msm_iommu_drvdata *);
+ 	void * (*iommu_lock_initialize)(void);
+-	void (*iommu_lock_acquire)(void);
+-	void (*iommu_lock_release)(void);
++	void (*iommu_lock_acquire)(unsigned int need_extra_lock);
++	void (*iommu_lock_release)(unsigned int need_extra_lock);
+ };
+ 
+ void msm_iommu_add_drv(struct msm_iommu_drvdata *drv);
+@@ -251,16 +251,18 @@ static inline struct iommu_access_ops *msm_get_iommu_access_ops(void)
+ #endif
+ 
+ #ifdef CONFIG_MSM_IOMMU_SYNC
+-void msm_iommu_remote_p0_spin_lock(void);
+-void msm_iommu_remote_p0_spin_unlock(void);
++void msm_iommu_remote_p0_spin_lock(unsigned int need_lock);
++void msm_iommu_remote_p0_spin_unlock(unsigned int need_lock);
+ 
+ #define msm_iommu_remote_lock_init() _msm_iommu_remote_spin_lock_init()
+-#define msm_iommu_remote_spin_lock() msm_iommu_remote_p0_spin_lock()
+-#define msm_iommu_remote_spin_unlock() msm_iommu_remote_p0_spin_unlock()
++#define msm_iommu_remote_spin_lock(need_lock) \
++				msm_iommu_remote_p0_spin_lock(need_lock)
++#define msm_iommu_remote_spin_unlock(need_lock) \
++				msm_iommu_remote_p0_spin_unlock(need_lock)
+ #else
+ #define msm_iommu_remote_lock_init()
+-#define msm_iommu_remote_spin_lock()
+-#define msm_iommu_remote_spin_unlock()
++#define msm_iommu_remote_spin_lock(need_lock)
++#define msm_iommu_remote_spin_unlock(need_lock)
+ #endif
+ 
+ #ifdef CONFIG_MSM_IOMMU
+diff --git a/drivers/iommu/msm_iommu-v0.c b/drivers/iommu/msm_iommu-v0.c
+index 56aa7b2..99d071b 100644
+--- a/drivers/iommu/msm_iommu-v0.c
++++ b/drivers/iommu/msm_iommu-v0.c
+@@ -91,8 +91,11 @@ static void _msm_iommu_remote_spin_lock_init(void)
+ 			sizeof(*msm_iommu_remote_lock.lock));
+ }
+ 
+-void msm_iommu_remote_p0_spin_lock(void)
++void msm_iommu_remote_p0_spin_lock(unsigned int need_lock)
+ {
++	if (!need_lock)
++		return;
++
+ 	msm_iommu_remote_lock.lock->flag[PROC_APPS] = 1;
+ 	msm_iommu_remote_lock.lock->turn = 1;
+ 
+@@ -103,8 +106,11 @@ void msm_iommu_remote_p0_spin_lock(void)
+ 		cpu_relax();
+ }
+ 
+-void msm_iommu_remote_p0_spin_unlock(void)
++void msm_iommu_remote_p0_spin_unlock(unsigned int need_lock)
+ {
++	if (!need_lock)
++		return;
++
+ 	smp_mb();
+ 
+ 	msm_iommu_remote_lock.lock->flag[PROC_APPS] = 0;
+@@ -200,15 +206,15 @@ static void *_iommu_lock_initialize(void)
+ 	return msm_iommu_lock_initialize();
+ }
+ 
+-static void _iommu_lock_acquire(void)
++static void _iommu_lock_acquire(unsigned int need_extra_lock)
+ {
+ 	msm_iommu_mutex_lock();
+-	msm_iommu_remote_spin_lock();
++	msm_iommu_remote_spin_lock(need_extra_lock);
+ }
+ 
+-static void _iommu_lock_release(void)
++static void _iommu_lock_release(unsigned int need_extra_lock)
+ {
+-	msm_iommu_remote_spin_unlock();
++	msm_iommu_remote_spin_unlock(need_extra_lock);
+ 	msm_iommu_mutex_unlock();
+ }
+ 
+@@ -243,7 +249,7 @@ static int __flush_iotlb_va(struct iommu_domain *domain, unsigned int va)
+ 		if (ret)
+ 			goto fail;
+ 
+-		msm_iommu_remote_spin_lock();
++		msm_iommu_remote_spin_lock(iommu_drvdata->needs_rem_spinlock);
+ 
+ 		asid = GET_CONTEXTIDR_ASID(iommu_drvdata->base,
+ 					   ctx_drvdata->num);
+@@ -252,7 +258,7 @@ static int __flush_iotlb_va(struct iommu_domain *domain, unsigned int va)
+ 			   asid | (va & TLBIVA_VA));
+ 		mb();
+ 
+-		msm_iommu_remote_spin_unlock();
++		msm_iommu_remote_spin_unlock(iommu_drvdata->needs_rem_spinlock);
+ 
+ 		__disable_clocks(iommu_drvdata);
+ 	}
+@@ -280,7 +286,7 @@ static int __flush_iotlb(struct iommu_domain *domain)
+ 		if (ret)
+ 			goto fail;
+ 
+-		msm_iommu_remote_spin_lock();
++		msm_iommu_remote_spin_lock(iommu_drvdata->needs_rem_spinlock);
+ 
+ 		asid = GET_CONTEXTIDR_ASID(iommu_drvdata->base,
+ 					   ctx_drvdata->num);
+@@ -288,7 +294,7 @@ static int __flush_iotlb(struct iommu_domain *domain)
+ 		SET_TLBIASID(iommu_drvdata->base, ctx_drvdata->num, asid);
+ 		mb();
+ 
+-		msm_iommu_remote_spin_unlock();
++		msm_iommu_remote_spin_unlock(iommu_drvdata->needs_rem_spinlock);
+ 
+ 		__disable_clocks(iommu_drvdata);
+ 	}
+@@ -320,13 +326,16 @@ static void __reset_context(void __iomem *base, void __iomem *glb_base, int ctx)
+ 	mb();
+ }
+ 
+-static void __program_context(void __iomem *base, void __iomem *glb_base,
++static void __program_context(struct msm_iommu_drvdata *iommu_drvdata,
+ 			      int ctx, int ncb, phys_addr_t pgtable,
+ 			      int redirect, int ttbr_split)
+ {
++	void __iomem *base = iommu_drvdata->base;
++	void __iomem *glb_base = iommu_drvdata->glb_base;
+ 	unsigned int prrr, nmrr;
+ 	int i, j, found;
+-	msm_iommu_remote_spin_lock();
++
++	msm_iommu_remote_spin_lock(iommu_drvdata->needs_rem_spinlock);
+ 
+ 	__reset_context(base, glb_base, ctx);
+ 
+@@ -418,7 +427,7 @@ static void __program_context(void __iomem *base, void __iomem *glb_base,
+ 	SET_M(base, ctx, 1);
+ 	mb();
+ 
+-	msm_iommu_remote_spin_unlock();
++	msm_iommu_remote_spin_unlock(iommu_drvdata->needs_rem_spinlock);
+ }
+ 
+ static int msm_iommu_domain_init(struct iommu_domain *domain, int flags)
+@@ -528,7 +537,7 @@ static int msm_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 	if (ret)
+ 		goto unlock;
+ 
+-	__program_context(iommu_drvdata->base, iommu_drvdata->glb_base,
++	__program_context(iommu_drvdata,
+ 			  ctx_drvdata->num, iommu_drvdata->ncb,
+ 			  __pa(priv->pt.fl_table), priv->pt.redirect,
+ 			  iommu_drvdata->ttbr_split);
+@@ -579,7 +588,7 @@ static void msm_iommu_detach_dev(struct iommu_domain *domain,
+ 	if (ret)
+ 		goto unlock;
+ 
+-	msm_iommu_remote_spin_lock();
++	msm_iommu_remote_spin_lock(iommu_drvdata->needs_rem_spinlock);
+ 
+ 	SET_TLBIASID(iommu_drvdata->base, ctx_drvdata->num,
+ 		    GET_CONTEXTIDR_ASID(iommu_drvdata->base, ctx_drvdata->num));
+@@ -587,7 +596,7 @@ static void msm_iommu_detach_dev(struct iommu_domain *domain,
+ 	__reset_context(iommu_drvdata->base, iommu_drvdata->glb_base,
+ 			ctx_drvdata->num);
+ 
+-	msm_iommu_remote_spin_unlock();
++	msm_iommu_remote_spin_unlock(iommu_drvdata->needs_rem_spinlock);
+ 
+ 	__disable_clocks(iommu_drvdata);
+ 
+@@ -1248,7 +1257,7 @@ static phys_addr_t msm_iommu_iova_to_phys(struct iommu_domain *domain,
+ 	if (ret)
+ 		goto fail;
+ 
+-	msm_iommu_remote_spin_lock();
++	msm_iommu_remote_spin_lock(iommu_drvdata->needs_rem_spinlock);
+ 
+ 	SET_V2PPR(base, ctx, va & V2Pxx_VA);
+ 
+@@ -1264,7 +1273,7 @@ static phys_addr_t msm_iommu_iova_to_phys(struct iommu_domain *domain,
+ 	if (GET_FAULT(base, ctx))
+ 		ret = 0;
+ 
+-	msm_iommu_remote_spin_unlock();
++	msm_iommu_remote_spin_unlock(iommu_drvdata->needs_rem_spinlock);
+ 
+ 	__disable_clocks(iommu_drvdata);
+ fail:
+@@ -1326,7 +1335,7 @@ irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)
+ 	if (ret)
+ 		goto fail;
+ 
+-	msm_iommu_remote_spin_lock();
++	msm_iommu_remote_spin_lock(drvdata->needs_rem_spinlock);
+ 
+ 	fsr = GET_FSR(base, num);
+ 
+@@ -1359,7 +1368,7 @@ irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)
+ 	} else
+ 		ret = IRQ_NONE;
+ 
+-	msm_iommu_remote_spin_unlock();
++	msm_iommu_remote_spin_unlock(drvdata->needs_rem_spinlock);
+ 
+ 	__disable_clocks(drvdata);
+ fail:
+diff --git a/drivers/iommu/msm_iommu-v1.c b/drivers/iommu/msm_iommu-v1.c
+index ff36cc3..2c217c1 100644
+--- a/drivers/iommu/msm_iommu-v1.c
++++ b/drivers/iommu/msm_iommu-v1.c
+@@ -127,12 +127,12 @@ static void __disable_clocks(struct msm_iommu_drvdata *drvdata)
+ 	clk_disable_unprepare(drvdata->pclk);
+ }
+ 
+-static void _iommu_lock_acquire(void)
++static void _iommu_lock_acquire(unsigned int need_extra_lock)
+ {
+ 	mutex_lock(&msm_iommu_lock);
+ }
+ 
+-static void _iommu_lock_release(void)
++static void _iommu_lock_release(unsigned int need_extra_lock)
+ {
+ 	mutex_unlock(&msm_iommu_lock);
+ }
+diff --git a/drivers/iommu/msm_iommu_perfmon-v0.c b/drivers/iommu/msm_iommu_perfmon-v0.c
+index 1073623..b08a9ec 100644
+--- a/drivers/iommu/msm_iommu_perfmon-v0.c
++++ b/drivers/iommu/msm_iommu_perfmon-v0.c
+@@ -176,9 +176,9 @@ static irqreturn_t iommu_pm_evt_ovfl_int_handler(int irq, void *dev_id)
+ 		goto out;
+ 	}
+ 
+-	iommu->ops->iommu_lock_acquire();
++	iommu->ops->iommu_lock_acquire(1);
+ 	iommu_pm_check_for_overflow(pmon);
+-	iommu->ops->iommu_lock_release();
++	iommu->ops->iommu_lock_release(1);
+ 
+ 	mutex_unlock(&pmon->lock);
+ 
+diff --git a/drivers/iommu/msm_iommu_perfmon-v1.c b/drivers/iommu/msm_iommu_perfmon-v1.c
+index 7d6dd34..2b55184 100644
+--- a/drivers/iommu/msm_iommu_perfmon-v1.c
++++ b/drivers/iommu/msm_iommu_perfmon-v1.c
+@@ -151,9 +151,9 @@ static irqreturn_t iommu_pm_evt_ovfl_int_handler(int irq, void *dev_id)
+ 		goto out;
+ 	}
+ 
+-	iommu->ops->iommu_lock_acquire();
++	iommu->ops->iommu_lock_acquire(0);
+ 	iommu_pm_check_for_overflow(pmon);
+-	iommu->ops->iommu_lock_release();
++	iommu->ops->iommu_lock_release(0);
+ 
+ 	mutex_unlock(&pmon->lock);
+ 
+diff --git a/drivers/iommu/msm_iommu_perfmon.c b/drivers/iommu/msm_iommu_perfmon.c
+index 958c6ca..503d4ab 100644
+--- a/drivers/iommu/msm_iommu_perfmon.c
++++ b/drivers/iommu/msm_iommu_perfmon.c
+@@ -188,11 +188,11 @@ static void iommu_pm_set_event_type(struct iommu_pmon *pmon,
+ 
+ 	if (event_class == MSM_IOMMU_PMU_NO_EVENT_CLASS) {
+ 		if (iommu->hw_ops->is_hw_access_OK(pmon)) {
+-			iommu->ops->iommu_lock_acquire();
++			iommu->ops->iommu_lock_acquire(1);
+ 			iommu->hw_ops->counter_disable(iommu, counter);
+ 			iommu->hw_ops->ovfl_int_disable(iommu, counter);
+ 			iommu->hw_ops->set_event_class(pmon, count_no, 0);
+-			iommu->ops->iommu_lock_release();
++			iommu->ops->iommu_lock_release(1);
+ 		}
+ 		counter->overflow_count = 0;
+ 		counter->value = 0;
+@@ -200,12 +200,12 @@ static void iommu_pm_set_event_type(struct iommu_pmon *pmon,
+ 		counter->overflow_count = 0;
+ 		counter->value = 0;
+ 		if (iommu->hw_ops->is_hw_access_OK(pmon)) {
+-			iommu->ops->iommu_lock_acquire();
++			iommu->ops->iommu_lock_acquire(1);
+ 			iommu->hw_ops->set_event_class(pmon, count_no,
+ 					event_class);
+ 			iommu->hw_ops->ovfl_int_enable(iommu, counter);
+ 			iommu->hw_ops->counter_enable(iommu, counter);
+-			iommu->ops->iommu_lock_release();
++			iommu->ops->iommu_lock_release(1);
+ 		}
+ 	}
+ }
+@@ -261,9 +261,9 @@ static void iommu_pm_on(struct iommu_pmon *pmon)
+ 	iommu->ops->iommu_clk_on(iommu_drvdata);
+ 
+ 	/* Reset counters in HW */
+-	iommu->ops->iommu_lock_acquire();
++	iommu->ops->iommu_lock_acquire(1);
+ 	iommu->hw_ops->reset_counters(&pmon->iommu);
+-	iommu->ops->iommu_lock_release();
++	iommu->ops->iommu_lock_release(1);
+ 
+ 	/* Reset SW counters */
+ 	iommu_pm_reset_counts(pmon);
+@@ -272,7 +272,7 @@ static void iommu_pm_on(struct iommu_pmon *pmon)
+ 
+ 	iommu_pm_set_all_counters(pmon);
+ 
+-	iommu->ops->iommu_lock_acquire();
++	iommu->ops->iommu_lock_acquire(1);
+ 
+ 	/* enable all counter group */
+ 	for (i = 0; i < pmon->num_groups; ++i)
+@@ -280,7 +280,7 @@ static void iommu_pm_on(struct iommu_pmon *pmon)
+ 
+ 	/* enable global counters */
+ 	iommu->hw_ops->enable_pm(iommu);
+-	iommu->ops->iommu_lock_release();
++	iommu->ops->iommu_lock_release(1);
+ 
+ 	pr_info("%s: TLB performance monitoring turned ON\n",
+ 		pmon->iommu.iommu_name);
+@@ -295,7 +295,7 @@ static void iommu_pm_off(struct iommu_pmon *pmon)
+ 
+ 	pmon->enabled = 0;
+ 
+-	iommu->ops->iommu_lock_acquire();
++	iommu->ops->iommu_lock_acquire(1);
+ 
+ 	/* disable global counters */
+ 	iommu->hw_ops->disable_pm(iommu);
+@@ -310,7 +310,7 @@ static void iommu_pm_off(struct iommu_pmon *pmon)
+ 	/* Update cached copy of counters before turning off power */
+ 	iommu_pm_read_all_counters(pmon);
+ 
+-	iommu->ops->iommu_lock_release();
++	iommu->ops->iommu_lock_release(1);
+ 	iommu->ops->iommu_clk_off(iommu_drvdata);
+ 	iommu->ops->iommu_bus_vote(iommu_drvdata, 0);
+ 	iommu->ops->iommu_power_off(iommu_drvdata);
+@@ -341,9 +341,9 @@ static ssize_t iommu_pm_count_value_read(struct file *fp,
+ 	mutex_lock(&pmon->lock);
+ 
+ 	if (iommu->hw_ops->is_hw_access_OK(pmon)) {
+-		iommu->ops->iommu_lock_acquire();
++		iommu->ops->iommu_lock_acquire(1);
+ 		counter->value = iommu->hw_ops->read_counter(counter);
+-		iommu->ops->iommu_lock_release();
++		iommu->ops->iommu_lock_release(1);
+ 	}
+ 	full_count = (unsigned long long) counter->value +
+ 		     ((unsigned long long)counter->overflow_count *
+@@ -448,9 +448,9 @@ static ssize_t iommu_reset_counters_write(struct file *fp,
+ 		rv = kstrtoul(buf, 10, &cmd);
+ 		if (!rv && (cmd == 1)) {
+ 			if (iommu->hw_ops->is_hw_access_OK(pmon)) {
+-				iommu->ops->iommu_lock_acquire();
++				iommu->ops->iommu_lock_acquire(1);
+ 				iommu->hw_ops->reset_counters(&pmon->iommu);
+-				iommu->ops->iommu_lock_release();
++				iommu->ops->iommu_lock_release(1);
+ 			}
+ 			iommu_pm_reset_counts(pmon);
+ 			pr_info("TLB performance counters reset\n");
+diff --git a/drivers/iommu/msm_iommu_sec.c b/drivers/iommu/msm_iommu_sec.c
+index 684a73fa..51b2d54 100644
+--- a/drivers/iommu/msm_iommu_sec.c
++++ b/drivers/iommu/msm_iommu_sec.c
+@@ -146,7 +146,7 @@ irqreturn_t msm_iommu_secure_fault_handler_v2(int irq, void *dev_id)
+ 	struct msm_scm_fault_regs_dump *regs;
+ 	int tmp, ret = IRQ_HANDLED;
+ 
+-	iommu_access_ops->iommu_lock_acquire();
++	iommu_access_ops->iommu_lock_acquire(0);
+ 
+ 	BUG_ON(!pdev);
+ 
+@@ -221,7 +221,7 @@ irqreturn_t msm_iommu_secure_fault_handler_v2(int irq, void *dev_id)
+ free_regs:
+ 	kfree(regs);
+ lock_release:
+-	iommu_access_ops->iommu_lock_release();
++	iommu_access_ops->iommu_lock_release(0);
+ 	return ret;
+ }
+ 
+@@ -443,12 +443,12 @@ static void msm_iommu_domain_destroy(struct iommu_domain *domain)
+ {
+ 	struct msm_iommu_priv *priv;
+ 
+-	iommu_access_ops->iommu_lock_acquire();
++	iommu_access_ops->iommu_lock_acquire(0);
+ 	priv = domain->priv;
+ 	domain->priv = NULL;
+ 
+ 	kfree(priv);
+-	iommu_access_ops->iommu_lock_release();
++	iommu_access_ops->iommu_lock_release(0);
+ }
+ 
+ static int msm_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
+@@ -459,7 +459,7 @@ static int msm_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 	struct msm_iommu_ctx_drvdata *tmp_drvdata;
+ 	int ret = 0;
+ 
+-	iommu_access_ops->iommu_lock_acquire();
++	iommu_access_ops->iommu_lock_acquire(0);
+ 
+ 	priv = domain->priv;
+ 	if (!priv || !dev) {
+@@ -514,12 +514,12 @@ static int msm_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 	ctx_drvdata->attached_domain = domain;
+ 	++iommu_drvdata->ctx_attach_count;
+ 
+-	iommu_access_ops->iommu_lock_release();
++	iommu_access_ops->iommu_lock_release(0);
+ 
+ 	msm_iommu_attached(dev->parent);
+ 	return ret;
+ fail:
+-	iommu_access_ops->iommu_lock_release();
++	iommu_access_ops->iommu_lock_release(0);
+ 	return ret;
+ }
+ 
+@@ -531,7 +531,7 @@ static void msm_iommu_detach_dev(struct iommu_domain *domain,
+ 
+ 	msm_iommu_detached(dev->parent);
+ 
+-	iommu_access_ops->iommu_lock_acquire();
++	iommu_access_ops->iommu_lock_acquire(0);
+ 	if (!dev)
+ 		goto fail;
+ 
+@@ -547,7 +547,7 @@ static void msm_iommu_detach_dev(struct iommu_domain *domain,
+ 	BUG_ON(iommu_drvdata->ctx_attach_count == 0);
+ 	--iommu_drvdata->ctx_attach_count;
+ fail:
+-	iommu_access_ops->iommu_lock_release();
++	iommu_access_ops->iommu_lock_release(0);
+ }
+ 
+ static int get_drvdata(struct iommu_domain *domain,
+@@ -577,7 +577,7 @@ static int msm_iommu_map(struct iommu_domain *domain, unsigned long va,
+ 	struct msm_iommu_ctx_drvdata *ctx_drvdata;
+ 	int ret = 0;
+ 
+-	iommu_access_ops->iommu_lock_acquire();
++	iommu_access_ops->iommu_lock_acquire(0);
+ 
+ 	ret = get_drvdata(domain, &iommu_drvdata, &ctx_drvdata);
+ 	if (ret)
+@@ -588,7 +588,7 @@ static int msm_iommu_map(struct iommu_domain *domain, unsigned long va,
+ 					va, pa, len);
+ 	iommu_access_ops->iommu_clk_off(iommu_drvdata);
+ fail:
+-	iommu_access_ops->iommu_lock_release();
++	iommu_access_ops->iommu_lock_release(0);
+ 	return ret;
+ }
+ 
+@@ -599,7 +599,7 @@ static size_t msm_iommu_unmap(struct iommu_domain *domain, unsigned long va,
+ 	struct msm_iommu_ctx_drvdata *ctx_drvdata;
+ 	int ret = -ENODEV;
+ 
+-	iommu_access_ops->iommu_lock_acquire();
++	iommu_access_ops->iommu_lock_acquire(0);
+ 
+ 	ret = get_drvdata(domain, &iommu_drvdata, &ctx_drvdata);
+ 	if (ret)
+@@ -610,7 +610,7 @@ static size_t msm_iommu_unmap(struct iommu_domain *domain, unsigned long va,
+ 					va, len);
+ 	iommu_access_ops->iommu_clk_off(iommu_drvdata);
+ fail:
+-	iommu_access_ops->iommu_lock_release();
++	iommu_access_ops->iommu_lock_release(0);
+ 
+ 	/* the IOMMU API requires us to return how many bytes were unmapped */
+ 	len = ret ? 0 : len;
+@@ -625,7 +625,7 @@ static int msm_iommu_map_range(struct iommu_domain *domain, unsigned int va,
+ 	struct msm_iommu_drvdata *iommu_drvdata;
+ 	struct msm_iommu_ctx_drvdata *ctx_drvdata;
+ 
+-	iommu_access_ops->iommu_lock_acquire();
++	iommu_access_ops->iommu_lock_acquire(0);
+ 
+ 	ret = get_drvdata(domain, &iommu_drvdata, &ctx_drvdata);
+ 	if (ret)
+@@ -635,7 +635,7 @@ static int msm_iommu_map_range(struct iommu_domain *domain, unsigned int va,
+ 						va, sg, len);
+ 	iommu_access_ops->iommu_clk_off(iommu_drvdata);
+ fail:
+-	iommu_access_ops->iommu_lock_release();
++	iommu_access_ops->iommu_lock_release(0);
+ 	return ret;
+ }
+ 
+@@ -647,7 +647,7 @@ static int msm_iommu_unmap_range(struct iommu_domain *domain, unsigned int va,
+ 	struct msm_iommu_ctx_drvdata *ctx_drvdata;
+ 	int ret;
+ 
+-	iommu_access_ops->iommu_lock_acquire();
++	iommu_access_ops->iommu_lock_acquire(0);
+ 
+ 	ret = get_drvdata(domain, &iommu_drvdata, &ctx_drvdata);
+ 	if (ret)
+@@ -658,7 +658,7 @@ static int msm_iommu_unmap_range(struct iommu_domain *domain, unsigned int va,
+ 	iommu_access_ops->iommu_clk_off(iommu_drvdata);
+ 
+ fail:
+-	iommu_access_ops->iommu_lock_release();
++	iommu_access_ops->iommu_lock_release(0);
+ 	return 0;
+ }
+ 
+-- 
+1.7.9.5
+
