@@ -1,0 +1,72 @@
+From abbce4f22655f99c047bcff1c7ae786b1ea0805d Mon Sep 17 00:00:00 2001
+From: Konstantin Khlebnikov <khlebnikov@openvz.org>
+Date: Tue, 29 May 2012 15:06:57 -0700
+Subject: [PATCH 412/590] mm/memcg: use vm_swappiness from target memory
+ cgroup
+
+Use vm_swappiness from memory cgroup which is triggered this memory
+reclaim.  This is more reasonable and allows to kill one argument.
+
+Change-Id: I6aa49763a5746f021ae084885df6764bb7835a62
+[akpm@linux-foundation.org: fix build (patch skew)]
+Signed-off-by: Konstantin Khlebnikov <khlebnikov@openvz.org>
+Acked-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujtisu.com>
+Cc: Hugh Dickins <hughd@google.com>
+Cc: Glauber Costa <glommer@parallels.com>
+Cc: Michal Hocko <mhocko@suse.cz>
+Cc: Johannes Weiner <hannes@cmpxchg.org>
+Cc: Minchan Kim <minchan@kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: 3d58ab5c97fa2d145050242137ac39ca7d3bc2fc
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/vmscan.c |   11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 71d459b..1501c90 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -1623,12 +1623,11 @@ static unsigned long shrink_list(enum lru_list lru, unsigned long nr_to_scan,
+ 	return shrink_inactive_list(nr_to_scan, mz, sc, priority, lru);
+ }
+ 
+-static int vmscan_swappiness(struct mem_cgroup_zone *mz,
+-			     struct scan_control *sc)
++static int vmscan_swappiness(struct scan_control *sc)
+ {
+ 	if (global_reclaim(sc))
+ 		return vm_swappiness;
+-	return mem_cgroup_swappiness(mz->mem_cgroup);
++	return mem_cgroup_swappiness(sc->target_mem_cgroup);
+ }
+ 
+ /*
+@@ -1696,8 +1695,8 @@ static void get_scan_count(struct mem_cgroup_zone *mz, struct scan_control *sc,
+ 	 * With swappiness at 100, anonymous and file have the same priority.
+ 	 * This scanning priority is essentially the inverse of IO cost.
+ 	 */
+-	anon_prio = vmscan_swappiness(mz, sc);
+-	file_prio = 200 - vmscan_swappiness(mz, sc);
++	anon_prio = vmscan_swappiness(sc);
++	file_prio = 200 - vmscan_swappiness(sc);
+ 
+ 	/*
+ 	 * OK, so we have swap space and a fair amount of page cache
+@@ -1742,7 +1741,7 @@ out:
+ 		unsigned long scan;
+ 
+ 		scan = zone_nr_lru_pages(mz, lru);
+-		if (priority || noswap || !vmscan_swappiness(mz, sc)) {
++		if (priority || noswap || !vmscan_swappiness(sc)) {
+ 			scan >>= priority;
+ 			if (!scan && force_scan)
+ 				scan = SWAP_CLUSTER_MAX;
+-- 
+1.7.9.5
+

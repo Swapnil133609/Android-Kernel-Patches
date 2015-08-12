@@ -1,0 +1,27 @@
+From 56a257434417d794c62c5e1baca9a5be523f89c0 Mon Sep 17 00:00:00 2001
+From: Pranav Vashi <neobuddy89@gmail.com>
+Date: Fri, 20 Dec 2013 01:48:59 -0800
+Subject: [PATCH 577/590] scsi: disable module compiling
+
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/scsi/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/scsi/Kconfig b/drivers/scsi/Kconfig
+index 29684c8..362baec 100644
+--- a/drivers/scsi/Kconfig
++++ b/drivers/scsi/Kconfig
+@@ -265,7 +265,7 @@ config SCSI_SCAN_ASYNC
+ 
+ config SCSI_WAIT_SCAN
+ 	tristate  # No prompt here, this is an invisible symbol.
+-	default m
++	default n
+ 	depends on SCSI
+ 	depends on MODULES
+ # scsi_wait_scan is a loadable module which waits until all the async scans are
+-- 
+1.7.9.5
+

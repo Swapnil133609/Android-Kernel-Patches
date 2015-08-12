@@ -1,0 +1,43 @@
+From 0cc6612578ae83cecce39f13e1b952288b7fa85b Mon Sep 17 00:00:00 2001
+From: Pushkar Joshi <pushkarj@codeaurora.org>
+Date: Wed, 11 Sep 2013 11:23:26 -0700
+Subject: [PATCH 448/590] mm: panic on the first bad page table entry access
+
+Sometimes having a number of bad page table entries precipitates in
+a crash much later. Because of this, we do not have any context for
+the point at which the first bad pte entry was encountered. Hence,
+panic on first such instance to help gather context for debug.
+
+Change-Id: Idddf2b977214eb1463d08e16630e98264b9af487
+Signed-off-by: Pushkar Joshi <pushkarj@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/memory.c |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/mm/memory.c b/mm/memory.c
+index 6452240..e1536f8 100644
+--- a/mm/memory.c
++++ b/mm/memory.c
+@@ -58,6 +58,7 @@
+ #include <linux/swapops.h>
+ #include <linux/elf.h>
+ #include <linux/gfp.h>
++#include <linux/bug.h>
+ 
+ #include <asm/io.h>
+ #include <asm/pgalloc.h>
+@@ -710,6 +711,9 @@ static void print_bad_pte(struct vm_area_struct *vma, unsigned long addr,
+ 	if (vma->vm_file && vma->vm_file->f_op)
+ 		print_symbol(KERN_ALERT "vma->vm_file->f_op->mmap: %s\n",
+ 				(unsigned long)vma->vm_file->f_op->mmap);
++
++	BUG_ON(PANIC_CORRUPTION);
++
+ 	dump_stack();
+ 	add_taint(TAINT_BAD_PAGE);
+ }
+-- 
+1.7.9.5
+

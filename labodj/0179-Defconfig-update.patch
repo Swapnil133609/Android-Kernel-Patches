@@ -1,0 +1,39 @@
+From df6816437d555599cb28eab9f377c55c287f13f7 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Thu, 5 Dec 2013 00:22:38 +0100
+Subject: [PATCH 179/590] Defconfig: update
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/labo_defconfig |    7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/configs/labo_defconfig b/arch/arm/configs/labo_defconfig
+index 7e26fa4..57d60d8 100644
+--- a/arch/arm/configs/labo_defconfig
++++ b/arch/arm/configs/labo_defconfig
+@@ -412,7 +412,7 @@ CONFIG_CPU_HAS_L2_PMU=y
+ CONFIG_MSM_SMD=y
+ # CONFIG_MSM_SMD_PKG3 is not set
+ CONFIG_MSM_SMD_PKG4=y
+-CONFIG_MSM_SMD_DEBUG=y
++# CONFIG_MSM_SMD_DEBUG is not set
+ CONFIG_MSM_BAM_DMUX=y
+ CONFIG_MSM_N_WAY_SMD=y
+ CONFIG_MSM_N_WAY_SMSM=y
+@@ -507,10 +507,7 @@ CONFIG_MSM_L2_SPM=y
+ CONFIG_MSM_MULTIMEDIA_USE_ION=y
+ CONFIG_MSM_OCMEM=y
+ CONFIG_MSM_OCMEM_LOCAL_POWER_CTRL=y
+-CONFIG_MSM_OCMEM_DEBUG=y
+-# CONFIG_MSM_OCMEM_NONSECURE is not set
+-# CONFIG_MSM_OCMEM_POWER_DEBUG is not set
+-# CONFIG_MSM_OCMEM_DEBUG_ALWAYS_ON is not set
++# CONFIG_MSM_OCMEM_DEBUG is not set
+ # CONFIG_MSM_OCMEM_POWER_DISABLE is not set
+ CONFIG_SENSORS_ADSP=y
+ # CONFIG_MSM_RTB is not set
+-- 
+1.7.9.5
+

@@ -1,0 +1,27 @@
+From ea9a5bbba3b019e7b1611f0e1faf1423545655b3 Mon Sep 17 00:00:00 2001
+From: morfic <morfic@gmail.com>
+Date: Thu, 28 Feb 2013 19:24:59 -0600
+Subject: [PATCH 008/590] Not cool to force that debugging.
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ init/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/init/Kconfig b/init/Kconfig
+index e4b67a1..d377a52 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -962,7 +962,7 @@ config PANIC_TIMEOUT
+ menuconfig EXPERT
+ 	bool "Configure standard kernel features (expert users)"
+ 	# Unhide debug options, to make the on-by-default options visible
+-	select DEBUG_KERNEL
++	# We do not select DEBUG_KERNEL
+ 	help
+ 	  This option allows certain base kernel options and settings
+           to be disabled or tweaked. This is for specialized
+-- 
+1.7.9.5
+

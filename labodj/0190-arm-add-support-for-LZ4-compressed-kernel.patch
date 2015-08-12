@@ -1,0 +1,184 @@
+From 975e6d9cdf2049c28c93cd9cc1d0b63831e27130 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Fri, 6 Dec 2013 15:35:51 +0100
+Subject: [PATCH 190/590] arm: add support for LZ4-compressed kernel
+
+Integrates the LZ4 decompression code to the arm pre-boot code.
+
+Signed-off-by: Kyungsik Lee <kyungsik.lee@lge.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: Ingo Molnar <mingo@elte.hu>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Russell King <rmk@arm.linux.org.uk>
+Cc: Borislav Petkov <bp@alien8.de>
+Cc: Florian Fainelli <florian@openwrt.org>
+Cc: Yann Collet <yann.collet.73@gmail.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ Documentation/x86/boot.txt            |    7 ++++---
+ arch/arm/Kconfig                      |    1 +
+ arch/arm/boot/compressed/.gitignore   |    1 +
+ arch/arm/boot/compressed/Makefile     |    6 ++++--
+ arch/arm/boot/compressed/decompress.c |    4 ++++
+ arch/arm/boot/compressed/piggy.lz4.S  |    6 ++++++
+ arch/x86/Kconfig                      |    1 +
+ arch/x86/boot/compressed/Makefile     |    6 +++++-
+ arch/x86/boot/compressed/misc.c       |    4 ++++
+ 9 files changed, 30 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/boot/compressed/piggy.lz4.S
+
+diff --git a/Documentation/x86/boot.txt b/Documentation/x86/boot.txt
+index 7c3a880..97ebecc 100644
+--- a/Documentation/x86/boot.txt
++++ b/Documentation/x86/boot.txt
+@@ -623,9 +623,10 @@ Protocol:	2.08+
+   uncompressed data should be determined using the standard magic
+   numbers.  The currently supported compression formats are gzip
+   (magic numbers 1F 8B or 1F 9E), bzip2 (magic number 42 5A), LZMA
+-  (magic number 5D 00), and XZ (magic number FD 37).  The uncompressed
+-  payload is currently always ELF (magic number 7F 45 4C 46).
+-  
++  (magic number 5D 00), XZ (magic number FD 37), and LZ4 (magic number
++  02 21).  The uncompressed payload is currently always ELF (magic
++  number 7F 45 4C 46).
++
+ Field name:	payload_length
+ Type:		read
+ Offset/size:	0x24c/4
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 33ff99e..efedb13 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -23,6 +23,7 @@ config ARM
+ 	select HAVE_GENERIC_DMA_COHERENT
+ 	select HAVE_KERNEL_GZIP
+ 	select HAVE_KERNEL_LZO
++	select HAVE_KERNEL_LZ4
+ 	select HAVE_KERNEL_LZMA
+ 	select HAVE_KERNEL_XZ
+ 	select HAVE_IRQ_WORK
+diff --git a/arch/arm/boot/compressed/.gitignore b/arch/arm/boot/compressed/.gitignore
+index d0d441c..ae66f95 100644
+--- a/arch/arm/boot/compressed/.gitignore
++++ b/arch/arm/boot/compressed/.gitignore
+@@ -5,6 +5,7 @@ piggy.gzip
+ piggy.lzo
+ piggy.lzma
+ piggy.xzkern
++piggy.lz4
+ vmlinux
+ vmlinux.lds
+ 
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 34451a1..3907904 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -101,6 +101,7 @@ suffix_$(CONFIG_KERNEL_GZIP) = gzip
+ suffix_$(CONFIG_KERNEL_LZO)  = lzo
+ suffix_$(CONFIG_KERNEL_LZMA) = lzma
+ suffix_$(CONFIG_KERNEL_XZ)   = xzkern
++suffix_$(CONFIG_KERNEL_LZ4)  = lz4
+ 
+ # Borrowed libfdt files for the ATAG compatibility mode
+ 
+@@ -125,8 +126,9 @@ targets       := vmlinux vmlinux.lds \
+ 		 font.o font.c head.o misc.o decompress.o $(OBJS)
+ 
+ # Make sure files are removed during clean
+-extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern \
+-		 lib1funcs.S ashldi3.S $(libfdt) $(libfdt_hdrs)
++extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern piggy.lz4 \
++		 lib1funcs.S ashldi3.S $(libfdt) $(libfdt_hdrs) \
++		 hyp-stub.S
+ 
+ ifeq ($(CONFIG_FUNCTION_TRACER),y)
+ ORIG_CFLAGS := $(KBUILD_CFLAGS)
+diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
+index f41b38c..1d99e86 100644
+--- a/arch/arm/boot/compressed/decompress.c
++++ b/arch/arm/boot/compressed/decompress.c
+@@ -50,6 +50,10 @@ extern void error(char *);
+ #include "../../../../lib/decompress_unxz.c"
+ #endif
+ 
++#ifdef CONFIG_KERNEL_LZ4
++#include "../../../../lib/decompress_unlz4.c"
++#endif
++
+ int do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x))
+ {
+ 	return decompress(input, len, NULL, NULL, output, NULL, error);
+diff --git a/arch/arm/boot/compressed/piggy.lz4.S b/arch/arm/boot/compressed/piggy.lz4.S
+new file mode 100644
+index 0000000..3d9a575
+--- /dev/null
++++ b/arch/arm/boot/compressed/piggy.lz4.S
+@@ -0,0 +1,6 @@
++	.section .piggydata,#alloc
++	.globl	input_data
++input_data:
++	.incbin	"arch/arm/boot/compressed/piggy.lz4"
++	.globl	input_data_end
++input_data_end:
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 29cf70f..cc129e4 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -56,6 +56,7 @@ config X86
+ 	select HAVE_KERNEL_LZMA
+ 	select HAVE_KERNEL_XZ
+ 	select HAVE_KERNEL_LZO
++	select HAVE_KERNEL_LZ4
+ 	select HAVE_HW_BREAKPOINT
+ 	select HAVE_MIXED_BREAKPOINTS_REGS
+ 	select PERF_EVENTS
+diff --git a/arch/x86/boot/compressed/Makefile b/arch/x86/boot/compressed/Makefile
+index 5ef205c..dcd90df 100644
+--- a/arch/x86/boot/compressed/Makefile
++++ b/arch/x86/boot/compressed/Makefile
+@@ -4,7 +4,8 @@
+ # create a compressed vmlinux image from the original vmlinux
+ #
+ 
+-targets := vmlinux vmlinux.bin vmlinux.bin.gz vmlinux.bin.bz2 vmlinux.bin.lzma vmlinux.bin.xz vmlinux.bin.lzo
++targets := vmlinux vmlinux.bin vmlinux.bin.gz vmlinux.bin.bz2 vmlinux.bin.lzma \
++	vmlinux.bin.xz vmlinux.bin.lzo vmlinux.bin.lz4
+ 
+ KBUILD_CFLAGS := -m$(BITS) -D__KERNEL__ $(LINUX_INCLUDE) -O2
+ KBUILD_CFLAGS += -fno-strict-aliasing -fPIC
+@@ -63,12 +64,15 @@ $(obj)/vmlinux.bin.xz: $(vmlinux.bin.all-y) FORCE
+ 	$(call if_changed,xzkern)
+ $(obj)/vmlinux.bin.lzo: $(vmlinux.bin.all-y) FORCE
+ 	$(call if_changed,lzo)
++$(obj)/vmlinux.bin.lz4: $(vmlinux.bin.all-y) FORCE
++	$(call if_changed,lz4)
+ 
+ suffix-$(CONFIG_KERNEL_GZIP)	:= gz
+ suffix-$(CONFIG_KERNEL_BZIP2)	:= bz2
+ suffix-$(CONFIG_KERNEL_LZMA)	:= lzma
+ suffix-$(CONFIG_KERNEL_XZ)	:= xz
+ suffix-$(CONFIG_KERNEL_LZO) 	:= lzo
++suffix-$(CONFIG_KERNEL_LZ4) 	:= lz4
+ 
+ quiet_cmd_mkpiggy = MKPIGGY $@
+       cmd_mkpiggy = $(obj)/mkpiggy $< > $@ || ( rm -f $@ ; false )
+diff --git a/arch/x86/boot/compressed/misc.c b/arch/x86/boot/compressed/misc.c
+index 7116dcb..99c33dc 100644
+--- a/arch/x86/boot/compressed/misc.c
++++ b/arch/x86/boot/compressed/misc.c
+@@ -147,6 +147,10 @@ static int lines, cols;
+ #include "../../../../lib/decompress_unlzo.c"
+ #endif
+ 
++#ifdef CONFIG_KERNEL_LZ4
++#include "../../../../lib/decompress_unlz4.c"
++#endif
++
+ static void scroll(void)
+ {
+ 	int i;
+-- 
+1.7.9.5
+

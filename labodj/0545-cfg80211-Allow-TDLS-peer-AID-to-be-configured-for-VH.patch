@@ -1,0 +1,171 @@
+From a5f830c70361001faf2bf4fc3f20b00aa40786ad Mon Sep 17 00:00:00 2001
+From: Jouni Malinen <jouni@qca.qualcomm.com>
+Date: Tue, 4 Jun 2013 19:26:05 +0530
+Subject: [PATCH 545/590] cfg80211: Allow TDLS peer AID to be configured for
+ VHT
+
+VHT uses peer AID in the PARTIAL_AID field in TDLS frames. The
+current design for TDLS is to first add a dummy STA entry before
+completing TDLS Setup and then update information on this STA
+entry based on what was received from the peer during the setup
+exchange.
+
+In theory, this could use NL80211_ATTR_STA_AID to set
+the peer AID just like this is used in AP mode to set the AID
+of an association station. However, existing cfg80211 validation
+rules prevent this attribute from being used with set_station
+operation. To avoid interoperability issues between different
+kernel and user space version combinations, introduce a new
+nl80211 attribute for the purpose of setting TDLS peer AID.
+This attribute can be used in both the new_station and set_station
+operations. It is not supposed to be allowed to change the AID
+value during the lifetime of the STA entry, but that validation
+is left for drivers to do in the change_station callback.
+
+Signed-off-by: Jouni Malinen <jouni@qca.qualcomm.com>
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+Git-commit: 5e4b6f5698421d94226cc2f80eae6d613c9acef8
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/linville/wireless-testing.git
+Change-Id: I1d2f6d2f5a291f91858b45ad004de66a0080f1d2
+CRs-fixed: 483290
+[duttus@codeaurora.org: backport to 3.4-This commit includes the
+changes from following commits in include/linux/nl80211.h to compile
+for msm-3.4.
+5de17984898c5758fc6ebe08eccea9f4b6548914 :
+cfg80211: introduce critical protocol indication from user-space.]
+Signed-off-by: Sunil Dutt <duttus@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/nl80211.h |   46 ++++++++++++++++++++++++++++++++++++++++++++++
+ net/wireless/nl80211.c  |   11 +++++++++--
+ 2 files changed, 55 insertions(+), 2 deletions(-)
+
+diff --git a/include/linux/nl80211.h b/include/linux/nl80211.h
+index 6d7d178..6a68b72 100644
+--- a/include/linux/nl80211.h
++++ b/include/linux/nl80211.h
+@@ -608,6 +608,13 @@
+  *	with the relevant Information Elements. This event is used to report
+  *	received FT IEs (MDIE, FTIE, RSN IE, TIE, RICIE).
+  *
++ * @NL80211_CMD_CRIT_PROTOCOL_START: Indicates user-space will start running
++ *	a critical protocol that needs more reliability in the connection to
++ *	complete.
++ *
++ * @NL80211_CMD_CRIT_PROTOCOL_STOP: Indicates the connection reliability can
++ *	return back to normal.
++ *
+  * @NL80211_CMD_MAX: highest used command number
+  * @__NL80211_CMD_AFTER_LAST: internal use
+  */
+@@ -768,6 +775,9 @@ enum nl80211_commands {
+ 	NL80211_CMD_UPDATE_FT_IES,
+ 	NL80211_CMD_FT_EVENT,
+ 
++	NL80211_CMD_CRIT_PROTOCOL_START,
++	NL80211_CMD_CRIT_PROTOCOL_STOP,
++
+ 	/* add new commands above here */
+ 
+ 	/* used to define NL80211_CMD_MAX below */
+@@ -1360,6 +1370,16 @@ enum nl80211_commands {
+  * @NL80211_ATTR_IE_RIC: Resource Information Container Information
+  *	Element
+  *
++ * @NL80211_ATTR_CRIT_PROT_ID: critical protocol identifier requiring increased
++ *	reliability, see &enum nl80211_crit_proto_id (u16).
++ * @NL80211_ATTR_MAX_CRIT_PROT_DURATION: duration in milliseconds in which
++ *      the connection should have increased reliability (u16).
++ *
++ * @NL80211_ATTR_PEER_AID: Association ID for the peer TDLS station (u16).
++ *	This is similar to @NL80211_ATTR_STA_AID but with a difference of being
++ *	allowed to be used with the first @NL80211_CMD_SET_STATION command to
++ *	update a TDLS peer STA entry.
++ *
+  * @NL80211_ATTR_MAX: highest attribute number currently defined
+  * @__NL80211_ATTR_AFTER_LAST: internal use
+  */
+@@ -1655,6 +1675,11 @@ enum nl80211_attrs {
+ 	NL80211_ATTR_MDID,
+ 	NL80211_ATTR_IE_RIC,
+ 
++	NL80211_ATTR_CRIT_PROT_ID,
++	NL80211_ATTR_MAX_CRIT_PROT_DURATION,
++
++	NL80211_ATTR_PEER_AID,
++
+ 	/* add attributes here, update the policy in nl80211.c */
+ 
+ 	__NL80211_ATTR_AFTER_LAST,
+@@ -3097,4 +3122,25 @@ enum nl80211_acl_policy {
+ 	NL80211_ACL_POLICY_ACCEPT_UNLESS_LISTED,
+ 	NL80211_ACL_POLICY_DENY_UNLESS_LISTED,
+ };
++/**
++ * enum nl80211_crit_proto_id - nl80211 critical protocol identifiers
++ *
++ * @NL80211_CRIT_PROTO_UNSPEC: protocol unspecified.
++ * @NL80211_CRIT_PROTO_DHCP: BOOTP or DHCPv6 protocol.
++ * @NL80211_CRIT_PROTO_EAPOL: EAPOL protocol.
++ * @NL80211_CRIT_PROTO_APIPA: APIPA protocol.
++ * @NUM_NL80211_CRIT_PROTO: must be kept last.
++ */
++enum nl80211_crit_proto_id {
++	NL80211_CRIT_PROTO_UNSPEC,
++	NL80211_CRIT_PROTO_DHCP,
++	NL80211_CRIT_PROTO_EAPOL,
++	NL80211_CRIT_PROTO_APIPA,
++	/* add other protocols before this one */
++	NUM_NL80211_CRIT_PROTO
++};
++
++/* maximum duration for critical protocol measures */
++#define NL80211_CRIT_PROTO_MAX_DURATION		5000 /* msec */
++
+ #endif /* __LINUX_NL80211_H */
+diff --git a/net/wireless/nl80211.c b/net/wireless/nl80211.c
+index f750832..d2b38e8 100644
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -222,6 +222,7 @@ static const struct nla_policy nl80211_policy[NL80211_ATTR_MAX+1] = {
+ 	[NL80211_ATTR_MDID] = { .type = NLA_U16 },
+ 	[NL80211_ATTR_IE_RIC] = { .type = NLA_BINARY,
+ 				  .len = IEEE80211_MAX_DATA_LEN },
++	[NL80211_ATTR_PEER_AID] = { .type = NLA_U16 },
+ };
+ 
+ /* policy for the key attributes */
+@@ -2787,6 +2788,8 @@ static int nl80211_set_station_tdls(struct genl_info *info,
+ 	int err;
+ 
+ 	/* Dummy STA entry gets updated once the peer capabilities are known */
++	if (info->attrs[NL80211_ATTR_PEER_AID])
++		params->aid = nla_get_u16(info->attrs[NL80211_ATTR_PEER_AID]);
+ 	if (info->attrs[NL80211_ATTR_HT_CAPABILITY])
+ 		params->ht_capa =
+ 			nla_data(info->attrs[NL80211_ATTR_HT_CAPABILITY]);
+@@ -3016,7 +3019,8 @@ static int nl80211_new_station(struct sk_buff *skb, struct genl_info *info)
+ 	if (!info->attrs[NL80211_ATTR_STA_SUPPORTED_RATES])
+ 		return -EINVAL;
+ 
+-	if (!info->attrs[NL80211_ATTR_STA_AID])
++	if (!info->attrs[NL80211_ATTR_STA_AID] &&
++	    !info->attrs[NL80211_ATTR_PEER_AID])
+ 		return -EINVAL;
+ 
+ 	mac_addr = nla_data(info->attrs[NL80211_ATTR_MAC]);
+@@ -3027,7 +3031,10 @@ static int nl80211_new_station(struct sk_buff *skb, struct genl_info *info)
+ 	params.listen_interval =
+ 		nla_get_u16(info->attrs[NL80211_ATTR_STA_LISTEN_INTERVAL]);
+ 
+-	params.aid = nla_get_u16(info->attrs[NL80211_ATTR_STA_AID]);
++	if (info->attrs[NL80211_ATTR_STA_AID])
++		params.aid = nla_get_u16(info->attrs[NL80211_ATTR_STA_AID]);
++	else
++		params.aid = nla_get_u16(info->attrs[NL80211_ATTR_PEER_AID]);
+ 	if (!params.aid || params.aid > IEEE80211_MAX_AID)
+ 		return -EINVAL;
+ 
+-- 
+1.7.9.5
+

@@ -1,0 +1,35 @@
+From 89287d8b6a7642071d135b9e4248df3a1fb8c0c8 Mon Sep 17 00:00:00 2001
+From: Jordan Crouse <jcrouse@codeaurora.org>
+Date: Fri, 22 Nov 2013 08:47:27 -0700
+Subject: [PATCH 283/590] msm: kgsl: Protect against a potential overflow in
+ kgsl_sg_alloc
+
+Avoid allocating a scatterlist so large that it overflows the size
+passed to the memory allocators.
+
+CRs-fixed: 564448
+Change-Id: Ic0dedbad2ab421ddec8f3be38d61c9bdf9ae5bd4
+Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/msm/kgsl_sharedmem.h |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/gpu/msm/kgsl_sharedmem.h b/drivers/gpu/msm/kgsl_sharedmem.h
+index 3986c61..505be69 100644
+--- a/drivers/gpu/msm/kgsl_sharedmem.h
++++ b/drivers/gpu/msm/kgsl_sharedmem.h
+@@ -141,6 +141,9 @@ kgsl_sharedmem_map_vma(struct vm_area_struct *vma,
+ 
+ static inline void *kgsl_sg_alloc(unsigned int sglen)
+ {
++	if (sglen >= ULONG_MAX / sizeof(struct scatterlist))
++		return NULL;
++
+ 	if ((sglen * sizeof(struct scatterlist)) <  PAGE_SIZE)
+ 		return kzalloc(sglen * sizeof(struct scatterlist), GFP_KERNEL);
+ 	else
+-- 
+1.7.9.5
+

@@ -1,0 +1,63 @@
+From bfe07a90d2c5fc67bd71a77882b2fa492dd2491f Mon Sep 17 00:00:00 2001
+From: Jouni Malinen <jouni@qca.qualcomm.com>
+Date: Mon, 17 Jun 2013 17:51:57 +0530
+Subject: [PATCH 546/590] cfg80211: fix VHT TDLS peer AID verification
+
+I (Johannes) accidentally applied the first version of the patch
+("Allow TDLS peer AID to be configured for VHT"). Now apply just
+the changes between v1 and v2 to get the AID verification and
+prefer the new attribute over the old one.
+
+Signed-off-by: Jouni Malinen <jouni@qca.qualcomm.com>
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+Git-commit: 3d124ea27ae2fc895f81725f0b4c7f3d9c733df4
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/linville/wireless-testing.git
+Change-Id: If33cf927dcf6ff8b95b0e0478b8f701b4d899c40
+CRs-fixed: 483290
+Signed-off-by: Sunil Dutt <duttus@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ net/wireless/nl80211.c |   12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/net/wireless/nl80211.c b/net/wireless/nl80211.c
+index d2b38e8..c83b8a3 100644
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -3031,10 +3031,10 @@ static int nl80211_new_station(struct sk_buff *skb, struct genl_info *info)
+ 	params.listen_interval =
+ 		nla_get_u16(info->attrs[NL80211_ATTR_STA_LISTEN_INTERVAL]);
+ 
+-	if (info->attrs[NL80211_ATTR_STA_AID])
+-		params.aid = nla_get_u16(info->attrs[NL80211_ATTR_STA_AID]);
+-	else
++	if (info->attrs[NL80211_ATTR_PEER_AID])
+ 		params.aid = nla_get_u16(info->attrs[NL80211_ATTR_PEER_AID]);
++	else
++		params.aid = nla_get_u16(info->attrs[NL80211_ATTR_STA_AID]);
+ 	if (!params.aid || params.aid > IEEE80211_MAX_AID)
+ 		return -EINVAL;
+ 
+@@ -3104,7 +3104,8 @@ static int nl80211_new_station(struct sk_buff *skb, struct genl_info *info)
+ 			params.sta_modify_mask |= STATION_PARAM_APPLY_UAPSD;
+ 		}
+ 		/* TDLS peers cannot be added */
+-		if (params.sta_flags_set & BIT(NL80211_STA_FLAG_TDLS_PEER))
++		if ((params.sta_flags_set & BIT(NL80211_STA_FLAG_TDLS_PEER)) ||
++		    info->attrs[NL80211_ATTR_PEER_AID])
+ 			return -EINVAL;
+ 		/* but don't bother the driver with it */
+ 		params.sta_flags_mask &= ~BIT(NL80211_STA_FLAG_TDLS_PEER);
+@@ -3116,7 +3117,8 @@ static int nl80211_new_station(struct sk_buff *skb, struct genl_info *info)
+ 		break;
+ 	case NL80211_IFTYPE_MESH_POINT:
+ 		/* TDLS peers cannot be added */
+-		if (params.sta_flags_set & BIT(NL80211_STA_FLAG_TDLS_PEER))
++		if ((params.sta_flags_set & BIT(NL80211_STA_FLAG_TDLS_PEER)) ||
++		    info->attrs[NL80211_ATTR_PEER_AID])
+ 			return -EINVAL;
+ 		break;
+ 	case NL80211_IFTYPE_STATION:
+-- 
+1.7.9.5
+

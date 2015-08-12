@@ -1,0 +1,56 @@
+From 77ee6303ff62ae675e4d9171ce27eccf6377f7f3 Mon Sep 17 00:00:00 2001
+From: Minchan Kim <minchan@kernel.org>
+Date: Mon, 8 Oct 2012 16:33:51 -0700
+Subject: [PATCH 419/590] cma: decrease cc.nr_migratepages after reclaiming
+ pagelist
+
+reclaim_clean_pages_from_list() reclaims clean pages before migration so
+cc.nr_migratepages should be updated.  Currently, there is no problem but
+it can be wrong if we try to use the value in future.
+
+Change-Id: I8b3f1238645ba1b3adcc0fe3c41e10f7074b9a96
+Signed-off-by: Minchan Kim <minchan@kernel.org>
+Acked-by: Mel Gorman <mgorman@suse.de>
+Cc: Michal Nazarewicz <mina86@mina86.com>
+Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: beb51eaa88238daba698ad837222ad277d440b6d
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+[lauraa@codeaurora.org: Change cc to be structure instead of pointer]
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/page_alloc.c |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index a522721..9472050 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5803,7 +5803,7 @@ __alloc_contig_migrate_alloc(struct page *page, unsigned long private,
+ static int __alloc_contig_migrate_range(unsigned long start, unsigned long end)
+ {
+ 	/* This function is based on compact_zone() from compaction.c. */
+-
++	unsigned long nr_reclaimed;
+ 	unsigned long pfn = start;
+ 	unsigned int tries = 0;
+ 	int ret = 0;
+@@ -5838,7 +5838,9 @@ static int __alloc_contig_migrate_range(unsigned long start, unsigned long end)
+ 			break;
+ 		}
+ 
+-		reclaim_clean_pages_from_list(cc.zone, &cc.migratepages);
++		nr_reclaimed = reclaim_clean_pages_from_list(cc.zone,
++							&cc.migratepages);
++		cc.nr_migratepages -= nr_reclaimed;
+ 
+ 		ret = migrate_pages(&cc.migratepages,
+ 				    __alloc_contig_migrate_alloc,
+-- 
+1.7.9.5
+

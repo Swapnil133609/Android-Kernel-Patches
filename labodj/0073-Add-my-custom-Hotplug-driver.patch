@@ -1,0 +1,693 @@
+From 8ef32e0bad1ae5a523f5f0fe4a32e9bb2fba13a7 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Tue, 12 Nov 2013 19:57:22 +0000
+Subject: [PATCH 073/590] Add my custom Hotplug driver.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/kernel/Makefile            |    3 +-
+ arch/arm/kernel/load_stats.c        |  170 +++++++++++++++++++++
+ arch/arm/kernel/mako_hotplug.c      |  278 +++++++++++++++++++++++++++++++++++
+ drivers/misc/Makefile               |    1 +
+ drivers/misc/mako_hotplug_control.c |  129 ++++++++++++++++
+ include/linux/hotplug.h             |   46 ++++++
+ 6 files changed, 626 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/kernel/load_stats.c
+ create mode 100644 arch/arm/kernel/mako_hotplug.c
+ create mode 100644 drivers/misc/mako_hotplug_control.c
+ create mode 100644 include/linux/hotplug.h
+
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index fc00a23..b06a37f 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -17,7 +17,8 @@ CFLAGS_REMOVE_return_address.o = -pg
+ 
+ obj-y		:= elf.o entry-armv.o entry-common.o irq.o opcodes.o \
+ 		   process.o ptrace.o return_address.o sched_clock.o \
+-		   setup.o signal.o stacktrace.o sys_arm.o time.o traps.o
++		   setup.o signal.o stacktrace.o sys_arm.o time.o traps.o \
++		   mako_hotplug.o load_stats.o
+ 
+ obj-$(CONFIG_DEPRECATED_PARAM_STRUCT) += compat.o
+ 
+diff --git a/arch/arm/kernel/load_stats.c b/arch/arm/kernel/load_stats.c
+new file mode 100644
+index 0000000..b681f96
+--- /dev/null
++++ b/arch/arm/kernel/load_stats.c
+@@ -0,0 +1,170 @@
++/* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++/*
++ * Qualcomm MSM Runqueue Stats and cpu utilization Interface for Userspace
++ */
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/hrtimer.h>
++#include <linux/cpu.h>
++#include <linux/kobject.h>
++#include <linux/sysfs.h>
++#include <linux/notifier.h>
++#include <linux/slab.h>
++#include <linux/workqueue.h>
++#include <linux/sched.h>
++#include <linux/spinlock.h>
++#include <linux/rq_stats.h>
++#include <linux/cpufreq.h>
++#include <linux/kernel_stat.h>
++#include <linux/tick.h>
++#include <asm/smp_plat.h>
++#include "../mach-msm/acpuclock.h"
++#include <linux/suspend.h>
++#include <linux/hotplug.h>
++
++struct cpu_load_data {
++	cputime64_t prev_cpu_idle;
++	cputime64_t prev_cpu_wall;
++	cputime64_t prev_cpu_iowait;
++	unsigned int avg_load_maxfreq;
++	unsigned int prev_avg_load_maxfreq;
++	unsigned int samples;
++	unsigned int window_size;
++	unsigned int cur_freq;
++	unsigned int policy_max;
++	cpumask_var_t related_cpus;
++	struct mutex cpu_load_mutex;
++};
++
++static DEFINE_PER_CPU(struct cpu_load_data, cpuload);
++
++static inline u64 get_cpu_idle_time_jiffy(unsigned int cpu, u64 *wall)
++{
++	u64 idle_time;
++	u64 cur_wall_time;
++	u64 busy_time;
++
++	cur_wall_time = jiffies64_to_cputime64(get_jiffies_64());
++
++	busy_time  = kcpustat_cpu(cpu).cpustat[CPUTIME_USER];
++	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SYSTEM];
++	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_IRQ];
++	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SOFTIRQ];
++	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_STEAL];
++	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_NICE];
++
++	idle_time = cur_wall_time - busy_time;
++	if (wall)
++		*wall = jiffies_to_usecs(cur_wall_time);
++
++	return jiffies_to_usecs(idle_time);
++}
++
++static inline cputime64_t get_cpu_idle_time(unsigned int cpu, cputime64_t *wall)
++{
++	u64 idle_time = get_cpu_idle_time_us(cpu, NULL);
++
++	if (idle_time == -1ULL)
++		return get_cpu_idle_time_jiffy(cpu, wall);
++	else
++		idle_time += get_cpu_iowait_time_us(cpu, wall);
++
++	return idle_time;
++}
++
++static inline cputime64_t get_cpu_iowait_time(unsigned int cpu,
++							cputime64_t *wall)
++{
++	u64 iowait_time = get_cpu_iowait_time_us(cpu, wall);
++
++	if (iowait_time == -1ULL)
++		return 0;
++
++	return iowait_time;
++}
++
++static int update_average_load(unsigned int cpu)
++{
++	struct cpufreq_policy cpu_policy;
++	struct cpu_load_data *pcpu = &per_cpu(cpuload, cpu);
++	cputime64_t cur_wall_time, cur_idle_time, cur_iowait_time;
++	unsigned int idle_time, wall_time, iowait_time;
++	unsigned int cur_load, load_at_max_freq;
++
++	cpufreq_get_policy(&cpu_policy, cpu);
++
++	cur_idle_time = get_cpu_idle_time(cpu, &cur_wall_time);
++	cur_iowait_time = get_cpu_iowait_time(cpu, &cur_wall_time);
++
++	wall_time = (unsigned int) (cur_wall_time - pcpu->prev_cpu_wall);
++	pcpu->prev_cpu_wall = cur_wall_time;
++
++	idle_time = (unsigned int) (cur_idle_time - pcpu->prev_cpu_idle);
++	pcpu->prev_cpu_idle = cur_idle_time;
++
++	iowait_time = (unsigned int) (cur_iowait_time - pcpu->prev_cpu_iowait);
++	pcpu->prev_cpu_iowait = cur_iowait_time;
++
++	if (idle_time >= iowait_time)
++		idle_time -= iowait_time;
++
++	if (unlikely(!wall_time || wall_time < idle_time))
++		return 0;
++
++	cur_load = 100 * (wall_time - idle_time) / wall_time;
++
++	/* Calculate the scaled load across CPU */
++	load_at_max_freq = (cur_load * cpu_policy.cur) / pcpu->policy_max;
++
++	/* This is the first sample in this window*/
++	pcpu->avg_load_maxfreq = pcpu->prev_avg_load_maxfreq + load_at_max_freq;
++	pcpu->avg_load_maxfreq /= 2;
++	pcpu->window_size = wall_time;
++
++	return 0;
++}
++
++unsigned int report_load_at_max_freq(int cpu)
++{
++	struct cpu_load_data *pcpu;
++	unsigned int total_load = 0;
++	pcpu = &per_cpu(cpuload, cpu);
++	update_average_load(cpu);
++	total_load = pcpu->avg_load_maxfreq;
++	pcpu->prev_avg_load_maxfreq = pcpu->avg_load_maxfreq;
++	pcpu->avg_load_maxfreq = 0;
++
++	return total_load;
++}
++
++static int __init msm_rq_stats_init(void)
++{
++	int i;
++	struct cpufreq_policy cpu_policy;
++
++	for_each_possible_cpu(i) {
++		struct cpu_load_data *pcpu = &per_cpu(cpuload, i);
++		mutex_init(&pcpu->cpu_load_mutex);
++		cpufreq_get_policy(&cpu_policy, i);
++		pcpu->policy_max = cpu_policy.max;
++		if (cpu_online(i))
++			pcpu->cur_freq = acpuclk_get_rate(i);
++		cpumask_copy(pcpu->related_cpus, cpu_policy.cpus);
++	}
++
++	return 0;
++}
++late_initcall(msm_rq_stats_init);
++
+diff --git a/arch/arm/kernel/mako_hotplug.c b/arch/arm/kernel/mako_hotplug.c
+new file mode 100644
+index 0000000..b0b1c7e
+--- /dev/null
++++ b/arch/arm/kernel/mako_hotplug.c
+@@ -0,0 +1,278 @@
++/*
++ * Copyright (c) 2013, Francisco Franco <franciscofranco.1990@gmail.com>. 
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Simple no bullshit hot[un]plug driver for SMP
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/cpu.h>
++#include <linux/workqueue.h>
++#include <linux/sched.h>
++#include <linux/timer.h>
++#include <linux/cpufreq.h>
++#include <linux/delay.h>
++#include <linux/hotplug.h>
++#include <linux/input.h>
++#include <linux/lcd_notify.h>
++
++#include <mach/cpufreq.h>
++
++#define DEFAULT_FIRST_LEVEL 60
++#define DEFAULT_SUSPEND_FREQ 729600
++#define DEFAULT_CORES_ON_TOUCH 2
++#define HIGH_LOAD_COUNTER 20
++#define TIMER HZ
++
++/*
++ * 1000ms = 1 second
++ */
++#define MIN_TIME_CPU_ONLINE_MS 1000
++
++static struct cpu_stats
++{
++    unsigned int default_first_level;
++    unsigned int suspend_frequency;
++    unsigned int cores_on_touch;
++    unsigned int counter[2];
++	unsigned long timestamp[2];
++	bool ready_to_online[2];
++	struct notifier_block notif;
++	bool screen_off;
++} stats = {
++	.default_first_level = DEFAULT_FIRST_LEVEL,
++    .suspend_frequency = DEFAULT_SUSPEND_FREQ,
++    .cores_on_touch = DEFAULT_CORES_ON_TOUCH,
++    .counter = {0},
++	.timestamp = {0},
++	.ready_to_online = {false},
++	.screen_off = false,
++};
++
++static struct workqueue_struct *wq;
++static struct delayed_work decide_hotplug;
++
++static inline void calc_cpu_hotplug(unsigned int counter0,
++									unsigned int counter1)
++{
++	//int cpu;
++	int i, k;
++
++	stats.ready_to_online[0] = counter0 >= 10;
++	stats.ready_to_online[1] = counter1 >= 10;
++
++	//commented for now
++	/*if (unlikely(gpu_pref_counter >= 60))
++	{
++		if (num_online_cpus() < num_possible_cpus())
++		{
++			for_each_possible_cpu(cpu)
++			{
++				if (cpu && cpu_is_offline(cpu))
++					cpu_up(cpu);
++			}
++		}
++
++		return;
++	}*/
++
++	for (i = 0, k = 2; i < 2; i++, k++)
++	{
++		if (stats.ready_to_online[i])
++		{
++			if (cpu_is_offline(k))
++			{
++				cpu_up(k);
++				stats.timestamp[i] = ktime_to_ms(ktime_get());
++			}
++		}
++		else if (cpu_online(k))
++		{
++			/*
++			 * Let's not unplug this cpu unless its been online for longer than
++			 * 1sec to avoid consecutive ups and downs if the load is varying
++			 * closer to the threshold point.
++			 */
++			if (ktime_to_ms(ktime_get()) + MIN_TIME_CPU_ONLINE_MS
++					> stats.timestamp[i])
++				cpu_down(k);
++		}
++	}
++}
++
++static void __ref decide_hotplug_func(struct work_struct *work)
++{
++    int cpu;
++	//int i;
++
++	//commented for now
++	/*	
++	if (_ts->ts_data.curr_data[0].state == ABS_PRESS)
++	{
++		for (i = num_online_cpus(); i < stats.cores_on_touch; i++)
++		{
++			if (cpu_is_offline(i))
++			{
++				cpu_up(i);
++				stats.timestamp[i-2] = ktime_to_ms(ktime_get());
++			}
++		}
++		goto re_queue;
++	}*/
++
++	if (unlikely(stats.screen_off))
++		return;
++
++    for_each_online_cpu(cpu) 
++    {
++        if (report_load_at_max_freq(cpu) >= stats.default_first_level)
++        {
++            if (likely(stats.counter[cpu] < HIGH_LOAD_COUNTER))    
++                stats.counter[cpu] += 2;
++        }
++
++        else
++        {
++            if (stats.counter[cpu])
++                --stats.counter[cpu];
++        }
++
++		if (cpu)
++			break;
++    }
++
++	calc_cpu_hotplug(stats.counter[0], stats.counter[1]);
++
++//re_queue:	
++    queue_delayed_work(wq, &decide_hotplug, msecs_to_jiffies(TIMER));
++}
++
++void mako_hotplug_early_suspend(void)
++{	 
++    int cpu;
++
++    /* cancel the hotplug work when the screen is off and flush the WQ */
++    cancel_delayed_work(&decide_hotplug);
++	flush_workqueue(wq);
++
++    pr_info("Suspend stopping Hotplug work...\n");
++
++	/* reset the counters so that we start clean next time the display is on */
++    stats.counter[0] = 0;
++    stats.counter[1] = 0;
++
++    /* cap max frequency to 729MHz by default */
++	for_each_possible_cpu(cpu)
++    	msm_cpufreq_set_freq_limits(cpu, MSM_CPUFREQ_NO_LIMIT, 
++            stats.suspend_frequency);
++
++	disable_nonboot_cpus();
++
++    pr_info("Cpulimit: Suspend - limit cpus max frequency to: %dMHz\n", 
++			stats.suspend_frequency/1000);
++}
++
++void mako_hotplug_late_resume(void)
++{  
++    int cpu;
++
++	/* restore max frequency */
++	for_each_possible_cpu(cpu)
++    	msm_cpufreq_set_freq_limits(cpu, MSM_CPUFREQ_NO_LIMIT, 
++				MSM_CPUFREQ_NO_LIMIT);
++
++	enable_nonboot_cpus();
++
++    pr_info("Cpulimit: Resume - restore cpus max frequency.\n");
++    
++    pr_info("Resume starting Hotplug work...\n");
++    queue_delayed_work(wq, &decide_hotplug, HZ);
++}
++
++static int lcd_notifier_callback(struct notifier_block *this,
++				unsigned long event, void *data)
++{
++
++	switch (event) {
++	case LCD_EVENT_ON_START:
++		pr_info("LCD is on.\n");
++		mako_hotplug_late_resume();
++		stats.screen_off = false;
++		break;
++	case LCD_EVENT_ON_END:
++		break;
++	case LCD_EVENT_OFF_START:
++		break;
++	case LCD_EVENT_OFF_END:
++		pr_info("LCD is off.\n");
++		mako_hotplug_early_suspend();
++		stats.screen_off = true;
++		break;
++	default:
++		break;
++	}
++
++	return 0;
++}
++
++/* sysfs functions for external driver */
++void update_first_level(unsigned int level)
++{
++    stats.default_first_level = level;
++}
++
++void update_suspend_frequency(unsigned int freq)
++{
++    stats.suspend_frequency = freq;
++}
++
++void update_cores_on_touch(unsigned int num)
++{
++    stats.cores_on_touch = num;
++}
++
++unsigned int get_first_level()
++{
++    return stats.default_first_level;
++}
++
++unsigned int get_suspend_frequency()
++{
++    return stats.suspend_frequency;
++}
++
++unsigned int get_cores_on_touch()
++{
++    return stats.cores_on_touch;
++}
++/* end sysfs functions from external driver */
++
++int __init mako_hotplug_init(void)
++{
++	pr_info("Mako Hotplug driver started.\n");
++
++    wq = alloc_ordered_workqueue("mako_hotplug_workqueue", 0);
++    
++    if (!wq)
++        return -ENOMEM;
++
++	stats.notif.notifier_call = lcd_notifier_callback;
++	if (lcd_register_client(&stats.notif))
++		return -EINVAL;
++    
++    INIT_DELAYED_WORK(&decide_hotplug, decide_hotplug_func);
++    queue_delayed_work(wq, &decide_hotplug, HZ*30);
++    
++    return 0;
++}
++late_initcall(mako_hotplug_init);
++
+diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+index e2b7751..af6851f 100644
+--- a/drivers/misc/Makefile
++++ b/drivers/misc/Makefile
+@@ -74,3 +74,4 @@ obj-$(CONFIG_TI_DRV2667) += ti_drv2667.o
+ obj-$(CONFIG_QPNP_MISC) += qpnp-misc.o
+ obj-$(CONFIG_EARJACK_DEBUGGER) += earjack_debugger.o
+ obj-$(CONFIG_FAN48632_BOOST) += fan48632_boost.o
++obj-y += mako_hotplug_control.o
+diff --git a/drivers/misc/mako_hotplug_control.c b/drivers/misc/mako_hotplug_control.c
+new file mode 100644
+index 0000000..7114719
+--- /dev/null
++++ b/drivers/misc/mako_hotplug_control.c
+@@ -0,0 +1,129 @@
++/*
++ * Copyright 2013 Francisco Franco
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/init.h>
++#include <linux/device.h>
++#include <linux/miscdevice.h>
++#include <linux/hotplug.h>
++
++#define MAKO_HOTPLUG_CONTROL_VERSION 2
++
++/*
++ * Sysfs get/set entries
++ */
++
++static ssize_t first_level_show(struct device *dev, struct device_attribute *attr, char *buf)
++{
++    return sprintf(buf, "%u\n", get_first_level());
++}
++
++static ssize_t first_level_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
++{
++    unsigned int new_val;
++    
++	sscanf(buf, "%u", &new_val);
++    
++    if (new_val != get_first_level() && new_val >= 0 && new_val <= 100)
++    {
++        update_first_level(new_val);
++    }
++    
++    return size;
++}
++
++static ssize_t suspend_frequency_show(struct device *dev, struct device_attribute *attr, char *buf)
++{
++    return sprintf(buf, "%u\n", get_suspend_frequency());
++}
++
++static ssize_t suspend_frequency_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
++{
++    unsigned int new_val;
++    
++	sscanf(buf, "%u", &new_val);
++    
++    if (new_val != get_suspend_frequency() && new_val >= 0 && new_val <= 1512000)
++    {
++        update_suspend_frequency(new_val);
++    }
++    
++    return size;
++}
++
++static ssize_t cores_on_touch_show(struct device *dev, struct device_attribute *attr, char *buf)
++{
++    return sprintf(buf, "%u\n", get_cores_on_touch());
++}
++
++static ssize_t cores_on_touch_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
++{
++    unsigned int new_val;
++    
++    sscanf(buf, "%u", &new_val);
++    
++    if (new_val != get_cores_on_touch() && new_val >= 2 && new_val <= 4)
++    {
++        update_cores_on_touch(new_val);
++    }
++    
++    return size;
++}
++
++static ssize_t mako_hotplug_control_version(struct device *dev, struct device_attribute* attr, char *buf)
++{
++    return sprintf(buf, "%d\n", MAKO_HOTPLUG_CONTROL_VERSION);
++}
++
++static DEVICE_ATTR(first_level, 0777, first_level_show, first_level_store);
++static DEVICE_ATTR(suspend_frequency, 0777, suspend_frequency_show, suspend_frequency_store);
++static DEVICE_ATTR(cores_on_touch, 0777, cores_on_touch_show, cores_on_touch_store);
++static DEVICE_ATTR(version, 0777 , mako_hotplug_control_version, NULL);
++
++static struct attribute *mako_hotplug_control_attributes[] =
++{
++	&dev_attr_first_level.attr,
++    &dev_attr_suspend_frequency.attr,
++    &dev_attr_cores_on_touch.attr,
++	&dev_attr_version.attr,
++	NULL
++};
++
++static struct attribute_group mako_hotplug_control_group =
++{
++	.attrs  = mako_hotplug_control_attributes,
++};
++
++static struct miscdevice mako_hotplug_control_device =
++{
++	.minor = MISC_DYNAMIC_MINOR,
++	.name = "mako_hotplug_control",
++};
++
++static int __init mako_hotplug_control_init(void)
++{
++    int ret;
++    
++    pr_info("%s misc_register(%s)\n", __FUNCTION__, mako_hotplug_control_device.name);
++    
++    ret = misc_register(&mako_hotplug_control_device);
++    
++    if (ret)
++    {
++	    pr_err("%s misc_register(%s) fail\n", __FUNCTION__, mako_hotplug_control_device.name);
++	    return 1;
++	}
++    
++    if (sysfs_create_group(&mako_hotplug_control_device.this_device->kobj, &mako_hotplug_control_group) < 0)
++    {
++	    pr_err("%s sysfs_create_group fail\n", __FUNCTION__);
++	    pr_err("Failed to create sysfs group for device (%s)!\n", mako_hotplug_control_device.name);
++	}
++    
++    return 0;
++}
++late_initcall(mako_hotplug_control_init);
+diff --git a/include/linux/hotplug.h b/include/linux/hotplug.h
+new file mode 100644
+index 0000000..4fcc6bf
+--- /dev/null
++++ b/include/linux/hotplug.h
+@@ -0,0 +1,46 @@
++/*
++ * Copyright (c) 2013, Francisco Franco <franciscofranco.1990@gmail.com>.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _LINUX_HOTPLUG_H
++#define _LINUX_HOTPLUG_H
++
++extern void update_first_level(unsigned int level);
++extern void update_second_level(unsigned int level);
++extern void update_third_level(unsigned int level);
++extern void update_fourth_level(unsigned int level);
++extern void update_suspend_frequency(unsigned int freq);
++extern void update_cores_on_touch(unsigned int num);
++
++extern unsigned int get_first_level(void);
++extern unsigned int get_second_level(void);
++extern unsigned int get_third_level(void);
++extern unsigned int get_fourth_level(void);
++extern unsigned int get_suspend_frequency(void);
++extern unsigned int get_cores_on_touch(void);
++
++extern unsigned int get_input_boost_freq(void);
++extern unsigned int get_min_sample_time(void);
++extern bool get_dynamic_scaling(void);
++extern unsigned int get_hispeed_freq(void);
++
++extern bool is_touching;
++extern u64 freq_boosted_time;
++
++extern unsigned int report_load_at_max_freq(int cpu);
++
++extern bool interactive_selected;
++
++extern unsigned long gpu_pref_counter;
++
++#endif
+-- 
+1.7.9.5
+

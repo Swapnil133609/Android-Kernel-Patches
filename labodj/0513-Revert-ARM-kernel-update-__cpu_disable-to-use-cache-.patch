@@ -1,0 +1,33 @@
+From 7c49ad476a8bf6c01c3e3ff6f72d691406291a38 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Wed, 25 Dec 2013 19:12:24 +0100
+Subject: [PATCH 513/590] Revert "ARM: kernel: update __cpu_disable to use
+ cache LoUIS maintenance API"
+
+This reverts commit 1f2037ed6fc6fb226c1d880ce6e57696b2e649e9.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/kernel/smp.c |    5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index b753787..8df8b71 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -199,11 +199,8 @@ int __cpu_disable(void)
+ 	/*
+ 	 * Flush user cache and TLB mappings, and then remove this CPU
+ 	 * from the vm mask set of all processes.
+-	 *
+-	 * Caches are flushed to the Level of Unification Inner Shareable
+-	 * to write-back dirty lines to unified caches shared by all CPUs.
+ 	 */
+-	flush_cache_louis();
++	flush_cache_all();
+ 	local_flush_tlb_all();
+ 
+ 	read_lock(&tasklist_lock);
+-- 
+1.7.9.5
+

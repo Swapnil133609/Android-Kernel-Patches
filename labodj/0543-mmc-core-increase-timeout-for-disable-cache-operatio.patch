@@ -1,0 +1,61 @@
+From cd36c19e8eb5d0cb80b88063bc888209c124eb3c Mon Sep 17 00:00:00 2001
+From: Maya Erez <merez@codeaurora.org>
+Date: Thu, 7 Nov 2013 15:44:57 -0800
+Subject: [PATCH 543/590] mmc: core: increase timeout for disable cache
+ operation
+
+According to eMMC specification, there is no upper bound defined on
+a flush request and the duration of flush operation is left to card
+vendor's implementation. This means that it may take a very long
+time to complete.
+
+When eMMC cache is disabled, the card has to flush all the data in its
+cache. So this means that for certain cards, the driver is not waiting
+long enough for the flush to complete during cache disable operation,
+leading to data on the card being corrupted.
+
+This change increases the timeout for cache disable operation, thus
+preventing data corruption.
+
+CRs-Fixed: 562350
+Change-Id: If68328ab56b50c7596800f07ef92c0ab16a55ec0
+Signed-off-by: Maya Erez <merez@codeaurora.org>
+Signed-off-by: David Ng <dave@codeaurora.org>
+Signed-off-by: Krishna Konda <kkonda@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/mmc/core/core.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 478d442..bcf2056 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -61,6 +61,7 @@ static void mmc_clk_scaling(struct mmc_host *host, bool from_wq);
+ 
+ /* Flushing a large amount of cached data may take a long time. */
+ #define MMC_FLUSH_REQ_TIMEOUT_MS 90000 /* msec */
++#define MMC_CACHE_DISBALE_TIMEOUT_MS 180000 /* msec */
+ 
+ static struct workqueue_struct *workqueue;
+ 
+@@ -3379,14 +3380,14 @@ int mmc_cache_ctrl(struct mmc_host *host, u8 enable)
+ 
+ 		if (card->ext_csd.cache_ctrl ^ enable) {
+ 			if (!enable)
+-				timeout = MMC_FLUSH_REQ_TIMEOUT_MS;
++				timeout = MMC_CACHE_DISBALE_TIMEOUT_MS;
+ 
+ 			err = mmc_switch_ignore_timeout(card,
+ 					EXT_CSD_CMD_SET_NORMAL,
+ 					EXT_CSD_CACHE_CTRL, enable, timeout);
+ 
+ 			if (err == -ETIMEDOUT && !enable) {
+-				pr_debug("%s:cache disable operation timeout\n",
++				pr_err("%s:cache disable operation timeout\n",
+ 						mmc_hostname(card->host));
+ 				rc = mmc_interrupt_hpi(card);
+ 				if (rc)
+-- 
+1.7.9.5
+

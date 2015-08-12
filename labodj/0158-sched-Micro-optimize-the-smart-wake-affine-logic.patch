@@ -1,0 +1,86 @@
+From 27f177bd9845cac46e123fa46b8105efd5ebfe7f Mon Sep 17 00:00:00 2001
+From: Peter Zijlstra <peterz@infradead.org>
+Date: Thu, 4 Jul 2013 12:56:46 +0800
+Subject: [PATCH 158/590] sched: Micro-optimize the smart wake-affine logic
+
+Smart wake-affine is using node-size as the factor currently, but the overhead
+of the mask operation is high.
+
+Thus, this patch introduce the 'sd_llc_size' percpu variable, which will record
+the highest cache-share domain size, and make it to be the new factor, in order
+to reduce the overhead and make it more reasonable.
+
+Tested-by: Davidlohr Bueso <davidlohr.bueso@hp.com>
+Tested-by: Michael Wang <wangyun@linux.vnet.ibm.com>
+Signed-off-by: Peter Zijlstra <peterz@infradead.org>
+Acked-by: Michael Wang <wangyun@linux.vnet.ibm.com>
+Cc: Mike Galbraith <efault@gmx.de>
+Link: http://lkml.kernel.org/r/51D5008E.6030102@linux.vnet.ibm.com
+[ Tidied up the changelog. ]
+Signed-off-by: Ingo Molnar <mingo@kernel.org>
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/sched/core.c  |    7 ++++++-
+ kernel/sched/fair.c  |    2 +-
+ kernel/sched/sched.h |    1 +
+ 3 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index f7724b7..1e68c20 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -5895,18 +5895,23 @@ static void destroy_sched_domains(struct sched_domain *sd, int cpu)
+  * two cpus are in the same cache domain, see cpus_share_cache().
+  */
+ DEFINE_PER_CPU(struct sched_domain *, sd_llc);
++DEFINE_PER_CPU(int, sd_llc_size);
+ DEFINE_PER_CPU(int, sd_llc_id);
+ 
+ static void update_top_cache_domain(int cpu)
+ {
+ 	struct sched_domain *sd;
+ 	int id = cpu;
++	int size = 1;
+ 
+ 	sd = highest_flag_domain(cpu, SD_SHARE_PKG_RESOURCES);
+-	if (sd)
++	if (sd) {
+ 		id = cpumask_first(sched_domain_span(sd));
++		size = cpumask_weight(sched_domain_span(sd));
++	}
+ 
+ 	rcu_assign_pointer(per_cpu(sd_llc, cpu), sd);
++	per_cpu(sd_llc_size, cpu) = size;
+ 	per_cpu(sd_llc_id, cpu) = id;
+ }
+ 
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index b40ea3e..696c1df 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -2495,7 +2495,7 @@ static inline unsigned long effective_load(struct task_group *tg, int cpu,
+ 
+ static int wake_wide(struct task_struct *p)
+ {
+-	int factor = nr_cpus_node(cpu_to_node(smp_processor_id()));
++	int factor = this_cpu_read(sd_llc_size);
+ 
+ 	/*
+ 	 * Yeah, it's the switching-frequency, could means many wakee or
+diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+index c5a3295..e8a8aea 100644
+--- a/kernel/sched/sched.h
++++ b/kernel/sched/sched.h
+@@ -526,6 +526,7 @@ static inline struct sched_domain *highest_flag_domain(int cpu, int flag)
+ }
+ 
+ DECLARE_PER_CPU(struct sched_domain *, sd_llc);
++DECLARE_PER_CPU(int, sd_llc_size);
+ DECLARE_PER_CPU(int, sd_llc_id);
+ 
+ #endif /* CONFIG_SMP */
+-- 
+1.7.9.5
+

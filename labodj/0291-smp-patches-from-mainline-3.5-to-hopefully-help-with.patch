@@ -1,0 +1,354 @@
+From 4b3d7f333e240de124954ad57dce6728b769901b Mon Sep 17 00:00:00 2001
+From: Thomas Gleixner <tglx@linutronix.de>
+Date: Sat, 29 Dec 2012 02:09:24 -0500
+Subject: [PATCH 291/590] smp: patches from mainline 3.5 to hopefully help
+ with hotplug efficiency
+
+Thomas Gleixner's generic-idle patches:
+
+smp: Add task_struct argument to __cpu_up()
+Preparatory patch to make the idle thread allocation for secondary
+cpus generic.
+http://git.kernel.org/?p=linux/kernel/git/tip/tip.git;a=commit;h=8239c25f47d2b318156993b15f33900a86ea5e17
+
+smp: Add generic smpboot facility
+Start a new file, which will hold SMP and CPU hotplug related generic
+infrastructure.
+http://git.kernel.org/?p=linux/kernel/git/tip/tip.git;a=commit;h=38498a67aa2cf8c80754b8d304bfacc10bc582b5
+
+smp: Provide generic idle thread allocation
+All SMP architectures have magic to fork the idle task and to store it
+for reusage when cpu hotplug is enabled. Provide a generic
+infrastructure for it.
+Create/reinit the idle thread for the cpu which is brought up in the
+generic code and hand the thread pointer to the architecture code via
+__cpu_up().
+Note, that fork_idle() is called via a workqueue, because this
+guarantees that the idle thread does not get a reference to a user
+space VM. This can happen when the boot process did not bring up all
+possible cpus and a later cpu_up() is initiated via the sysfs
+interface. In that case fork_idle() would be called in the context of
+the user space task and take a reference on the user space VM.
+http://git.kernel.org/?p=linux/kernel/git/tip/tip.git;a=commit;h=29d5e0476e1c4a513859e7858845ad172f560389
+
+arm: Use generic idle thread allocation
+http://git.kernel.org/?p=linux/kernel/git/tip/tip.git;a=commit;h=84ec6d5796e095e2f8698bd2b5d33849ed26d9e2
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/Kconfig               |    3 ++
+ arch/arm/Kconfig           |    1 +
+ arch/arm/include/asm/cpu.h |    1 -
+ arch/arm/kernel/smp.c      |   27 +------------
+ include/linux/smp.h        |    2 +-
+ kernel/Makefile            |    1 +
+ kernel/cpu.c               |   10 ++++-
+ kernel/sched/core.c        |    2 +
+ kernel/smpboot.c           |   96 ++++++++++++++++++++++++++++++++++++++++++++
+ kernel/smpboot.h           |   16 ++++++++
+ 10 files changed, 131 insertions(+), 28 deletions(-)
+ create mode 100644 kernel/smpboot.c
+ create mode 100644 kernel/smpboot.h
+
+diff --git a/arch/Kconfig b/arch/Kconfig
+index 63fc37a..e38f33a 100644
+--- a/arch/Kconfig
++++ b/arch/Kconfig
+@@ -149,6 +149,9 @@ config HAVE_DMA_CONTIGUOUS
+ config USE_GENERIC_SMP_HELPERS
+ 	bool
+ 
++config GENERIC_SMP_IDLE_THREAD
++       bool
++
+ config HAVE_REGS_AND_STACK_ACCESS_API
+ 	bool
+ 	help
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index efedb13..3974d57 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -37,6 +37,7 @@ config ARM
+ 	select CPU_PM if (SUSPEND || CPU_IDLE)
+ 	select GENERIC_PCI_IOMAP
+ 	select HAVE_BPF_JIT if NET
++	select GENERIC_SMP_IDLE_THREAD
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
+diff --git a/arch/arm/include/asm/cpu.h b/arch/arm/include/asm/cpu.h
+index 7939681..d797223 100644
+--- a/arch/arm/include/asm/cpu.h
++++ b/arch/arm/include/asm/cpu.h
+@@ -16,7 +16,6 @@
+ struct cpuinfo_arm {
+ 	struct cpu	cpu;
+ #ifdef CONFIG_SMP
+-	struct task_struct *idle;
+ 	unsigned int	loops_per_jiffy;
+ #endif
+ };
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 028b9a4..8df8b71 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -71,32 +71,12 @@ void __init smp_set_ops(struct smp_operations *ops)
+ 		smp_ops = *ops;
+ };
+ 
+-int __cpuinit __cpu_up(unsigned int cpu)
++int __cpuinit __cpu_up(unsigned int cpu, struct task_struct *idle)
++
+ {
+-	struct cpuinfo_arm *ci = &per_cpu(cpu_data, cpu);
+-	struct task_struct *idle = ci->idle;
+ 	int ret;
+ 
+ 	/*
+-	 * Spawn a new process manually, if not already done.
+-	 * Grab a pointer to its task struct so we can mess with it
+-	 */
+-	if (!idle) {
+-		idle = fork_idle(cpu);
+-		if (IS_ERR(idle)) {
+-			printk(KERN_ERR "CPU%u: fork() failed\n", cpu);
+-			return PTR_ERR(idle);
+-		}
+-		ci->idle = idle;
+-	} else {
+-		/*
+-		 * Since this idle thread is being re-used, call
+-		 * init_idle() to reinitialize the thread structure.
+-		 */
+-		init_idle(idle, cpu);
+-	}
+-
+-	/*
+ 	 * We need to tell the secondary core where to find
+ 	 * its stack and the page tables.
+ 	 */
+@@ -385,9 +365,6 @@ void __init smp_cpus_done(unsigned int max_cpus)
+ 
+ void __init smp_prepare_boot_cpu(void)
+ {
+-	unsigned int cpu = smp_processor_id();
+-
+-	per_cpu(cpu_data, cpu).idle = current;
+ }
+ 
+ void __init smp_prepare_cpus(unsigned int max_cpus)
+diff --git a/include/linux/smp.h b/include/linux/smp.h
+index 10530d9..24360de 100644
+--- a/include/linux/smp.h
++++ b/include/linux/smp.h
+@@ -61,7 +61,7 @@ extern void smp_prepare_cpus(unsigned int max_cpus);
+ /*
+  * Bring a CPU up
+  */
+-extern int __cpu_up(unsigned int cpunum);
++extern int __cpu_up(unsigned int cpunum, struct task_struct *tidle);
+ 
+ /*
+  * Final polishing of CPUs
+diff --git a/kernel/Makefile b/kernel/Makefile
+index cb41b95..6c07f30 100644
+--- a/kernel/Makefile
++++ b/kernel/Makefile
+@@ -43,6 +43,7 @@ obj-$(CONFIG_DEBUG_RT_MUTEXES) += rtmutex-debug.o
+ obj-$(CONFIG_RT_MUTEX_TESTER) += rtmutex-tester.o
+ obj-$(CONFIG_GENERIC_ISA_DMA) += dma.o
+ obj-$(CONFIG_SMP) += smp.o
++obj-$(CONFIG_SMP) += smpboot.o
+ ifneq ($(CONFIG_SMP),y)
+ obj-y += up.o
+ endif
+diff --git a/kernel/cpu.c b/kernel/cpu.c
+index a5ce90a..b8e3645 100644
+--- a/kernel/cpu.c
++++ b/kernel/cpu.c
+@@ -19,6 +19,8 @@
+ 
+ #include <trace/events/sched.h>
+ 
++#include "smpboot.h"
++
+ #ifdef CONFIG_SMP
+ /* Serializes the updates to cpu_online_mask, cpu_present_mask */
+ static DEFINE_MUTEX(cpu_add_remove_lock);
+@@ -324,6 +326,11 @@ static int __cpuinit _cpu_up(unsigned int cpu, int tasks_frozen)
+ 		return -EINVAL;
+ 
+ 	cpu_hotplug_begin();
++
++	ret = smpboot_prepare(cpu);
++	if (ret)
++		goto out;
++
+ 	ret = __cpu_notify(CPU_UP_PREPARE | mod, hcpu, -1, &nr_calls);
+ 	if (ret) {
+ 		nr_calls--;
+@@ -333,7 +340,7 @@ static int __cpuinit _cpu_up(unsigned int cpu, int tasks_frozen)
+ 	}
+ 
+ 	/* Arch-specific enabling code. */
+-	ret = __cpu_up(cpu);
++	ret = __cpu_up(cpu, idle_thread_get(cpu));
+ 	if (ret != 0)
+ 		goto out_notify;
+ 	BUG_ON(!cpu_online(cpu));
+@@ -344,6 +351,7 @@ static int __cpuinit _cpu_up(unsigned int cpu, int tasks_frozen)
+ out_notify:
+ 	if (ret != 0)
+ 		__cpu_notify(CPU_UP_CANCELED | mod, hcpu, nr_calls, NULL);
++out:
+ 	cpu_hotplug_done();
+ 	trace_sched_cpu_hotplug(cpu, ret, 1);
+ 
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index bc12916..3671d3d 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -83,6 +83,7 @@
+ 
+ #include "sched.h"
+ #include "../workqueue_sched.h"
++#include "../smpboot.h"
+ 
+ #define CREATE_TRACE_POINTS
+ #include <trace/events/sched.h>
+@@ -7326,6 +7327,7 @@ void __init sched_init(void)
+ 	/* May be allocated at isolcpus cmdline parse time */
+ 	if (cpu_isolated_map == NULL)
+ 		zalloc_cpumask_var(&cpu_isolated_map, GFP_NOWAIT);
++	idle_thread_set_boot_cpu();
+ #endif
+ 	init_sched_fair_class();
+ 
+diff --git a/kernel/smpboot.c b/kernel/smpboot.c
+new file mode 100644
+index 0000000..ed15769
+--- /dev/null
++++ b/kernel/smpboot.c
+@@ -0,0 +1,96 @@
++/*
++ * Common SMP CPU bringup/teardown functions
++ */
++#include <linux/err.h>
++#include <linux/smp.h>
++#include <linux/init.h>
++#include <linux/sched.h>
++#include <linux/percpu.h>
++#include <linux/workqueue.h>
++
++#include "smpboot.h"
++
++#ifdef CONFIG_GENERIC_SMP_IDLE_THREAD
++struct create_idle {
++	struct work_struct	work;
++	struct task_struct	*idle;
++	struct completion	done;
++	unsigned int cpu;
++};
++
++static void __cpuinit do_fork_idle(struct work_struct *work)
++{
++	struct create_idle *c = container_of(work, struct create_idle, work);
++
++	c->idle = fork_idle(c->cpu);
++	complete(&c->done);
++}
++
++static struct task_struct * __cpuinit idle_thread_create(unsigned int cpu)
++{
++	struct create_idle c_idle = {
++		.cpu	= cpu,
++		.done	= COMPLETION_INITIALIZER_ONSTACK(c_idle.done),
++	};
++
++	INIT_WORK_ONSTACK(&c_idle.work, do_fork_idle);
++	schedule_work(&c_idle.work);
++	wait_for_completion(&c_idle.done);
++	destroy_work_on_stack(&c_idle.work);
++	return c_idle.idle;
++}
++
++/*
++ * For the hotplug case we keep the task structs around and reuse
++ * them.
++ */
++static DEFINE_PER_CPU(struct task_struct *, idle_threads);
++
++static inline struct task_struct *get_idle_for_cpu(unsigned int cpu)
++{
++	struct task_struct *tsk = per_cpu(idle_threads, cpu);
++
++	if (!tsk)
++		return idle_thread_create(cpu);
++	init_idle(tsk, cpu);
++	return tsk;
++}
++
++struct task_struct * __cpuinit idle_thread_get(unsigned int cpu)
++{
++	return per_cpu(idle_threads, cpu);
++}
++
++void __init idle_thread_set_boot_cpu(void)
++{
++	per_cpu(idle_threads, smp_processor_id()) = current;
++}
++
++/**
++ * idle_thread_init - Initialize the idle thread for a cpu
++ * @cpu:	The cpu for which the idle thread should be initialized
++ *
++ * Creates the thread if it does not exist.
++ */
++static int __cpuinit idle_thread_init(unsigned int cpu)
++{
++	struct task_struct *idle = get_idle_for_cpu(cpu);
++
++	if (IS_ERR(idle)) {
++		printk(KERN_ERR "failed fork for CPU %u\n", cpu);
++		return PTR_ERR(idle);
++	}
++	per_cpu(idle_threads, cpu) = idle;
++	return 0;
++}
++#else
++static inline int idle_thread_init(unsigned int cpu) { return 0; }
++#endif
++
++/**
++ * smpboot_prepare - generic smpboot preparation
++ */
++int __cpuinit smpboot_prepare(unsigned int cpu)
++{
++	return idle_thread_init(cpu);
++}
+diff --git a/kernel/smpboot.h b/kernel/smpboot.h
+new file mode 100644
+index 0000000..4d5b3e2
+--- /dev/null
++++ b/kernel/smpboot.h
+@@ -0,0 +1,16 @@
++#ifndef SMPBOOT_H
++#define SMPBOOT_H
++
++struct task_struct;
++
++int smpboot_prepare(unsigned int cpu);
++
++#ifdef CONFIG_GENERIC_SMP_IDLE_THREAD
++struct task_struct *idle_thread_get(unsigned int cpu);
++void idle_thread_set_boot_cpu(void);
++#else
++static inline struct task_struct *idle_thread_get(unsigned int cpu) { return NULL; }
++static inline void idle_thread_set_boot_cpu(void) { }
++#endif
++
++#endif
+\ No newline at end of file
+-- 
+1.7.9.5
+

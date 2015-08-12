@@ -1,0 +1,51 @@
+From 014c56e665eda7947b6f4604e3b9522296146626 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Wed, 25 Dec 2013 19:11:51 +0100
+Subject: [PATCH 510/590] Revert "ARM: kernel: update cpu_suspend code to use
+ cache LoUIS operations"
+
+This reverts commit 9b37331610f29add0770bb7ad9a3a41075959f98.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/kernel/suspend.c |   17 +----------------
+ 1 file changed, 1 insertion(+), 16 deletions(-)
+
+diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+index 358bca3..1794cc3 100644
+--- a/arch/arm/kernel/suspend.c
++++ b/arch/arm/kernel/suspend.c
+@@ -17,8 +17,6 @@ extern void cpu_resume_mmu(void);
+  */
+ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
+ {
+-	u32 *ctx = ptr;
+-
+ 	*save_ptr = virt_to_phys(ptr);
+ 
+ 	/* This must correspond to the LDM in cpu_resume() assembly */
+@@ -28,20 +26,7 @@ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
+ 
+ 	cpu_do_suspend(ptr);
+ 
+-	flush_cache_louis();
+-
+-	/*
+-	 * flush_cache_louis does not guarantee that
+-	 * save_ptr and ptr are cleaned to main memory,
+-	 * just up to the Level of Unification Inner Shareable.
+-	 * Since the context pointer and context itself
+-	 * are to be retrieved with the MMU off that
+-	 * data must be cleaned from all cache levels
+-	 * to main memory using "area" cache primitives.
+-	*/
+-	__cpuc_flush_dcache_area(ctx, ptrsz);
+-	__cpuc_flush_dcache_area(save_ptr, sizeof(*save_ptr));
+-
++	flush_cache_all();
+ 	outer_clean_range(*save_ptr, *save_ptr + ptrsz);
+ 	outer_clean_range(virt_to_phys(save_ptr),
+ 			  virt_to_phys(save_ptr) + sizeof(*save_ptr));
+-- 
+1.7.9.5
+

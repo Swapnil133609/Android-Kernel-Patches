@@ -1,0 +1,31 @@
+From ff6ceab18882e9322749706c2f64369701672fdb Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Fri, 29 Nov 2013 15:31:17 +0000
+Subject: [PATCH 149/590] Revert "Added BITS_PER_LONG_LONG definition avoiding
+ lib/vsprintf.c errors."
+
+This reverts commit b7dacad8a28d9969c96642aac306416260f13eb1.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/asm-generic/bitsperlong.h |    4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/include/asm-generic/bitsperlong.h b/include/asm-generic/bitsperlong.h
+index f421654..4ae54e0 100644
+--- a/include/asm-generic/bitsperlong.h
++++ b/include/asm-generic/bitsperlong.h
+@@ -12,10 +12,6 @@
+ #define __BITS_PER_LONG 32
+ #endif
+ 
+-#ifndef BITS_PER_LONG_LONG
+-#define BITS_PER_LONG_LONG 64
+-#endif
+-
+ #ifdef __KERNEL__
+ 
+ #ifdef CONFIG_64BIT
+-- 
+1.7.9.5
+

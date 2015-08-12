@@ -1,0 +1,28 @@
+From 3062b50604bff607b98a571ede48e233bfd52d37 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Tue, 12 Nov 2013 19:38:54 +0000
+Subject: [PATCH 071/590] dts: change back to sensor 0, sensor 5 specifically
+ tracks cpu0.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/boot/dts/msm8974.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/msm8974.dtsi b/arch/arm/boot/dts/msm8974.dtsi
+index 657ea6d..f86875a 100644
+--- a/arch/arm/boot/dts/msm8974.dtsi
++++ b/arch/arm/boot/dts/msm8974.dtsi
+@@ -1466,7 +1466,7 @@
+ 
+ 	qcom,msm-thermal {
+ 		compatible = "qcom,msm-thermal";
+-		qcom,sensor-id = <5>;
++		qcom,sensor-id = <0>;
+ 		qcom,poll-ms = <250>;
+ 		qcom,limit-temp = <60>;
+ 		qcom,temp-hysteresis = <10>;
+-- 
+1.7.9.5
+

@@ -1,0 +1,44 @@
+From b48d11db25091c88a8aa0cc7a21ad47ddc1957bf Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Sat, 2 Nov 2013 21:48:41 +0000
+Subject: [PATCH 036/590] Revert "writeback: I believe these defines were
+ calculated with HZ=1000 in mind. Since our devices
+ are HZ=100 I hardcoded the values on this
+ constants. I'm not 100% sure if this code was made
+ for HZ with 1000 but I couldn't track it to
+ understand clearly. Although I didn't see any
+ drawback of using this as it is now. If anyone
+ knows the answer please chime in."
+
+This reverts commit fab7e959ff798466b493ff90e2248078ae37a2dc.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/page-writeback.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/mm/page-writeback.c b/mm/page-writeback.c
+index 5c3e3bc..174f36b 100644
+--- a/mm/page-writeback.c
++++ b/mm/page-writeback.c
+@@ -39,7 +39,7 @@
+ /*
+  * Sleep at most 200ms at a time in balance_dirty_pages().
+  */
+-#define MAX_PAUSE		200
++#define MAX_PAUSE		max(HZ/5, 1)
+ 
+ /*
+  * Try to keep balance_dirty_pages() call intervals higher than this many pages
+@@ -50,7 +50,7 @@
+ /*
+  * Estimate write bandwidth at 200ms intervals.
+  */
+-#define BANDWIDTH_INTERVAL	200
++#define BANDWIDTH_INTERVAL	max(HZ/5, 1)
+ 
+ #define RATELIMIT_CALC_SHIFT	10
+ 
+-- 
+1.7.9.5
+

@@ -1,0 +1,30 @@
+From 971d496b1b8d4a871f550b1f4bee41cfa7618db1 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Wed, 13 Nov 2013 03:15:45 +0000
+Subject: [PATCH 075/590] dts: remove hysteria from the sensor, this way no
+ crazy jumps in exported temperature are no more, it
+ made no sense that the temperature reported could
+ change as much as 30C in 4 seconds.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/boot/dts/msm8974.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/msm8974.dtsi b/arch/arm/boot/dts/msm8974.dtsi
+index f86875a..fe39d48 100644
+--- a/arch/arm/boot/dts/msm8974.dtsi
++++ b/arch/arm/boot/dts/msm8974.dtsi
+@@ -1469,7 +1469,7 @@
+ 		qcom,sensor-id = <0>;
+ 		qcom,poll-ms = <250>;
+ 		qcom,limit-temp = <60>;
+-		qcom,temp-hysteresis = <10>;
++		qcom,temp-hysteresis = <0>;
+ 		qcom,freq-step = <2>;
+ 		qcom,freq-control-mask = <0xf>;
+ 		qcom,core-limit-temp = <80>;
+-- 
+1.7.9.5
+

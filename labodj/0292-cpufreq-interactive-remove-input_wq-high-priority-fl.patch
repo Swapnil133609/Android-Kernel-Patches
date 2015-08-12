@@ -1,0 +1,28 @@
+From ce3967e76194b29c38aea027ad7d749a75e9f686 Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Mon, 9 Dec 2013 02:27:57 +0000
+Subject: [PATCH 292/590] cpufreq: interactive: remove input_wq high priority
+ flag.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index 8d81ce5..864b039 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -1257,7 +1257,7 @@ static int __init cpufreq_interactive_init(void)
+ 		init_rwsem(&pcpu->enable_sem);
+ 	}
+ 
+-	input_wq = alloc_workqueue("input_wq", WQ_HIGHPRI, 1);
++	input_wq = alloc_workqueue("input_wq", 0, 1);
+ 
+ 	if (!input_wq)
+ 		return -EINVAL;
+-- 
+1.7.9.5
+

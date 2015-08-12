@@ -1,0 +1,43 @@
+From e677d0decbde0ef74639c2c169f5f5ce8b1e96c6 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Tue, 3 Dec 2013 03:26:04 +0000
+Subject: [PATCH 162/590] cpufreq: interactive: fix a bug where the
+ thread_migration notifier was wrongly pushing the
+ cpu to use higher freqs a lot more than it should.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |   11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index d1a4d12..ecff960 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -704,15 +704,18 @@ static int thread_migration_notify(struct notifier_block *nb,
+ 				unsigned long target_cpu, void *arg)
+ {
+ 	unsigned long flags;
++	unsigned int boost_freq = CPU_SYNC_FREQ;
+ 	struct cpufreq_interactive_cpuinfo *target, *source;
+ 	target = &per_cpu(cpuinfo, target_cpu);
+ 	source = &per_cpu(cpuinfo, (int)arg);
+ 	
+-	if ((source->policy->cur > target->policy->cur) & 
+-			(target->policy->cur < CPU_SYNC_FREQ))
++	if (source->policy->cur > target->policy->cur)
+ 	{
+-		target->target_freq = CPU_SYNC_FREQ;
+-		target->floor_freq = CPU_SYNC_FREQ;
++		if (source->policy->cur < boost_freq)
++			boost_freq = source->policy->cur;
++
++		target->target_freq = boost_freq;
++		target->floor_freq = boost_freq;
+ 		target->floor_validate_time = ktime_to_us(ktime_get());
+ 
+ 		spin_lock_irqsave(&speedchange_cpumask_lock, flags);
+-- 
+1.7.9.5
+

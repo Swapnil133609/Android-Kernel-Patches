@@ -1,0 +1,32 @@
+From 06a49a6743351873c26fc08c7e959eb9d69e622f Mon Sep 17 00:00:00 2001
+From: Syed Rameez Mustafa <rameezmustafa@codeaurora.org>
+Date: Wed, 16 Oct 2013 15:27:07 -0700
+Subject: [PATCH 557/590] msm: msm_bus: fix memory leak in
+ msm_bus_fabric_probe
+
+Certain bus driver data structures do not get freed in the error
+paths of msm_bus_fabric_probe. Fix the memory leak.
+
+Change-Id: I7fd890612e33ca519fa4d94edde1954b60b8ef06
+Signed-off-by: Syed Rameez Mustafa <rameezmustafa@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_bus/msm_bus_fabric.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/mach-msm/msm_bus/msm_bus_fabric.c b/arch/arm/mach-msm/msm_bus/msm_bus_fabric.c
+index ddf747e..7c694a7 100644
+--- a/arch/arm/mach-msm/msm_bus/msm_bus_fabric.c
++++ b/arch/arm/mach-msm/msm_bus/msm_bus_fabric.c
+@@ -766,6 +766,8 @@ static int __devinit msm_bus_fabric_probe(struct platform_device *pdev)
+ 		pdata = msm_bus_of_get_fab_data(pdev);
+ 		if (IS_ERR(pdata) || ZERO_OR_NULL_PTR(pdata)) {
+ 			pr_err("Null platform data\n");
++			kfree(fabric->info.node_info);
++			kfree(fabric);
+ 			return PTR_ERR(pdata);
+ 		}
+ 		msm_bus_board_init(pdata);
+-- 
+1.7.9.5
+

@@ -1,0 +1,84 @@
+From 821ba0ebe2dcba385953b6e1f28e3eb1160c788c Mon Sep 17 00:00:00 2001
+From: Kiran Gunda <kgunda@codeaurora.org>
+Date: Fri, 25 Oct 2013 22:53:37 -0700
+Subject: [PATCH 219/590] msm_serial_hs: Fix race condition with BAM rx pipe
+
+Crash observed due to the race condition with bam
+rx pipe during sps_disconnect and sps_transfer_one
+operations executed at the same time on two CPUs.
+
+Because of this race condition rx bam descriptor
+pointer becomes NULL and accessing of this pointer
+leads to crash.
+
+This patch waits for sps_transfer_one function to
+complete, if it is in progress, before calling
+sps_disconnect function from the set_termios.
+
+https://www.codeaurora.org/cgit/quic/la/kernel/msm-3.10/commit/drivers/tty/serial/msm_serial_hs.c?h=msm-3.10&id=478fe086cb075301da4488e3e9e02683b2409084
+
+CRs-Fixed: 534029
+Change-Id: I7581062a17a3dc7ede8eb58e4d25e3b517812ab2
+Signed-off-by: Kiran Gunda <kgunda@codeaurora.org>
+Signed-off-by: Devin Kim <dojip.kim@lge.com>
+Signed-off-by: Patrick Tjin <pattjin@google.com>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/tty/serial/msm_serial_hs.c |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/tty/serial/msm_serial_hs.c b/drivers/tty/serial/msm_serial_hs.c
+index 945f31e..5002284 100644
+--- a/drivers/tty/serial/msm_serial_hs.c
++++ b/drivers/tty/serial/msm_serial_hs.c
+@@ -219,6 +219,7 @@ struct msm_hs_port {
+ 	struct msm_bus_scale_pdata *bus_scale_table;
+ 	bool rx_discard_flush_issued;
+ 	int rx_count_callback;
++	bool rx_bam_inprogress;
+ };
+ 
+ #define MSM_UARTDM_BURST_SIZE 16   /* DM burst size (in bytes) */
+@@ -1047,6 +1048,10 @@ static void msm_hs_set_termios(struct uart_port *uport,
+ 		 */
+ 		mb();
+ 		if (is_blsp_uart(msm_uport)) {
++			if (msm_uport->rx_bam_inprogress)
++				ret = wait_event_timeout(msm_uport->rx.wait,
++					msm_uport->rx_bam_inprogress == false,
++					RX_FLUSH_COMPLETE_TIMEOUT);
+ 			ret = sps_disconnect(sps_pipe_handle);
+ 			if (ret)
+ 				pr_err("%s(): sps_disconnect failed\n",
+@@ -1310,10 +1315,13 @@ static void msm_hs_start_rx_locked(struct uart_port *uport)
+ 	msm_uport->rx.flush = FLUSH_NONE;
+ 
+ 	if (is_blsp_uart(msm_uport)) {
++		msm_uport->rx_bam_inprogress = true;
+ 		sps_pipe_handle = rx->prod.pipe_handle;
+ 		/* Queue transfer request to SPS */
+ 		sps_transfer_one(sps_pipe_handle, rx->rbuffer,
+ 			UARTDM_RX_BUF_SIZE, msm_uport, flags);
++		msm_uport->rx_bam_inprogress = false;
++		wake_up(&msm_uport->rx.wait);
+ 	} else {
+ 		msm_dmov_enqueue_cmd(msm_uport->dma_rx_channel,
+ 				&msm_uport->rx.xfer);
+@@ -1483,10 +1491,13 @@ static void msm_serial_hs_rx_tlet(unsigned long tlet_ptr)
+ 	if (!msm_uport->rx.buffer_pending) {
+ 		if (is_blsp_uart(msm_uport)) {
+ 			msm_uport->rx.flush = FLUSH_NONE;
++			msm_uport->rx_bam_inprogress = true;
+ 			sps_pipe_handle = rx->prod.pipe_handle;
+ 			/* Queue transfer request to SPS */
+ 			sps_transfer_one(sps_pipe_handle, rx->rbuffer,
+ 				UARTDM_RX_BUF_SIZE, msm_uport, sps_flags);
++			msm_uport->rx_bam_inprogress = false;
++			wake_up(&msm_uport->rx.wait);
+ 		} else {
+ 			msm_hs_start_rx_locked(uport);
+ 		}
+-- 
+1.7.9.5
+

@@ -1,0 +1,47 @@
+From 8f50ebb05b3530fc6493b768898a38d06b05e48c Mon Sep 17 00:00:00 2001
+From: Stepan Moskovchenko <stepanm@codeaurora.org>
+Date: Tue, 22 Oct 2013 18:57:56 -0700
+Subject: [PATCH 127/590] ARM: Use -mcpu=cortex-a15 when targeting MSM Krait
+ CPUs
+
+Enable compiler optimizations specific to the Cortex-A15
+processor when targeting MSM Krait CPUs. This is necessary
+take advantage of the UDIV/SDIV instructions supported by
+these processors. To accomplish this, we need to remove the
+-march=armv7-a ISA restriction from the compiler options
+because 'cortex-a15' is a superset of 'armv7-a'.
+
+Change-Id: I6215aecc11fb4f77c971de7b84f68649ef234357
+Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/Makefile |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 7eb4577..bc38382 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -69,6 +69,18 @@ arch-$(CONFIG_CPU_32v4T)	:=-D__LINUX_ARM_ARCH__=4 -march=armv4t
+ arch-$(CONFIG_CPU_32v4)		:=-D__LINUX_ARM_ARCH__=4 -march=armv4
+ arch-$(CONFIG_CPU_32v3)		:=-D__LINUX_ARM_ARCH__=3 -march=armv3
+ 
++# Since 'cortex-a15' is a superset of the 'armv7-a' arch spec, we need to
++# explicitly redefine the arch options to not include '-march=armv7-a' when
++# generating code for Krait, which is compatible with the instruction set of the
++# Cortex-A15, because GCC will warn us about ambiguous ISA restrictions caused
++# by seemingly conflicting -march and -mcpu options.
++# If $(CC) does not support the -mcpu=cortex-a15 option, fall back on passing
++# -march=armv7-a to specify the ISA restriction, though this is suboptimal. To
++# keep things simpler, we don't bother with a fallback option if the compiler
++# doesn't even support -march=armv7-a, since in that situation we would have
++# bigger problems.
++arch-$(CONFIG_ARCH_MSM_KRAIT)	:=-D__LINUX_ARM_ARCH__=7 $(call cc-option,-mcpu=cortex-a15,-march=armv7-a)
++
+ # This selects how we optimise for the processor.
+ tune-$(CONFIG_CPU_ARM610)	:=-mtune=arm610
+ tune-$(CONFIG_CPU_ARM710)	:=-mtune=arm710
+-- 
+1.7.9.5
+

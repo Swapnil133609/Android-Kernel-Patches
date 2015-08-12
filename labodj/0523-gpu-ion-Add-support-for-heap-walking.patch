@@ -1,0 +1,65 @@
+From 0afb9ccaf5c8888dc19f2cf61f0e2ac69afabd5a Mon Sep 17 00:00:00 2001
+From: Laura Abbott <lauraa@codeaurora.org>
+Date: Thu, 27 Jun 2013 18:20:47 -0700
+Subject: [PATCH 523/590] gpu: ion: Add support for heap walking
+
+Clients may wish to implement custom functions on a particular
+heap ID. Add a generic interface to walk all the heaps available
+and call a function on the particular heap ID.
+
+Change-Id: I8b3de7a2de74cd9ea1873020ed00ee40100ce923
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/ion/ion.c      |   22 ++++++++++++++++++++++
+ drivers/gpu/ion/ion_priv.h |    3 +++
+ 2 files changed, 25 insertions(+)
+
+diff --git a/drivers/gpu/ion/ion.c b/drivers/gpu/ion/ion.c
+index c791c49..0809308 100644
+--- a/drivers/gpu/ion/ion.c
++++ b/drivers/gpu/ion/ion.c
+@@ -1784,6 +1784,28 @@ int ion_secure_heap(struct ion_device *dev, int heap_id, int version,
+ }
+ EXPORT_SYMBOL(ion_secure_heap);
+ 
++int ion_walk_heaps(struct ion_client *client, int heap_id, void *data,
++			int (*f)(struct ion_heap *heap, void *data))
++{
++	int ret_val = -EINVAL;
++	struct ion_heap *heap;
++	struct ion_device *dev = client->dev;
++	/*
++	 * traverse the list of heaps available in this system
++	 * and find the heap that is specified.
++	 */
++	down_write(&dev->lock);
++	plist_for_each_entry(heap, &dev->heaps, node) {
++		if (ION_HEAP(heap->id) != heap_id)
++			continue;
++		ret_val = f(heap, data);
++		break;
++	}
++	up_write(&dev->lock);
++	return ret_val;
++}
++EXPORT_SYMBOL(ion_walk_heaps);
++
+ int ion_unsecure_heap(struct ion_device *dev, int heap_id, int version,
+ 			void *data)
+ {
+diff --git a/drivers/gpu/ion/ion_priv.h b/drivers/gpu/ion/ion_priv.h
+index 2b00ee6..f5d0287 100644
+--- a/drivers/gpu/ion/ion_priv.h
++++ b/drivers/gpu/ion/ion_priv.h
+@@ -393,4 +393,7 @@ void ion_page_pool_free(struct ion_page_pool *, struct page *);
+ int ion_page_pool_shrink(struct ion_page_pool *pool, gfp_t gfp_mask,
+ 			  int nr_to_scan);
+ 
++int ion_walk_heaps(struct ion_client *client, int heap_id, void *data,
++			int (*f)(struct ion_heap *heap, void *data));
++
+ #endif /* _ION_PRIV_H */
+-- 
+1.7.9.5
+

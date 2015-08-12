@@ -1,0 +1,43 @@
+From 27f5d2b5363a2bc7bc4adcc7f1beae0fddffdf85 Mon Sep 17 00:00:00 2001
+From: Ajay Dudani <adudani@codeaurora.org>
+Date: Sat, 12 Oct 2013 16:15:26 -0700
+Subject: [PATCH 250/590] qseecom: Ensure incoming "app_name" does not corrupt
+ the kernel stack
+
+Printing a string with that does not have null terminated character,
+would lead to overflow, as the print continues until it finds a null
+terminated character.
+Avoid this issue by explicitly assigning a string with null termination.
+
+Change-Id: I9528db2ba046c514d829097d08c09540588bb1a2
+Signed-off-by: Hariprasad Dhalinarasimha <hnamgund@codeaurora.org>
+Signed-off-by: Ajay Dudani <adudani@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/misc/qseecom.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/misc/qseecom.c b/drivers/misc/qseecom.c
+index aaf711a..04ef966 100644
+--- a/drivers/misc/qseecom.c
++++ b/drivers/misc/qseecom.c
+@@ -615,6 +615,7 @@ static int qseecom_load_app(struct qseecom_dev_handle *data, void __user *argp)
+ 	if (ret)
+ 		pr_warning("Unable to vote for SFPB clock");
+ 	req.qsee_cmd_id = QSEOS_APP_LOOKUP_COMMAND;
++	load_img_req.img_name[MAX_APP_NAME_SIZE-1] = '\0';
+ 	memcpy(req.app_name, load_img_req.img_name, MAX_APP_NAME_SIZE);
+ 
+ 	ret = __qseecom_check_app_exists(req);
+@@ -2158,6 +2159,7 @@ static int qseecom_query_app_loaded(struct qseecom_dev_handle *data,
+ 	}
+ 
+ 	req.qsee_cmd_id = QSEOS_APP_LOOKUP_COMMAND;
++	query_req.app_name[MAX_APP_NAME_SIZE-1] = '\0';
+ 	memcpy(req.app_name, query_req.app_name, MAX_APP_NAME_SIZE);
+ 
+ 	ret = __qseecom_check_app_exists(req);
+-- 
+1.7.9.5
+

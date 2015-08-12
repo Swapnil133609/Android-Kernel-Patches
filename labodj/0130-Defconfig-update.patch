@@ -1,0 +1,44 @@
+From b12f1d9c2d88ce6aef105389f4bd3ac72d46e5ff Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Wed, 27 Nov 2013 11:47:25 +0100
+Subject: [PATCH 130/590] Defconfig: update
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/labo_defconfig |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/configs/labo_defconfig b/arch/arm/configs/labo_defconfig
+index bcf677a..2f0affa 100644
+--- a/arch/arm/configs/labo_defconfig
++++ b/arch/arm/configs/labo_defconfig
+@@ -112,6 +112,7 @@ CONFIG_NAMESPACES=y
+ # CONFIG_USER_NS is not set
+ # CONFIG_PID_NS is not set
+ CONFIG_NET_NS=y
++# CONFIG_UIDGID_STRICT_TYPE_CHECKS is not set
+ # CONFIG_SCHED_AUTOGROUP is not set
+ # CONFIG_SYSFS_DEPRECATED is not set
+ CONFIG_RELAY=y
+@@ -487,7 +488,7 @@ CONFIG_MSM_DLOAD_MODE=y
+ # CONFIG_MSM_JTAG is not set
+ # CONFIG_MSM_JTAG_MM is not set
+ # CONFIG_MSM_SLEEP_STATS_DEVICE is not set
+-CONFIG_MSM_RUN_QUEUE_STATS=y
++# CONFIG_MSM_RUN_QUEUE_STATS is not set
+ # CONFIG_MSM_STANDALONE_POWER_COLLAPSE is not set
+ # CONFIG_MSM_GSBI9_UART is not set
+ CONFIG_MSM_SHOW_RESUME_IRQ=y
+@@ -920,7 +921,7 @@ CONFIG_NETFILTER_XT_TARGET_NFQUEUE=y
+ # CONFIG_NETFILTER_XT_TARGET_TPROXY is not set
+ # CONFIG_NETFILTER_XT_TARGET_TRACE is not set
+ CONFIG_NETFILTER_XT_TARGET_SECMARK=y
+-# CONFIG_NETFILTER_XT_TARGET_TCPMSS is not set
++CONFIG_NETFILTER_XT_TARGET_TCPMSS=y
+ # CONFIG_NETFILTER_XT_TARGET_TCPOPTSTRIP is not set
+ 
+ #
+-- 
+1.7.9.5
+

@@ -1,0 +1,48 @@
+From d86592639f627985fef6a3e5af09ccb83ec014e5 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Wed, 4 Dec 2013 06:28:24 +0000
+Subject: [PATCH 174/590] cpufreq: interactive: fallback to previous new_freq
+ calculation as it is much more conservative. Also
+ fix the new_freq logic, specially if boosted is
+ true.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |   17 +++++++++++------
+ 1 file changed, 11 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index ecff960..9ab745c 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -371,15 +371,20 @@ static void cpufreq_interactive_timer(unsigned long data)
+ 	cpu_load = loadadjfreq / pcpu->target_freq;
+ 	boosted = now < boostpulse_endtime;
+ 
+-	new_freq = cpu_load * pcpu->max_load_freq_divided;
++	new_freq = choose_freq(pcpu, loadadjfreq);
+ 
+-	if (cpu_load >= go_hispeed_load) {
++	if (cpu_load >= go_hispeed_load) 
++	{
+ 		if (new_freq < hispeed_freq)
++		{
+ 			new_freq = hispeed_freq;
+-
+-		pcpu->hispeed_validate_time = now;
+-	} else if (boosted) {
+-		new_freq = input_boost_freq; 
++			pcpu->hispeed_validate_time = now;		
++		}
++	} 
++	else if (boosted) 
++	{
++		if (new_freq < input_boost_freq)
++			new_freq = input_boost_freq; 
+ 	}
+ 
+ 	if (pcpu->target_freq >= hispeed_freq &&
+-- 
+1.7.9.5
+

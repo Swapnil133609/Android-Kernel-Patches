@@ -1,0 +1,33 @@
+From 265a2ae74c546858ec5c2d0d0f7055ce001b4149 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Thu, 5 Dec 2013 08:26:40 +0100
+Subject: [PATCH 334/590] drivers/input/touchscreen/sweep2wake: add mako
+ definitions
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/sweep2wake.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/drivers/input/touchscreen/sweep2wake.c b/drivers/input/touchscreen/sweep2wake.c
+index f0c220f..c962988 100644
+--- a/drivers/input/touchscreen/sweep2wake.c
++++ b/drivers/input/touchscreen/sweep2wake.c
+@@ -64,6 +64,13 @@ MODULE_LICENSE("GPLv2");
+ #define S2W_X_B1                400
+ #define S2W_X_B2                700
+ #define S2W_X_FINAL             250
++#elif defined(CONFIG_MACH_APQ8064_MAKO)
++/* Mako aka Nexus 4 */
++#define S2W_Y_LIMIT             2350
++#define S2W_X_MAX               1540
++#define S2W_X_B1                500
++#define S2W_X_B2                1000
++#define S2W_X_FINAL             300
+ #else
+ /* defaults */
+ #define S2W_Y_LIMIT             2350
+-- 
+1.7.9.5
+

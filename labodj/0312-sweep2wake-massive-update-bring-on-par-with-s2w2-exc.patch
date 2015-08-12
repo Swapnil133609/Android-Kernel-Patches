@@ -1,0 +1,1025 @@
+From f1073c59116d337847cf4dcbfdce24fd27889f32 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Tue, 10 Dec 2013 14:26:10 +0100
+Subject: [PATCH 312/590] sweep2wake: massive update, bring on par with s2w2
+ except algorithm
+
+This patches sweep2wake on par with s2w2, minus the detection algorithm.
+Changes in detail:
+- Remove dependency on a power key setter, use a dummy device.
+- Remove dependency on a touchscreen driver, use an input callback
+- Remove dependency on external sysfs functions
+- Remove dependency on external reset calls
+- Migrate all of this into sweep2wake
+
+Porting to new devices is now easier than ever:
+1. Define your device parameters in the Sweep2wake tuneables
+2. Check if the android_touch_kobj is already used by your touchscreen driver
+2a. If it is export it and define S2W_ANDROID_TOUCH_DECLARED
+(This will prevent s2w from spawning it's own kobj)
+3. Force the touchscreen driver to deliver signals in suspend and you are done.
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/Kconfig               |   20 +-
+ drivers/input/touchscreen/sweep2wake.c          |  305 +++++++++++++++++++++--
+ drivers/input/touchscreen/touch_synaptics.c     |  102 ++------
+ drivers/input/touchscreen/touch_synaptics_ds5.c |  122 ++-------
+ drivers/platform/msm/qpnp-power-on.c            |   10 -
+ include/linux/input/sweep2wake.h                |   10 -
+ 6 files changed, 317 insertions(+), 252 deletions(-)
+
+diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+index 29ca2db..5423c51 100644
+--- a/drivers/input/touchscreen/Kconfig
++++ b/drivers/input/touchscreen/Kconfig
+@@ -1034,24 +1034,14 @@ config TOUCHSCREEN_CHARGER_NOTIFY
+ 
+ config TOUCHSCREEN_SWEEP2WAKE
+         tristate "Sweep2Wake for touchscreens"
++	select TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+         default n
+ 
+-choice
+-	prompt "Sweep2wake power key device?"
+-	depends on TOUCHSCREEN_SWEEP2WAKE
+-	default TOUCHSCREEN_SWEEP2WAKE_QPNP_PON if MACH_MSM8974_HAMMERHEAD
++config TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
++        bool "Inihibit sleep on modified touchscreen drivers"
+ 	default n
+ 	help
+-	  This option sets which pwrkey driver sweep2wake should use to emulate
+-	  the power key presses. Selecting the wrong one will lead to null
+-	  pointer exceptions!
+-
+-config TOUCHSCREEN_SWEEP2WAKE_QPNP_PON
+-        bool "Use qpnp-power-on to emulate power button presses."
+-	help
+-	  This uses the qpnp driver to register the sweep2wake power key device
+-	  used to emulate the power key presses on touch events.
+-
+-endchoice
++	  This allows sweep2wake to disable the sleep function of modified
++	  touchscreen drivers.
+ 
+ endif
+diff --git a/drivers/input/touchscreen/sweep2wake.c b/drivers/input/touchscreen/sweep2wake.c
+index 183dfe2..269dee0 100644
+--- a/drivers/input/touchscreen/sweep2wake.c
++++ b/drivers/input/touchscreen/sweep2wake.c
+@@ -2,7 +2,7 @@
+  * drivers/input/touchscreen/sweep2wake.c
+  *
+  *
+- * Copyright (c) 2012, Dennis Rassmann <showp1984@gmail.com>
++ * Copyright (c) 2013, Dennis Rassmann <showp1984@gmail.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -26,6 +26,20 @@
+ #include <linux/init.h>
+ #include <linux/err.h>
+ #include <linux/input/sweep2wake.h>
++#include <linux/slab.h>
++#include <linux/workqueue.h>
++#include <linux/lcd_notify.h>
++
++/* Version, author, desc, etc */
++#define DRIVER_AUTHOR "Dennis Rassmann <showp1984@gmail.com>"
++#define DRIVER_DESCRIPTION "Sweep2wake for almost any device"
++#define DRIVER_VERSION "1.5"
++#define LOGTAG "[sweep2wake]: "
++
++MODULE_AUTHOR(DRIVER_AUTHOR);
++MODULE_DESCRIPTION(DRIVER_DESCRIPTION);
++MODULE_VERSION(DRIVER_VERSION);
++MODULE_LICENSE("GPLv2");
+ 
+ /* Tuneables */
+ #define DEBUG                   0
+@@ -51,34 +65,34 @@
+ 
+ /* Resources */
+ int s2w_switch = 1;
+-bool scr_suspended = false, exec_count = true, irq_wake = false;
+-bool scr_on_touch = false, barrier[2] = {false, false};
++bool irq_wake = false;
++static int touch_x = 0;
++static int touch_y = 0;
++static bool touch_x_called = false, touch_y_called = false;
++static bool scr_suspended = false, exec_count = true;
++static bool scr_on_touch = false, barrier[2] = {false, false};
++static struct notifier_block s2w_lcd_notif;
+ static struct input_dev * sweep2wake_pwrdev;
+ static DEFINE_MUTEX(pwrkeyworklock);
++static struct workqueue_struct *s2w_input_wq;
++static struct work_struct s2w_input_work;
+ 
+ /* Read cmdline for s2w */
+ static int __init read_s2w_cmdline(char *s2w)
+ {
+ 	if (strcmp(s2w, "1") == 0) {
+-		printk(KERN_INFO "[cmdline_s2w]: Sweep2Wake enabled. | s2w='%s'", s2w);
++		pr_info("[cmdline_s2w]: Sweep2Wake enabled. | s2w='%s'\n", s2w);
+ 		s2w_switch = 1;
+ 	} else if (strcmp(s2w, "0") == 0) {
+-		printk(KERN_INFO "[cmdline_s2w]: Sweep2Wake disabled. | s2w='%s'", s2w);
++		pr_info("[cmdline_s2w]: Sweep2Wake disabled. | s2w='%s'\n", s2w);
+ 		s2w_switch = 0;
+ 	} else {
+-		printk(KERN_INFO "[cmdline_s2w]: No valid input found. Going with default: | s2w='%u'", s2w_switch);
++		pr_info("[cmdline_s2w]: No valid input found. Going with default: | s2w='%u'\n", s2w_switch);
+ 	}
+ 	return 1;
+ }
+ __setup("s2w=", read_s2w_cmdline);
+ 
+-/* PowerKey setter */
+-void sweep2wake_setdev(struct input_dev * input_device) {
+-	sweep2wake_pwrdev = input_device;
+-	return;
+-}
+-EXPORT_SYMBOL(sweep2wake_setdev);
+-
+ /* PowerKey work func */
+ static void sweep2wake_presspwr(struct work_struct * sweep2wake_presspwr_work) {
+ 	if (!mutex_trylock(&pwrkeyworklock))
+@@ -95,13 +109,13 @@ static void sweep2wake_presspwr(struct work_struct * sweep2wake_presspwr_work) {
+ static DECLARE_WORK(sweep2wake_presspwr_work, sweep2wake_presspwr);
+ 
+ /* PowerKey trigger */
+-void sweep2wake_pwrtrigger(void) {
++static void sweep2wake_pwrtrigger(void) {
+ 	schedule_work(&sweep2wake_presspwr_work);
+         return;
+ }
+ 
+ /* reset on finger release */
+-void sweep2wake_reset(void) {
++static void sweep2wake_reset(void) {
+ 	exec_count = true;
+ 	barrier[0] = false;
+ 	barrier[1] = false;
+@@ -109,12 +123,12 @@ void sweep2wake_reset(void) {
+ }
+ 
+ /* Sweep2wake main function */
+-void detect_sweep2wake(int x, int y, bool st)
++static void detect_sweep2wake(int x, int y, bool st)
+ {
+         int prevx = 0, nextx = 0;
+         bool single_touch = st;
+ #if DEBUG
+-        pr_info("[sweep2wake]: x,y(%4d,%4d) single:%s\n",
++        pr_info(LOGTAG"x,y(%4d,%4d) single:%s\n",
+                 x, y, (single_touch) ? "true" : "false");
+ #endif
+ 	//left->right
+@@ -138,7 +152,7 @@ void detect_sweep2wake(int x, int y, bool st)
+ 				    (y > 0)) {
+ 					if (x > (S2W_X_MAX - S2W_X_FINAL)) {
+ 						if (exec_count) {
+-							printk(KERN_INFO "[sweep2wake]: ON");
++							pr_info(LOGTAG"ON\n");
+ 							sweep2wake_pwrtrigger();
+ 							exec_count = false;
+ 						}
+@@ -168,7 +182,7 @@ void detect_sweep2wake(int x, int y, bool st)
+ 				    (y > S2W_Y_LIMIT)) {
+ 					if (x < S2W_X_FINAL) {
+ 						if (exec_count) {
+-							printk(KERN_INFO "[sweep2wake]: OFF");
++							pr_info(LOGTAG"OFF\n");
+ 							sweep2wake_pwrtrigger();
+ 							exec_count = false;
+ 						}
+@@ -179,24 +193,267 @@ void detect_sweep2wake(int x, int y, bool st)
+ 	}
+ }
+ 
++static void s2w_input_callback(struct work_struct *unused) {
++
++	detect_sweep2wake(touch_x, touch_y, true);
++
++	return;
++}
++
++static void s2w_input_event(struct input_handle *handle, unsigned int type,
++				unsigned int code, int value) {
++#if DEBUG
++	pr_info("sweep2wake: code: %s|%u, val: %i\n",
++		((code==ABS_MT_POSITION_X) ? "X" :
++		(code==ABS_MT_POSITION_Y) ? "Y" :
++		(code==ABS_MT_TRACKING_ID) ? "ID" :
++		"undef"), code, value);
++#endif
++	if (code == ABS_MT_TRACKING_ID && value == -1) {
++		sweep2wake_reset();
++		return;
++	}
++
++	if (code == ABS_MT_POSITION_X) {
++		touch_x = value;
++		touch_x_called = true;
++	}
++
++	if (code == ABS_MT_POSITION_Y) {
++		touch_y = value;
++		touch_y_called = true;
++	}
++
++	if (touch_x_called && touch_y_called) {
++		touch_x_called = false;
++		touch_y_called = false;
++		queue_work_on(0, s2w_input_wq, &s2w_input_work);
++	}
++}
++
++static int input_dev_filter(struct input_dev *dev) {
++	if (strstr(dev->name, "touch")) {
++		return 0;
++	} else {
++		return 1;
++	}
++}
++
++static int s2w_input_connect(struct input_handler *handler,
++				struct input_dev *dev, const struct input_device_id *id) {
++	struct input_handle *handle;
++	int error;
++
++	if (input_dev_filter(dev))
++		return -ENODEV;
++
++	handle = kzalloc(sizeof(struct input_handle), GFP_KERNEL);
++	if (!handle)
++		return -ENOMEM;
++
++	handle->dev = dev;
++	handle->handler = handler;
++	handle->name = "s2w";
++
++	error = input_register_handle(handle);
++	if (error)
++		goto err2;
++
++	error = input_open_device(handle);
++	if (error)
++		goto err1;
++
++	return 0;
++err1:
++	input_unregister_handle(handle);
++err2:
++	kfree(handle);
++	return error;
++}
++
++static void s2w_input_disconnect(struct input_handle *handle) {
++	input_close_device(handle);
++	input_unregister_handle(handle);
++	kfree(handle);
++}
++
++static const struct input_device_id s2w_ids[] = {
++	{ .driver_info = 1 },
++	{ },
++};
++
++static struct input_handler s2w_input_handler = {
++	.event		= s2w_input_event,
++	.connect	= s2w_input_connect,
++	.disconnect	= s2w_input_disconnect,
++	.name		= "s2w_inputreq",
++	.id_table	= s2w_ids,
++};
++
++#ifndef CONFIG_HAS_EARLYSUSPEND
++static int lcd_notifier_callback(struct notifier_block *this,
++				unsigned long event, void *data)
++{
++	switch (event) {
++	case LCD_EVENT_ON_END:
++		scr_suspended = false;
++		break;
++	case LCD_EVENT_OFF_END:
++		scr_suspended = true;
++		break;
++	default:
++		break;
++	}
++
++	return 0;
++}
++#else
++static void s2w_early_suspend(struct early_suspend *h) {
++	scr_suspended = true;
++}
++
++static void s2w_late_resume(struct early_suspend *h) {
++	scr_suspended = false;
++}
++
++static struct early_suspend s2w_early_suspend_handler = {
++	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN,
++	.suspend = s2w_early_suspend,
++	.resume = s2w_late_resume,
++};
++#endif
++
+ /*
+- * INIT / EXIT stuff below here
++ * SYSFS stuff below here
+  */
++static ssize_t s2w_sweep2wake_show(struct device *dev,
++		struct device_attribute *attr, char *buf)
++{
++	size_t count = 0;
++
++	count += sprintf(buf, "%d\n", s2w_switch);
++
++	return count;
++}
++
++static ssize_t s2w_sweep2wake_dump(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t count)
++{
++	if (buf[0] >= '0' && buf[0] <= '2' && buf[1] == '\n')
++                if (s2w_switch != buf[0] - '0')
++		        s2w_switch = buf[0] - '0';
++
++	return count;
++}
++
++static DEVICE_ATTR(sweep2wake, (S_IWUSR|S_IRUGO),
++	s2w_sweep2wake_show, s2w_sweep2wake_dump);
+ 
++static ssize_t s2w_version_show(struct device *dev,
++		struct device_attribute *attr, char *buf)
++{
++	size_t count = 0;
++
++	count += sprintf(buf, "%s\n", DRIVER_VERSION);
++
++	return count;
++}
++
++static ssize_t s2w_version_dump(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t count)
++{
++	return count;
++}
++
++static DEVICE_ATTR(version, (S_IWUSR|S_IRUGO),
++	s2w_version_show, s2w_version_dump);
++
++/*
++ * INIT / EXIT stuff below here
++ */
++#ifdef S2W_ANDROID_TOUCH_DECLARED
++extern struct kobject *android_touch_kobj;
++#else
++static struct kobject *android_touch_kobj;
++EXPORT_SYMBOL_GPL(android_touch_kobj);
++#endif
+ static int __init sweep2wake_init(void)
+ {
+-	pr_info("[sweep2wake]: %s done\n", __func__);
++	int rc = 0;
++
++	sweep2wake_pwrdev = input_allocate_device();
++	if (!sweep2wake_pwrdev) {
++		pr_err("Can't allocate suspend autotest power button\n");
++		goto err_alloc_dev;
++	}
++
++	input_set_capability(sweep2wake_pwrdev, EV_KEY, KEY_POWER);
++	sweep2wake_pwrdev->name = "s2w_pwrkey";
++	sweep2wake_pwrdev->phys = "s2w_pwrkey/input0";
++
++	rc = input_register_device(sweep2wake_pwrdev);
++	if (rc) {
++		pr_err("%s: input_register_device err=%d\n", __func__, rc);
++		goto err_input_dev;
++	}
++
++	s2w_input_wq = create_workqueue("s2wiwq");
++	if (!s2w_input_wq) {
++		pr_err("%s: Failed to create s2wiwq workqueue\n", __func__);
++		return -EFAULT;
++	}
++	INIT_WORK(&s2w_input_work, s2w_input_callback);
++	rc = input_register_handler(&s2w_input_handler);
++	if (rc)
++		pr_err("%s: Failed to register s2w_input_handler\n", __func__);
++
++#ifndef CONFIG_HAS_EARLYSUSPEND
++	s2w_lcd_notif.notifier_call = lcd_notifier_callback;
++	if (lcd_register_client(&s2w_lcd_notif) != 0) {
++		pr_err("%s: Failed to register lcd callback\n", __func__);
++	}
++#else
++	register_early_suspend(&s2w_early_suspend_handler);
++#endif
++
++#ifndef S2W_ANDROID_TOUCH_DECLARED
++	android_touch_kobj = kobject_create_and_add("android_touch", NULL) ;
++	if (android_touch_kobj == NULL) {
++		pr_warn("%s: android_touch_kobj create_and_add failed\n", __func__);
++	}
++#endif
++	rc = sysfs_create_file(android_touch_kobj, &dev_attr_sweep2wake.attr);
++	if (rc) {
++		pr_warn("%s: sysfs_create_file failed for sweep2wake\n", __func__);
++	}
++	rc = sysfs_create_file(android_touch_kobj, &dev_attr_version.attr);
++	if (rc) {
++		pr_warn("%s: sysfs_create_file failed for version\n", __func__);
++	}
++
++err_input_dev:
++	input_free_device(sweep2wake_pwrdev);
++err_alloc_dev:
++	pr_info(LOGTAG"%s done\n", __func__);
++
+ 	return 0;
+ }
+ 
+ static void __exit sweep2wake_exit(void)
+ {
++#ifndef S2W_ANDROID_TOUCH_DECLARED
++	kobject_del(android_touch_kobj);
++#endif
++#ifndef CONFIG_HAS_EARLYSUSPEND
++	lcd_unregister_client(&s2w_lcd_notif);
++#endif
++	input_unregister_handler(&s2w_input_handler);
++	destroy_workqueue(s2w_input_wq);
++	input_unregister_device(sweep2wake_pwrdev);
++	input_free_device(sweep2wake_pwrdev);
+ 	return;
+ }
+ 
+ module_init(sweep2wake_init);
+ module_exit(sweep2wake_exit);
+ 
+-MODULE_DESCRIPTION("Sweep2wake");
+-MODULE_LICENSE("GPLv2");
+-
+diff --git a/drivers/input/touchscreen/touch_synaptics.c b/drivers/input/touchscreen/touch_synaptics.c
+index 49d75e5..8fcac60 100644
+--- a/drivers/input/touchscreen/touch_synaptics.c
++++ b/drivers/input/touchscreen/touch_synaptics.c
+@@ -38,7 +38,7 @@
+ 
+ #include "SynaImage.h"
+ 
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_QPNP_PON
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ #include <linux/input/sweep2wake.h>
+ #endif
+ 
+@@ -249,11 +249,6 @@ static int synaptics_init_panel(struct i2c_client *client,
+ static int get_ic_info(struct synaptics_ts_data *ts,
+ 					struct synaptics_ts_fw_info *fw_info);
+ 
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-/* gives back true if only one touch is recognized */
+-extern bool is_single_touch(struct synaptics_ts_data *);
+-#endif
+-
+ /* touch_asb_input_report
+  *
+  * finger status report
+@@ -271,9 +266,6 @@ static void touch_abs_input_report(struct synaptics_ts_data *ts)
+ 				ts->ts_data.curr_data[id].state != ABS_RELEASE);
+ 
+ 		if (ts->ts_data.curr_data[id].state != ABS_RELEASE) {
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-			detect_sweep2wake(ts->ts_data.curr_data[id].x_position, ts->ts_data.curr_data[id].y_position, is_single_touch(ts));
+-#endif
+ 			input_report_abs(ts->input_dev, ABS_MT_POSITION_X,
+ 					ts->ts_data.curr_data[id].x_position);
+ 			input_report_abs(ts->input_dev, ABS_MT_POSITION_Y,
+@@ -287,11 +279,6 @@ static void touch_abs_input_report(struct synaptics_ts_data *ts)
+ 		}
+ 		else {
+ 			ts->ts_data.curr_data[id].state = 0;
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-			if (s2w_switch > 0) {
+-				sweep2wake_reset();
+-			}
+-#endif
+ 		}
+ 	}
+ 
+@@ -487,7 +474,7 @@ static void touch_fw_upgrade_func(struct work_struct *work_fw_upgrade)
+ 
+ 	if (ts->curr_pwr_state == POWER_ON) {
+ 		disable_irq(ts->client->irq);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 		if (irq_wake) {
+ 			irq_wake = false;
+ 			disable_irq_wake(ts->client->irq);
+@@ -511,7 +498,7 @@ static void touch_fw_upgrade_func(struct work_struct *work_fw_upgrade)
+ 	}
+ 	else {
+ 		enable_irq(ts->client->irq);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 		if (!irq_wake) {
+ 			irq_wake = true;
+ 			enable_irq_wake(ts->client->irq);
+@@ -546,7 +533,7 @@ static void touch_init_func(struct work_struct *work_init)
+ 	TOUCH_DEBUG_TRACE("%s\n", __func__);
+ 
+ 	enable_irq(ts->client->irq);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 	if (!irq_wake) {
+ 		irq_wake = true;
+ 		enable_irq_wake(ts->client->irq);
+@@ -569,7 +556,7 @@ static void touch_recover_func(struct work_struct *work_recover)
+ 				struct synaptics_ts_data, work_recover);
+ 
+ 	disable_irq(ts->client->irq);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 	if (irq_wake) {
+ 		irq_wake = false;
+ 		disable_irq_wake(ts->client->irq);
+@@ -577,7 +564,7 @@ static void touch_recover_func(struct work_struct *work_recover)
+ #endif
+ 	safety_reset(ts);
+ 	enable_irq(ts->client->irq);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 	if (!irq_wake) {
+ 		irq_wake = true;
+ 		enable_irq_wake(ts->client->irq);
+@@ -626,7 +613,7 @@ static int touch_ic_init(struct synaptics_ts_data *ts)
+ err_out_retry:
+ 	ts->ic_init_err_cnt++;
+ 	disable_irq_nosync(ts->client->irq);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 	if (irq_wake) {
+ 		irq_wake = false;
+ 		disable_irq_wake(ts->client->irq);
+@@ -1508,7 +1495,7 @@ static ssize_t store_ts_reset(struct device *dev,
+ 	sscanf(buf, "%s", string);
+ 
+ 	disable_irq_nosync(ts->client->irq);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 	if (irq_wake) {
+ 		irq_wake = false;
+ 		disable_irq_wake(ts->client->irq);
+@@ -1548,7 +1535,7 @@ static ssize_t store_ts_reset(struct device *dev,
+ 	}
+ 
+ 	enable_irq(ts->client->irq);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 	if (!irq_wake) {
+ 		irq_wake = true;
+ 		enable_irq_wake(ts->client->irq);
+@@ -1679,7 +1666,7 @@ static int synaptics_ts_stop(struct synaptics_ts_data *ts)
+ 	if (!ts->curr_resume_state) {
+ 		return 0;
+ 	}
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 	if (s2w_switch == 0)
+ #endif
+ 	{
+@@ -1711,15 +1698,9 @@ static int lcd_notifier_callback(struct notifier_block *this,
+ 	switch (event) {
+ 	case LCD_EVENT_ON_START:
+ 		synaptics_ts_start(ts);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-		scr_suspended = false;
+-#endif
+ 		break;
+ 	case LCD_EVENT_OFF_START:
+ 		synaptics_ts_stop(ts);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-		scr_suspended = true;
+-#endif
+ 		break;
+ 	default:
+ 		break;
+@@ -1728,61 +1709,6 @@ static int lcd_notifier_callback(struct notifier_block *this,
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-static ssize_t touch_synaptics_sweep2wake_show(struct device *dev,
+-               struct device_attribute *attr, char *buf)
+-{
+-       size_t count = 0;
+-
+-       count += sprintf(buf, "%d\n", s2w_switch);
+-
+-       return count;
+-}
+-
+-static ssize_t touch_synaptics_sweep2wake_dump(struct device *dev,
+-               struct device_attribute *attr, const char *buf, size_t count)
+-{
+-       if (buf[0] >= '0' && buf[0] <= '2' && buf[1] == '\n')
+-                if (s2w_switch != buf[0] - '0')
+-                       s2w_switch = buf[0] - '0';
+-
+-       return count;
+-}
+-
+-static DEVICE_ATTR(sweep2wake, (S_IWUSR|S_IRUGO),
+-       touch_synaptics_sweep2wake_show, touch_synaptics_sweep2wake_dump);
+-#endif
+-
+-static struct kobject *android_touch_kobj;
+-
+-static int touch_synaptics_sysfs_init(void)
+-{
+-       int ret ;
+-
+-       android_touch_kobj = kobject_create_and_add("android_touch", NULL) ;
+-       if (android_touch_kobj == NULL) {
+-               pr_debug("[touch_synaptics]%s: subsystem_register failed\n", __func__);
+-               ret = -ENOMEM;
+-               return ret;
+-       }
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-       ret = sysfs_create_file(android_touch_kobj, &dev_attr_sweep2wake.attr);
+-       if (ret) {
+-               printk(KERN_ERR "[sweep2wake]%s: sysfs_create_file failed\n", __func__);
+-               return ret;
+-       }
+-#endif
+-       return 0 ;
+-}
+-
+-static void touch_synaptics_sysfs_deinit(void)
+-{
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-       sysfs_remove_file(android_touch_kobj, &dev_attr_sweep2wake.attr);
+-#endif
+-       kobject_del(android_touch_kobj);
+-}
+-
+ static int synaptics_ts_probe(
+ 	struct i2c_client *client, const struct i2c_device_id *id)
+ {
+@@ -1793,8 +1719,6 @@ static int synaptics_ts_probe(
+ 
+ 	TOUCH_DEBUG_TRACE("%s\n", __func__);
+ 
+-	touch_synaptics_sysfs_init();
+-
+ 	synaptics_wq = create_singlethread_workqueue("synaptics_wq");
+ 	if (!synaptics_wq)
+ 		return -ENOMEM;
+@@ -1909,7 +1833,11 @@ static int synaptics_ts_probe(
+ 	gpio_direction_input(ts->pdata->irq_gpio);
+ 
+ 	ret = request_threaded_irq(client->irq, NULL, touch_irq_handler,
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 			IRQF_TRIGGER_FALLING | IRQF_ONESHOT | IRQF_NO_SUSPEND, client->name, ts);
++#else
++			IRQF_TRIGGER_FALLING | IRQF_ONESHOT, client->name, ts);
++#endif
+ 
+ 	if (ret < 0) {
+ 		TOUCH_ERR_MSG("request_irq failed. use polling mode\n");
+@@ -1972,8 +1900,6 @@ static int synaptics_ts_remove(struct i2c_client *client)
+ {
+ 	struct synaptics_ts_data *ts = i2c_get_clientdata(client);
+ 
+-	touch_synaptics_sysfs_deinit();
+-
+ 	/* Power off */
+ 	touch_power_cntl(ts, POWER_OFF);
+ 	free_irq(client->irq, ts);
+diff --git a/drivers/input/touchscreen/touch_synaptics_ds5.c b/drivers/input/touchscreen/touch_synaptics_ds5.c
+index 1520e2f..32e667a 100644
+--- a/drivers/input/touchscreen/touch_synaptics_ds5.c
++++ b/drivers/input/touchscreen/touch_synaptics_ds5.c
+@@ -39,7 +39,7 @@
+ 
+ #include "SynaImage_ds5.h"
+ 
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_QPNP_PON
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ #include <linux/input/sweep2wake.h>
+ #endif
+ 
+@@ -283,28 +283,6 @@ inline void touchboost(void)
+ 	}
+ }
+ 
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-/* gives back true if only one touch is recognized */
+-bool is_single_touch(struct synaptics_ts_data *ts)
+-{
+-        int i = 0, cnt = 0;
+-
+-        for (i = 0; i<ts->pdata->max_id; i++) {
+-                if ((!ts->ts_data.curr_data[i].state) ||
+-                    (ts->ts_data.curr_data[i].state == ABS_RELEASE))
+-                        continue;
+-                else cnt++;
+-		//save some cycles if we are already >1
+-		if (cnt>1)
+-			break;
+-        }
+-        if (cnt == 1)
+-                return true;
+-        else
+-                return false;
+-}
+-#endif
+-
+ /* touch_asb_input_report
+  *
+  * finger status report
+@@ -327,9 +305,6 @@ static void touch_abs_input_report(struct synaptics_ts_data *ts, const ktime_t t
+ 				ts->ts_data.curr_data[id].state != ABS_RELEASE);
+ 
+ 		if (ts->ts_data.curr_data[id].state != ABS_RELEASE) {
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-			detect_sweep2wake(ts->ts_data.curr_data[id].x_position, ts->ts_data.curr_data[id].y_position, is_single_touch(ts));
+-#endif
+ 			input_report_abs(ts->input_dev, ABS_MT_POSITION_X,
+ 					ts->ts_data.curr_data[id].x_position);
+ 			input_report_abs(ts->input_dev, ABS_MT_POSITION_Y,
+@@ -343,11 +318,6 @@ static void touch_abs_input_report(struct synaptics_ts_data *ts, const ktime_t t
+ 		}
+ 		else {
+ 			ts->ts_data.curr_data[id].state = 0;
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-                        if (s2w_switch > 0) {
+-				sweep2wake_reset();
+-                        }
+-#endif
+ 		}
+ 	}
+ 
+@@ -503,7 +473,7 @@ static void touch_fw_upgrade_func(struct work_struct *work_fw_upgrade)
+ 	saved_state = ts->curr_pwr_state;
+ 	if (ts->curr_pwr_state == POWER_ON) {
+ 		disable_irq(ts->client->irq);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 		if (irq_wake) {
+ 			irq_wake = false;
+ 			disable_irq_wake(ts->client->irq);
+@@ -525,7 +495,7 @@ static void touch_fw_upgrade_func(struct work_struct *work_fw_upgrade)
+ 	if (saved_state == POWER_ON) {
+ 		touch_ic_init(ts);
+ 		enable_irq(ts->client->irq);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 		if (!irq_wake) {
+ 			irq_wake = true;
+ 			enable_irq_wake(ts->client->irq);
+@@ -563,7 +533,7 @@ static void touch_init_func(struct work_struct *work_init)
+ 	if (!ts->curr_resume_state) {
+ 		enable_irq(ts->client->irq);
+ 		mutex_unlock(&ts->input_dev->mutex);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 		if (!irq_wake) {
+ 			irq_wake = true;
+ 			enable_irq_wake(ts->client->irq);
+@@ -576,7 +546,7 @@ static void touch_init_func(struct work_struct *work_init)
+ 	touch_ic_init(ts);
+ 	enable_irq(ts->client->irq);
+ 
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 	if (!irq_wake) {
+ 		irq_wake = true;
+ 		enable_irq_wake(ts->client->irq);
+@@ -598,7 +568,7 @@ static void touch_recover_func(struct work_struct *work_recover)
+ 				struct synaptics_ts_data, work_recover);
+ 
+ 	disable_irq(ts->client->irq);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 	if (irq_wake) {
+ 		irq_wake = false;
+ 		disable_irq_wake(ts->client->irq);
+@@ -607,7 +577,7 @@ static void touch_recover_func(struct work_struct *work_recover)
+ 	safety_reset(ts);
+ 	touch_ic_init(ts);
+ 	enable_irq(ts->client->irq);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 	if (!irq_wake) {
+ 		irq_wake = true;
+ 		enable_irq_wake(ts->client->irq);
+@@ -641,7 +611,7 @@ static int touch_ic_init(struct synaptics_ts_data *ts)
+ err_out_retry:
+ 	ts->ic_init_err_cnt++;
+ 	disable_irq_nosync(ts->client->irq);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 	if (irq_wake) {
+ 		irq_wake = false;
+ 		disable_irq_wake(ts->client->irq);
+@@ -1493,7 +1463,7 @@ static ssize_t store_ts_reset(struct device *dev,
+ 	sscanf(buf, "%s", string);
+ 
+ 	disable_irq_nosync(ts->client->irq);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 	if (irq_wake) {
+ 		irq_wake = false;
+ 		disable_irq_wake(ts->client->irq);
+@@ -1536,7 +1506,7 @@ static ssize_t store_ts_reset(struct device *dev,
+ 		touch_ic_init(ts);
+ 
+ 	enable_irq(ts->client->irq);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 	if (!irq_wake) {
+ 		irq_wake = true;
+ 		enable_irq_wake(ts->client->irq);
+@@ -1800,12 +1770,9 @@ static int lcd_notifier_callback(struct notifier_block *this,
+ 				msecs_to_jiffies(70));
+ 		}
+ 		mutex_unlock(&ts->input_dev->mutex);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-		scr_suspended = false;
+-#endif
+ 		break;
+ 	case LCD_EVENT_OFF_START:
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 		if (s2w_switch == 0)
+ #endif
+ 		{
+@@ -1815,15 +1782,14 @@ static int lcd_notifier_callback(struct notifier_block *this,
+ 		}
+ 		break;
+ 	case LCD_EVENT_OFF_END:
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 		if (s2w_switch == 0)
+ #endif
+ 		{
+ 			synaptics_ts_stop(ts);
+ 			mutex_unlock(&ts->input_dev->mutex);
+ 		}
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-		scr_suspended = true;
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 		if (!irq_wake) {
+ 			irq_wake = true;
+ 			enable_irq_wake(ts->client->irq);
+@@ -1837,61 +1803,6 @@ static int lcd_notifier_callback(struct notifier_block *this,
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-static ssize_t touch_synaptics_sweep2wake_show(struct device *dev,
+-		struct device_attribute *attr, char *buf)
+-{
+-	size_t count = 0;
+-
+-	count += sprintf(buf, "%d\n", s2w_switch);
+-
+-	return count;
+-}
+-
+-static ssize_t touch_synaptics_sweep2wake_dump(struct device *dev,
+-		struct device_attribute *attr, const char *buf, size_t count)
+-{
+-	if (buf[0] >= '0' && buf[0] <= '2' && buf[1] == '\n')
+-                if (s2w_switch != buf[0] - '0')
+-		        s2w_switch = buf[0] - '0';
+-
+-	return count;
+-}
+-
+-static DEVICE_ATTR(sweep2wake, (S_IWUSR|S_IRUGO),
+-	touch_synaptics_sweep2wake_show, touch_synaptics_sweep2wake_dump);
+-#endif
+-
+-static struct kobject *android_touch_kobj;
+-
+-static int touch_synaptics_sysfs_init(void)
+-{
+-	int ret ;
+-
+-	android_touch_kobj = kobject_create_and_add("android_touch", NULL) ;
+-	if (android_touch_kobj == NULL) {
+-		pr_debug("[touch_synaptics]%s: subsystem_register failed\n", __func__);
+-		ret = -ENOMEM;
+-		return ret;
+-	}
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-	ret = sysfs_create_file(android_touch_kobj, &dev_attr_sweep2wake.attr);
+-	if (ret) {
+-		printk(KERN_ERR "[sweep2wake]%s: sysfs_create_file failed\n", __func__);
+-		return ret;
+-	}
+-#endif
+-	return 0 ;
+-}
+-
+-static void touch_synaptics_sysfs_deinit(void)
+-{
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-	sysfs_remove_file(android_touch_kobj, &dev_attr_sweep2wake.attr);
+-#endif
+-	kobject_del(android_touch_kobj);
+-}
+-
+ static int synaptics_ts_probe(
+ 	struct i2c_client *client, const struct i2c_device_id *id)
+ {
+@@ -1983,8 +1894,6 @@ static int synaptics_ts_probe(
+ 		goto err_input_dev_alloc_failed;
+ 	}
+ 
+-	touch_synaptics_sysfs_init();
+-
+ 	ts->input_dev->name = "touch_dev";
+ 
+ 	set_bit(EV_SYN, ts->input_dev->evbit);
+@@ -2019,7 +1928,11 @@ static int synaptics_ts_probe(
+ 	gpio_direction_input(ts->pdata->irq_gpio);
+ 
+ 	ret = request_threaded_irq(client->irq, NULL, touch_irq_handler,
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 			IRQF_TRIGGER_FALLING | IRQF_ONESHOT | IRQF_NO_SUSPEND, client->name, ts);
++#else
++			IRQF_TRIGGER_FALLING | IRQF_ONESHOT, client->name, ts);
++#endif
+ 
+ 	if (ret < 0) {
+ 		TOUCH_ERR_MSG("request_irq failed. use polling mode\n");
+@@ -2090,7 +2003,6 @@ static int synaptics_ts_remove(struct i2c_client *client)
+ 	struct synaptics_ts_data *ts = i2c_get_clientdata(client);
+ 	int i;
+ 
+-	touch_synaptics_sysfs_deinit();
+ 	for (i = 0; i < ARRAY_SIZE(synaptics_device_attrs); i++) {
+ 		device_remove_file(&client->dev,
+ 				&synaptics_device_attrs[i]);
+diff --git a/drivers/platform/msm/qpnp-power-on.c b/drivers/platform/msm/qpnp-power-on.c
+index 65ccefb..67ce1b5 100644
+--- a/drivers/platform/msm/qpnp-power-on.c
++++ b/drivers/platform/msm/qpnp-power-on.c
+@@ -24,10 +24,6 @@
+ #include <linux/log2.h>
+ #include <linux/qpnp/power-on.h>
+ 
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_QPNP_PON
+-#include <linux/input/sweep2wake.h>
+-#endif
+-
+ /* Common PNP defines */
+ #define QPNP_PON_REVISION2(base)		(base + 0x01)
+ 
+@@ -837,12 +833,6 @@ static int __devinit qpnp_pon_config_init(struct qpnp_pon *pon)
+ 				"Can't register pon key: %d\n", rc);
+ 			goto free_input_dev;
+ 		}
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_QPNP_PON
+-		else {
+-			sweep2wake_setdev(pon->pon_input);
+-			printk(KERN_INFO "[sweep2wake]: set device %s\n", pon->pon_input->name);
+-		}
+-#endif
+ 	}
+ 
+ 	for (i = 0; i < pon->num_pon_config; i++) {
+diff --git a/include/linux/input/sweep2wake.h b/include/linux/input/sweep2wake.h
+index ac008f7..c540bb3 100644
+--- a/include/linux/input/sweep2wake.h
++++ b/include/linux/input/sweep2wake.h
+@@ -29,16 +29,6 @@
+ 
+ extern int s2w_switch;
+ extern bool irq_wake;
+-extern bool scr_suspended;
+-extern bool scr_on_touch;
+-extern bool exec_count;
+-extern bool barrier[2];
+-
+-/* Sweep2wake reset function */
+-extern void sweep2wake_reset(void);
+-
+-/* Sweep2wake main function */
+-extern void detect_sweep2wake(int, int, bool);
+ 
+ /* PowerKey setter */
+ extern void sweep2wake_setdev(struct input_dev *);
+-- 
+1.7.9.5
+

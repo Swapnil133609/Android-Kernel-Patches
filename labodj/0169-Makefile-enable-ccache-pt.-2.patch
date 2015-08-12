@@ -1,0 +1,27 @@
+From 541e3612b6410c4c2d99f591c170a03aa5210e5c Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Wed, 4 Dec 2013 12:51:06 +0100
+Subject: [PATCH 169/590] Makefile: enable ccache pt. 2
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ Makefile |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Makefile b/Makefile
+index eb7c908..57a6ee7 100644
+--- a/Makefile
++++ b/Makefile
+@@ -329,7 +329,7 @@ include $(srctree)/scripts/Kbuild.include
+ 
+ AS		= $(CROSS_COMPILE)as
+ LD		= $(CROSS_COMPILE)ld
+-CC		= $(CROSS_COMPILE)gcc
++CC		= ccache $(CROSS_COMPILE)gcc
+ CPP		= $(CC) -E
+ AR		= $(CROSS_COMPILE)ar
+ NM		= $(CROSS_COMPILE)nm
+-- 
+1.7.9.5
+

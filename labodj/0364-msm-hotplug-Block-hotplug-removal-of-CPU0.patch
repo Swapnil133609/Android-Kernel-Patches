@@ -1,0 +1,77 @@
+From ff45ac8ac82a80ceab9c05e88b05038d2559cf6a Mon Sep 17 00:00:00 2001
+From: Matt Wagantall <mattw@codeaurora.org>
+Date: Tue, 26 Nov 2013 18:16:24 -0800
+Subject: [PATCH 364/590] msm: hotplug: Block hotplug removal of CPU0
+
+Hotplug removal of CPU0 is not currently supported. Attempts to
+remove it may result in undefined behaviour. Explicitly block
+any such attempts before other hotplug notifiers get the chance
+to run by setting the notifier priority to INT_MAX.
+
+Change-Id: I9e1f5b4a0db554295a097220417f2bdf4c690f5f
+Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/hotplug.c |   32 +++++++++++++++++++++++++++++++-
+ 1 file changed, 31 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/hotplug.c b/arch/arm/mach-msm/hotplug.c
+index 20e3c3b..174a50a 100644
+--- a/arch/arm/mach-msm/hotplug.c
++++ b/arch/arm/mach-msm/hotplug.c
+@@ -11,6 +11,7 @@
+ #include <linux/errno.h>
+ #include <linux/smp.h>
+ #include <linux/cpu.h>
++#include <linux/ratelimit.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+@@ -150,6 +151,29 @@ static struct notifier_block hotplug_rtb_notifier = {
+ 	.notifier_call = hotplug_rtb_callback,
+ };
+ 
++static int hotplug_cpu_check_callback(struct notifier_block *nfb,
++				      unsigned long action, void *hcpu)
++{
++	int cpu = (int)hcpu;
++
++	switch (action & (~CPU_TASKS_FROZEN)) {
++	case CPU_DOWN_PREPARE:
++		if (cpu == 0) {
++			pr_err_ratelimited("CPU0 hotplug is not supported\n");
++			return NOTIFY_BAD;
++		}
++		break;
++	default:
++		break;
++	}
++
++	return NOTIFY_OK;
++}
++static struct notifier_block hotplug_cpu_check_notifier = {
++	.notifier_call = hotplug_cpu_check_callback,
++	.priority = INT_MAX,
++};
++
+ int msm_platform_secondary_init(unsigned int cpu)
+ {
+ 	int ret;
+@@ -170,6 +194,12 @@ int msm_platform_secondary_init(unsigned int cpu)
+ 
+ static int __init init_hotplug(void)
+ {
+-	return register_hotcpu_notifier(&hotplug_rtb_notifier);
++	int rc;
++
++	rc = register_hotcpu_notifier(&hotplug_rtb_notifier);
++	if (rc)
++		return rc;
++
++	return register_hotcpu_notifier(&hotplug_cpu_check_notifier);
+ }
+ early_initcall(init_hotplug);
+-- 
+1.7.9.5
+

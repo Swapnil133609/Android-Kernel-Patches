@@ -1,0 +1,60 @@
+From 31ef9cbdfa772a0089b3f7861ac14e075d61ebf6 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Fri, 29 Nov 2013 15:31:29 +0000
+Subject: [PATCH 150/590] Revert "userns: Add a Kconfig option to enforce
+ strict kuid and kgid type checks"
+
+This reverts commit b2d63baf51a618bff5d26ff75bcc5f6c5a1af27d.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/uidgid.h |    2 +-
+ init/Kconfig           |   12 +-----------
+ 2 files changed, 2 insertions(+), 12 deletions(-)
+
+diff --git a/include/linux/uidgid.h b/include/linux/uidgid.h
+index 5398568..a0addb8 100644
+--- a/include/linux/uidgid.h
++++ b/include/linux/uidgid.h
+@@ -17,7 +17,7 @@
+ struct user_namespace;
+ extern struct user_namespace init_user_ns;
+ 
+-#ifdef CONFIG_UIDGID_STRICT_TYPE_CHECKS
++#if defined(NOTYET)
+ 
+ typedef struct {
+ 	uid_t val;
+diff --git a/init/Kconfig b/init/Kconfig
+index c7d2efd..d377a52 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -828,8 +828,7 @@ config IPC_NS
+ config USER_NS
+ 	bool "User namespace (EXPERIMENTAL)"
+ 	depends on EXPERIMENTAL
+-	select UIDGID_STRICT_TYPE_CHECKS
+-	default n
++	default y
+ 	help
+ 	  This allows containers, i.e. vservers, to use user namespaces
+ 	  to provide different user info for different servers.
+@@ -853,15 +852,6 @@ config NET_NS
+ 
+ endif # NAMESPACES
+ 
+-config UIDGID_STRICT_TYPE_CHECKS
+-	bool "Require conversions between uid/gids and their internal representation"
+-	default n
+-	help
+-	 While the nececessary conversions are being added to all subsystems this option allows
+-	 the code to continue to build for unconverted subsystems.
+-
+-	 Say Y here if you want the strict type checking enabled
+-
+ config SCHED_AUTOGROUP
+ 	bool "Automatic process group scheduling"
+ 	select EVENTFD
+-- 
+1.7.9.5
+

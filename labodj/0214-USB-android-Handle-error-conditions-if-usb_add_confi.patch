@@ -1,0 +1,36 @@
+From c34f20eac23f1a38e86e87cc3787a3a6427f6143 Mon Sep 17 00:00:00 2001
+From: Devin Kim <dojip.kim@lge.com>
+Date: Thu, 24 Oct 2013 07:51:37 -0700
+Subject: [PATCH 214/590] USB: android: Handle error conditions if
+ usb_add_config fails
+
+This is missing changes of commit 0f12d93e06af8 (USB: android: Handle error
+conditions if usb_add_config fails" when cherry-picking this.
+
+Change-Id: I9ce4f28c6af73420f6b8dda0f8538d2da114087d
+Signed-off-by: Devin Kim <dojip.kim@lge.com>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/usb/gadget/composite.c |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/usb/gadget/composite.c b/drivers/usb/gadget/composite.c
+index dfd23f0..928bd6d 100644
+--- a/drivers/usb/gadget/composite.c
++++ b/drivers/usb/gadget/composite.c
+@@ -819,6 +819,11 @@ int usb_remove_config(struct usb_composite_dev *cdev,
+ 
+ 	spin_lock_irqsave(&cdev->lock, flags);
+ 
++	if (WARN_ON(!config->cdev)) {
++		spin_unlock_irqrestore(&cdev->lock, flags);
++		return 0;
++	}
++
+ 	if (cdev->config == config)
+ 		reset_config(cdev);
+ 
+-- 
+1.7.9.5
+

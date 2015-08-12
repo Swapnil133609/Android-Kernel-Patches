@@ -1,0 +1,35 @@
+From 4cb251c0246aa9d5f4788c2f862df1c362e65138 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Sat, 4 Jan 2014 13:36:38 +0100
+Subject: [PATCH 574/590] Defconfig: Update to r30
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/labo_defconfig |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/labo_defconfig b/arch/arm/configs/labo_defconfig
+index 2c0b15a..d24312f 100644
+--- a/arch/arm/configs/labo_defconfig
++++ b/arch/arm/configs/labo_defconfig
+@@ -781,7 +781,7 @@ CONFIG_XFRM_IPCOMP=y
+ CONFIG_NET_KEY=y
+ # CONFIG_NET_KEY_MIGRATE is not set
+ CONFIG_INET=y
+-# CONFIG_IP_MULTICAST is not set
++CONFIG_IP_MULTICAST=y
+ CONFIG_IP_ADVANCED_ROUTER=y
+ # CONFIG_IP_FIB_TRIE_STATS is not set
+ CONFIG_IP_MULTIPLE_TABLES=y
+@@ -793,6 +793,7 @@ CONFIG_IP_PNP_DHCP=y
+ # CONFIG_IP_PNP_RARP is not set
+ # CONFIG_NET_IPIP is not set
+ # CONFIG_NET_IPGRE_DEMUX is not set
++# CONFIG_IP_MROUTE is not set
+ # CONFIG_ARPD is not set
+ # CONFIG_SYN_COOKIES is not set
+ CONFIG_INET_AH=y
+-- 
+1.7.9.5
+

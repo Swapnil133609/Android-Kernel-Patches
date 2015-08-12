@@ -1,0 +1,77 @@
+From 4516ba71c412b17cf7198b1a38b952701f8c1ba7 Mon Sep 17 00:00:00 2001
+From: Ecco Park <eccopark@broadcom.com>
+Date: Mon, 18 Nov 2013 09:37:35 +0900
+Subject: [PATCH 275/590] net: wireless: bcmdhd: Change the parameter for TDLS
+
+	1) tuned the parameter for TDLS connection to transit between AP
+	and TDLS smoothly.
+	2) tdls_rssi_high : -70 dbm -> -60 dbm (for setup)
+	   tdls_rssi_low : -80 dbm -> -70dbm (for teardown)
+	bug : 11632025
+Signed-off-by: Ecco Park <eccopark@broadcom.com>
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/net/wireless/bcmdhd/Makefile    |    4 ++++
+ drivers/net/wireless/bcmdhd/dhd_linux.c |   15 +++++++++++++++
+ 2 files changed, 19 insertions(+)
+
+diff --git a/drivers/net/wireless/bcmdhd/Makefile b/drivers/net/wireless/bcmdhd/Makefile
+index dc070e3..5ca269b 100644
+--- a/drivers/net/wireless/bcmdhd/Makefile
++++ b/drivers/net/wireless/bcmdhd/Makefile
+@@ -51,6 +51,10 @@ ifeq ($(CONFIG_BCMDHD),m)
+ EXTRA_LDFLAGS += --strip-debug
+ endif
+ 
++DHDCFLAGS += -DCUSTOM_TDLS_RSSI_THRESHOLD_HIGH=-60
++DHDCFLAGS += -DCUSTOM_TDLS_RSSI_THRESHOLD_LOW=-70
++DHDCFLAGS += -DCUSTOM_TDLS_IDLE_MODE_SETTING=40000
++
+ #########################
+ # Chip dependent feature
+ #########################
+diff --git a/drivers/net/wireless/bcmdhd/dhd_linux.c b/drivers/net/wireless/bcmdhd/dhd_linux.c
+index e7680f2..de93d41 100644
+--- a/drivers/net/wireless/bcmdhd/dhd_linux.c
++++ b/drivers/net/wireless/bcmdhd/dhd_linux.c
+@@ -3568,6 +3568,8 @@ int _dhd_tdls_enable(dhd_pub_t *dhd, bool tdls_on, bool auto_on, struct ether_ad
+ 	int ret = 0;
+ 	uint32 tdls_auto_op = 0;
+ 	uint32 tdls_idle_time = CUSTOM_TDLS_IDLE_MODE_SETTING;
++	int32 tdls_rssi_high = CUSTOM_TDLS_RSSI_THRESHOLD_HIGH;
++	int32 tdls_rssi_low = CUSTOM_TDLS_RSSI_THRESHOLD_LOW;
+ 	if (!FW_SUPPORTED(dhd, tdls))
+ 		return BCME_ERROR;
+ 
+@@ -3598,6 +3600,16 @@ auto_mode:
+ 				DHD_ERROR(("%s: tdls_idle_time failed %d\n", __FUNCTION__, ret));
+ 				goto exit;
+ 			}
++			bcm_mkiovar("tdls_rssi_high", (char *)&tdls_rssi_high, 4, iovbuf, sizeof(iovbuf));
++			if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0)) < 0) {
++				DHD_ERROR(("%s: tdls_rssi_high failed %d\n", __FUNCTION__, ret));
++				goto exit;
++			}
++			bcm_mkiovar("tdls_rssi_low", (char *)&tdls_rssi_low, 4, iovbuf, sizeof(iovbuf));
++			if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0)) < 0) {
++				DHD_ERROR(("%s: tdls_rssi_low failed %d\n", __FUNCTION__, ret));
++				goto exit;
++			}
+ 		}
+ 	}
+ exit:
+@@ -3766,6 +3778,9 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
+ 		dhd->wlfc_enabled = FALSE;
+ #endif /* PROP_TXSTATUS_VSDB */
+ #endif /* PROP_TXSTATUS */
++#ifdef WLTDLS
++	dhd->tdls_enable = FALSE;
++#endif /* WLTDLS */
+ 	dhd->suspend_bcn_li_dtim = CUSTOM_SUSPEND_BCN_LI_DTIM;
+ 	DHD_TRACE(("Enter %s\n", __FUNCTION__));
+ 	dhd->op_mode = 0;
+-- 
+1.7.9.5
+

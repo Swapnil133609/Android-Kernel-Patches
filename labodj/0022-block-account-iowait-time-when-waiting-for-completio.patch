@@ -1,0 +1,91 @@
+From 9397c26bebbe92f3303e0aceeb0eaed2f3ef84f2 Mon Sep 17 00:00:00 2001
+From: Vladimir Davydov <vdavydov@parallels.com>
+Date: Thu, 14 Feb 2013 18:19:59 +0400
+Subject: [PATCH 022/590] block: account iowait time when waiting for
+ completion of IO request
+
+Using wait_for_completion() for waiting for a IO request to be executed
+results in wrong iowait time accounting. For example, a system having
+the only task doing write() and fdatasync() on a block device can be
+reported being idle instead of iowaiting as it should because
+blkdev_issue_flush() calls wait_for_completion() which in turn calls
+schedule() that does not increment the iowait proc counter and thus does
+not turn on iowait time accounting.
+
+The patch makes block layer use wait_for_completion_io() instead of
+wait_for_completion() where appropriate to account iowait time
+correctly.
+
+Signed-off-by: Vladimir Davydov <vdavydov@parallels.com>
+Signed-off-by: Jens Axboe <axboe@kernel.dk>
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ block/blk-exec.c  |    4 ++--
+ block/blk-flush.c |    2 +-
+ block/blk-lib.c   |    6 +++---
+ 3 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/block/blk-exec.c b/block/blk-exec.c
+index fb2cbd5..b49f7c9 100644
+--- a/block/blk-exec.c
++++ b/block/blk-exec.c
+@@ -109,9 +109,9 @@ int blk_execute_rq(struct request_queue *q, struct gendisk *bd_disk,
+ 	/* Prevent hang_check timer from firing at us during very long I/O */
+ 	hang_check = sysctl_hung_task_timeout_secs;
+ 	if (hang_check)
+-		while (!wait_for_completion_timeout(&wait, hang_check * (HZ/2)));
++		while (!wait_for_completion_io_timeout(&wait, hang_check * (HZ/2)));
+ 	else
+-		wait_for_completion(&wait);
++		wait_for_completion_io(&wait);
+ 
+ 	if (rq->errors)
+ 		err = -EIO;
+diff --git a/block/blk-flush.c b/block/blk-flush.c
+index 720ad60..db8f1b5 100644
+--- a/block/blk-flush.c
++++ b/block/blk-flush.c
+@@ -436,7 +436,7 @@ int blkdev_issue_flush(struct block_device *bdev, gfp_t gfp_mask,
+ 
+ 	bio_get(bio);
+ 	submit_bio(WRITE_FLUSH, bio);
+-	wait_for_completion(&wait);
++	wait_for_completion_io(&wait);
+ 
+ 	/*
+ 	 * The driver must store the error location in ->bi_sector, if
+diff --git a/block/blk-lib.c b/block/blk-lib.c
+index 280d63e..d185765 100644
+--- a/block/blk-lib.c
++++ b/block/blk-lib.c
+@@ -105,7 +105,7 @@ int blkdev_issue_discard(struct block_device *bdev, sector_t sector,
+ 
+ 	/* Wait for bios in-flight */
+ 	if (!atomic_dec_and_test(&bb.done))
+-		wait_for_completion(&wait);
++		wait_for_completion_io(&wait);
+ 
+ 	if (!test_bit(BIO_UPTODATE, &bb.flags))
+ 		ret = -EIO;
+@@ -156,7 +156,7 @@ int blkdev_issue_sanitize(struct block_device *bdev, gfp_t gfp_mask)
+ 
+ 	/* Wait for bios in-flight */
+ 	if (!atomic_dec_and_test(&bb.done))
+-		wait_for_completion(&wait);
++		wait_for_completion_io(&wait);
+ 
+ 	if (!test_bit(BIO_UPTODATE, &bb.flags))
+ 		ret = -EIO;
+@@ -218,7 +218,7 @@ int blkdev_issue_zeroout(struct block_device *bdev, sector_t sector,
+ 
+ 	/* Wait for bios in-flight */
+ 	if (!atomic_dec_and_test(&bb.done))
+-		wait_for_completion(&wait);
++		wait_for_completion_io(&wait);
+ 
+ 	if (!test_bit(BIO_UPTODATE, &bb.flags))
+ 		/* One of bios in the batch was completed with error.*/
+-- 
+1.7.9.5
+

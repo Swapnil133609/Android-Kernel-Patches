@@ -1,0 +1,135 @@
+From 950fa8a76fb6f007999077a6a94d9ed357322057 Mon Sep 17 00:00:00 2001
+From: Minchan Kim <minchan@kernel.org>
+Date: Mon, 8 Oct 2012 16:33:48 -0700
+Subject: [PATCH 435/590] CMA: migrate mlocked pages
+
+Presently CMA cannot migrate mlocked pages so it ends up failing to allocate
+contiguous memory space.
+
+This patch makes mlocked pages be migrated out.  Of course, it can affect
+realtime processes but in CMA usecase, contiguous memory allocation failing
+is far worse than access latency to an mlocked page being variable while
+CMA is running.  If someone wants to make the system realtime, he shouldn't
+enable CMA because stalls can still happen at random times.
+
+Change-Id: I560f43fdeb94f8fd2a4cc9e2ac12a1593ca38ecb
+[akpm@linux-foundation.org: tweak comment text, per Mel]
+Signed-off-by: Minchan Kim <minchan@kernel.org>
+Acked-by: Mel Gorman <mgorman@suse.de>
+Cc: Michal Nazarewicz <mina86@mina86.com>
+Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: e46a28790e594c0876d1a84270926abf75460f61
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+[lauraa@codeaurora.org: Minor context fixups]
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/mmzone.h |    2 ++
+ mm/compaction.c        |    8 ++++++--
+ mm/internal.h          |    2 +-
+ mm/page_alloc.c        |    2 +-
+ mm/vmscan.c            |    4 ++--
+ 5 files changed, 12 insertions(+), 6 deletions(-)
+
+diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+index 13985fe..124168e 100644
+--- a/include/linux/mmzone.h
++++ b/include/linux/mmzone.h
+@@ -210,6 +210,8 @@ struct lruvec {
+ #define ISOLATE_UNMAPPED	((__force isolate_mode_t)0x2)
+ /* Isolate for asynchronous migration */
+ #define ISOLATE_ASYNC_MIGRATE	((__force isolate_mode_t)0x4)
++/* Isolate unevictable pages */
++#define ISOLATE_UNEVICTABLE	((__force isolate_mode_t)0x8)
+ 
+ /* LRU Isolation modes. */
+ typedef unsigned __bitwise__ isolate_mode_t;
+diff --git a/mm/compaction.c b/mm/compaction.c
+index 1980020..87bfdd9 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -461,6 +461,7 @@ static bool too_many_isolated(struct zone *zone)
+  * @cc:		Compaction control structure.
+  * @low_pfn:	The first PFN of the range.
+  * @end_pfn:	The one-past-the-last PFN of the range.
++ * @unevictable: true if it allows to isolate unevictable pages
+  *
+  * Isolate all pages that can be migrated from the range specified by
+  * [low_pfn, end_pfn).  Returns zero if there is a fatal signal
+@@ -476,7 +477,7 @@ static bool too_many_isolated(struct zone *zone)
+  */
+ unsigned long
+ isolate_migratepages_range(struct zone *zone, struct compact_control *cc,
+-			   unsigned long low_pfn, unsigned long end_pfn)
++		unsigned long low_pfn, unsigned long end_pfn, bool unevictable)
+ {
+ 	unsigned long last_pageblock_nr = 0, pageblock_nr;
+ 	unsigned long nr_scanned = 0, nr_isolated = 0;
+@@ -601,6 +602,9 @@ isolate_migratepages_range(struct zone *zone, struct compact_control *cc,
+ 		if (!cc->sync)
+ 			mode |= ISOLATE_ASYNC_MIGRATE;
+ 
++		if (unevictable)
++			mode |= ISOLATE_UNEVICTABLE;
++
+ 		/* Try isolate the page */
+ 		if (__isolate_lru_page(page, mode) != 0)
+ 			continue;
+@@ -804,7 +808,7 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
+ 	}
+ 
+ 	/* Perform the isolation */
+-	low_pfn = isolate_migratepages_range(zone, cc, low_pfn, end_pfn);
++	low_pfn = isolate_migratepages_range(zone, cc, low_pfn, end_pfn, false);
+ 	if (!low_pfn || cc->contended)
+ 		return ISOLATE_ABORT;
+ 
+diff --git a/mm/internal.h b/mm/internal.h
+index 1c59ee7..b202468 100644
+--- a/mm/internal.h
++++ b/mm/internal.h
+@@ -138,7 +138,7 @@ isolate_freepages_range(struct compact_control *cc,
+ 			unsigned long start_pfn, unsigned long end_pfn);
+ unsigned long
+ isolate_migratepages_range(struct zone *zone, struct compact_control *cc,
+-			   unsigned long low_pfn, unsigned long end_pfn);
++	unsigned long low_pfn, unsigned long end_pfn, bool unevictable);
+ 
+ #endif
+ 
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index ac85638..2c98621 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5866,7 +5866,7 @@ static int __alloc_contig_migrate_range(struct compact_control *cc,
+ 		if (list_empty(&cc->migratepages)) {
+ 			cc->nr_migratepages = 0;
+ 			pfn = isolate_migratepages_range(cc->zone, cc,
+-							 pfn, end);
++							 pfn, end, true);
+ 			if (!pfn) {
+ 				ret = -EINTR;
+ 				break;
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 80ae78b..8c3898b 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -993,8 +993,8 @@ int __isolate_lru_page(struct page *page, isolate_mode_t mode)
+ 	if (!PageLRU(page))
+ 		return ret;
+ 
+-	/* Do not give back unevictable pages for compaction */
+-	if (PageUnevictable(page))
++	/* Compaction should not handle unevictable pages but CMA can do so */
++	if (PageUnevictable(page) && !(mode & ISOLATE_UNEVICTABLE))
+ 		return ret;
+ 
+ 	ret = -EBUSY;
+-- 
+1.7.9.5
+

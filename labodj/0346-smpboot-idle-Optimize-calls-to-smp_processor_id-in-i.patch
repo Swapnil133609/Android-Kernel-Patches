@@ -1,0 +1,45 @@
+From 4efb809dc3108549d78a261b09a5d3a715c792b5 Mon Sep 17 00:00:00 2001
+From: "Srivatsa S. Bhat" <srivatsa.bhat@linux.vnet.ibm.com>
+Date: Thu, 24 May 2012 20:40:55 +0530
+Subject: [PATCH 346/590] smpboot, idle: Optimize calls to smp_processor_id()
+ in idle_threads_init()
+
+While trying to initialize idle threads for all cpus, idle_threads_init()
+calls smp_processor_id() in a loop, which is unnecessary. The intent
+is to initialize idle threads for all non-boot cpus. So just use a variable
+to note the boot cpu and use it in the loop.
+
+Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
+Cc: suresh.b.siddha@intel.com
+Cc: venki@google.com
+Cc: nikunj@linux.vnet.ibm.com
+Link: http://lkml.kernel.org/r/20120524151055.2549.64309.stgit@srivatsabhat.in.ibm.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/smpboot.c |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/smpboot.c b/kernel/smpboot.c
+index e1a797e..0f2162f 100644
+--- a/kernel/smpboot.c
++++ b/kernel/smpboot.c
+@@ -52,10 +52,12 @@ static inline void idle_init(unsigned int cpu)
+  */
+ void __init idle_threads_init(void)
+ {
+-	unsigned int cpu;
++	unsigned int cpu, boot_cpu;
++
++	boot_cpu = smp_processor_id();
+ 
+ 	for_each_possible_cpu(cpu) {
+-		if (cpu != smp_processor_id())
++		if (cpu != boot_cpu)
+ 			idle_init(cpu);
+ 	}
+ }
+-- 
+1.7.9.5
+

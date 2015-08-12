@@ -1,0 +1,35 @@
+From c3cbc221505c1403b29e61553c9bc680e931500f Mon Sep 17 00:00:00 2001
+From: Olav Haugan <ohaugan@codeaurora.org>
+Date: Mon, 4 Nov 2013 10:46:16 -0800
+Subject: [PATCH 455/590] mm: vmscan: Move pages that fail swapout to LRU
+ active list
+
+Move pages that fail swapout to the LRU active list to reduce
+pressure on swap device when swapping out is already failing.
+This helps when using a pseudo swap device such as zram which
+starts failing when memory is low.
+
+Change-Id: Ib136cd0a744378aa93d837a24b9143ee818c80b3
+Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/vmscan.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 79161f7..c917a7a 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -474,6 +474,8 @@ static pageout_t pageout(struct page *page, struct address_space *mapping,
+ 		if (!PageWriteback(page)) {
+ 			/* synchronous write or broken a_ops? */
+ 			ClearPageReclaim(page);
++			if (PageError(page))
++				return PAGE_ACTIVATE;
+ 		}
+ 		trace_mm_vmscan_writepage(page, trace_reclaim_flags(page));
+ 		inc_zone_page_state(page, NR_VMSCAN_WRITE);
+-- 
+1.7.9.5
+

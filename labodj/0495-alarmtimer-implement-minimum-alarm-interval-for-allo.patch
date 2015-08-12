@@ -1,0 +1,81 @@
+From 98ca9d654977a640f68ced161ee9376b0ddf739b Mon Sep 17 00:00:00 2001
+From: Todd Poynor <toddpoynor@google.com>
+Date: Tue, 7 Aug 2012 17:14:52 -0700
+Subject: [PATCH 495/590] alarmtimer: implement minimum alarm interval for
+ allowing suspend
+
+alarmtimer suspend return -EBUSY if the next alarm will fire in less
+than 2 seconds.  This allows one RTC seconds tick to occur subsequent
+to this check before the alarm wakeup time is set, ensuring the wakeup
+time is still in the future (assuming the RTC does not tick one more
+second prior to setting the alarm).  If suspend is rejected, hold a
+wakeup source for 2 seconds to process the alarm prior to reattempting
+suspend.
+
+Signed-off-by: Todd Poynor <toddpoynor@google.com>
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/time/alarmtimer.c |   18 +++++++++++++-----
+ 1 file changed, 13 insertions(+), 5 deletions(-)
+
+diff --git a/kernel/time/alarmtimer.c b/kernel/time/alarmtimer.c
+index 2cfe9a5..4b788fa 100644
+--- a/kernel/time/alarmtimer.c
++++ b/kernel/time/alarmtimer.c
+@@ -46,6 +46,8 @@ static struct alarm_base {
+ static ktime_t freezer_delta;
+ static DEFINE_SPINLOCK(freezer_delta_lock);
+ 
++static struct wakeup_source *ws;
++
+ #ifdef CONFIG_RTC_CLASS
+ /* rtc timer and device for setting alarm wakeups at suspend */
+ static struct rtc_timer		rtctimer;
+@@ -250,6 +252,7 @@ static int alarmtimer_suspend(struct device *dev)
+ 	unsigned long flags;
+ 	struct rtc_device *rtc;
+ 	int i;
++	int ret;
+ 
+ 	spin_lock_irqsave(&freezer_delta_lock, flags);
+ 	min = freezer_delta;
+@@ -279,8 +282,10 @@ static int alarmtimer_suspend(struct device *dev)
+ 	if (min.tv64 == 0)
+ 		return 0;
+ 
+-	/* XXX - Should we enforce a minimum sleep time? */
+-	WARN_ON(min.tv64 < NSEC_PER_SEC);
++	if (ktime_to_ns(min) < 2 * NSEC_PER_SEC) {
++		__pm_wakeup_event(ws, 2 * MSEC_PER_SEC);
++		return -EBUSY;
++	}
+ 
+ 	/* Setup an rtc timer to fire that far in the future */
+ 	rtc_timer_cancel(rtc, &rtctimer);
+@@ -288,9 +293,11 @@ static int alarmtimer_suspend(struct device *dev)
+ 	now = rtc_tm_to_ktime(tm);
+ 	now = ktime_add(now, min);
+ 
+-	rtc_timer_start(rtc, &rtctimer, now, ktime_set(0, 0));
+-
+-	return 0;
++	/* Set alarm, if in the past reject suspend briefly to handle */
++	ret = rtc_timer_start(rtc, &rtctimer, now, ktime_set(0, 0));
++	if (ret < 0)
++		__pm_wakeup_event(ws, 1 * MSEC_PER_SEC);
++	return ret;
+ }
+ #else
+ static int alarmtimer_suspend(struct device *dev)
+@@ -821,6 +828,7 @@ static int __init alarmtimer_init(void)
+ 		error = PTR_ERR(pdev);
+ 		goto out_drv;
+ 	}
++	ws = wakeup_source_register("alarmtimer");
+ 	return 0;
+ 
+ out_drv:
+-- 
+1.7.9.5
+

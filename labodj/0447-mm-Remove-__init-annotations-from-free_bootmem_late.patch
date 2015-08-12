@@ -1,0 +1,48 @@
+From 85caff796485cda791f7238bbc6dc27374b88a98 Mon Sep 17 00:00:00 2001
+From: Laura Abbott <lauraa@codeaurora.org>
+Date: Fri, 28 Jun 2013 12:52:17 -0700
+Subject: [PATCH 447/590] mm: Remove __init annotations from free_bootmem_late
+
+free_bootmem_late is currently set up to only be used in init
+functions. Some clients need to use this function past initcalls.
+The functions themselves have no restrictions on being used later
+minus the __init annotations so remove the annotation.
+
+Change-Id: I7c7e15cf2780a8843ebb4610da5b633c9abb0b3d
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/bootmem.c    |    2 +-
+ mm/page_alloc.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/mm/bootmem.c b/mm/bootmem.c
+index 53cf62b..c4804c9 100644
+--- a/mm/bootmem.c
++++ b/mm/bootmem.c
+@@ -154,7 +154,7 @@ unsigned long __init init_bootmem(unsigned long start, unsigned long pages)
+  * down, but we are still initializing the system.  Pages are given directly
+  * to the page allocator, no bootmem metadata is updated because it is gone.
+  */
+-void __init free_bootmem_late(unsigned long addr, unsigned long size)
++void free_bootmem_late(unsigned long addr, unsigned long size)
+ {
+ 	unsigned long cursor, end;
+ 
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index db9909e..e546598 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -745,7 +745,7 @@ static void __free_pages_ok(struct page *page, unsigned int order)
+ 	local_irq_restore(flags);
+ }
+ 
+-void __meminit __free_pages_bootmem(struct page *page, unsigned int order)
++void __free_pages_bootmem(struct page *page, unsigned int order)
+ {
+ 	unsigned int nr_pages = 1 << order;
+ 	unsigned int loop;
+-- 
+1.7.9.5
+

@@ -1,0 +1,54 @@
+From f9679f3d209a672e0c0e6ade42c9d55cb7869b88 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Sun, 5 Jan 2014 14:18:54 +0100
+Subject: [PATCH 589/590] Defconfig: update
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/labo_defconfig |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/configs/labo_defconfig b/arch/arm/configs/labo_defconfig
+index 5d8dd00..4e00cd7 100644
+--- a/arch/arm/configs/labo_defconfig
++++ b/arch/arm/configs/labo_defconfig
+@@ -534,6 +534,7 @@ CONFIG_MSM_UARTDM_Core_v14=y
+ # CONFIG_MSM_BOOT_STATS is not set
+ # CONFIG_MSM_XPU_ERR_FATAL is not set
+ # CONFIG_MSM_CPR_REGULATOR is not set
++CONFIG_FORCE_FAST_CHARGE=y
+ 
+ #
+ # System MMU
+@@ -1292,7 +1293,6 @@ CONFIG_BLK_DEV_LOOP_MIN_COUNT=8
+ #
+ # DRBD disabled because PROC_FS, INET or CONNECTOR not selected
+ #
+-# CONFIG_EDS_MODULE is not set
+ # CONFIG_BLK_DEV_NBD is not set
+ # CONFIG_BLK_DEV_UB is not set
+ CONFIG_BLK_DEV_RAM=y
+@@ -3320,7 +3320,7 @@ CONFIG_HAVE_ARCH_KGDB=y
+ # CONFIG_TEST_KSTRTOX is not set
+ # CONFIG_STRICT_DEVMEM is not set
+ # CONFIG_ARM_UNWIND is not set
+-CONFIG_OLD_MCOUNT=y
++# CONFIG_OLD_MCOUNT is not set
+ # CONFIG_DEBUG_USER is not set
+ # CONFIG_DEBUG_LL is not set
+ # CONFIG_PID_IN_CONTEXTIDR is not set
+@@ -3491,9 +3491,8 @@ CONFIG_AUDIT_GENERIC=y
+ CONFIG_ZLIB_INFLATE=y
+ CONFIG_ZLIB_DEFLATE=y
+ CONFIG_LZO_COMPRESS=y
+-CONFIG_LZ4_COMPRESS=y
+-CONFIG_LZ4HC_COMPRESS=y
+ CONFIG_LZO_DECOMPRESS=y
++CONFIG_LZ4HC_COMPRESS=y
+ CONFIG_LZ4_DECOMPRESS=y
+ # CONFIG_XZ_DEC is not set
+ # CONFIG_XZ_DEC_BCJ is not set
+-- 
+1.7.9.5
+

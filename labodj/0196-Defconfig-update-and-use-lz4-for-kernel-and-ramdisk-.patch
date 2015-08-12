@@ -1,0 +1,64 @@
+From 6de98b75880ee10c8e6895cefbd4f5aacd905b76 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Fri, 6 Dec 2013 16:30:23 +0100
+Subject: [PATCH 196/590] Defconfig: update and use lz4 for kernel and ramdisk
+ (test)
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/labo_defconfig |    8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/configs/labo_defconfig b/arch/arm/configs/labo_defconfig
+index 57d60d8..cae0ca5 100644
+--- a/arch/arm/configs/labo_defconfig
++++ b/arch/arm/configs/labo_defconfig
+@@ -47,10 +47,12 @@ CONFIG_HAVE_KERNEL_GZIP=y
+ CONFIG_HAVE_KERNEL_LZMA=y
+ CONFIG_HAVE_KERNEL_XZ=y
+ CONFIG_HAVE_KERNEL_LZO=y
++CONFIG_HAVE_KERNEL_LZ4=y
+ # CONFIG_KERNEL_GZIP is not set
+ # CONFIG_KERNEL_LZMA is not set
+-CONFIG_KERNEL_XZ=y
++# CONFIG_KERNEL_XZ is not set
+ # CONFIG_KERNEL_LZO is not set
++CONFIG_KERNEL_LZ4=y
+ CONFIG_DEFAULT_HOSTNAME="(none)"
+ # CONFIG_SWAP is not set
+ CONFIG_SYSVIPC=y
+@@ -122,6 +124,7 @@ CONFIG_RD_BZIP2=y
+ CONFIG_RD_LZMA=y
+ # CONFIG_RD_XZ is not set
+ CONFIG_RD_LZO=y
++CONFIG_RD_LZ4=y
+ # CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
+ CONFIG_SYSCTL=y
+ CONFIG_ANON_INODES=y
+@@ -2721,7 +2724,6 @@ CONFIG_USB_STORAGE_ONETOUCH=y
+ CONFIG_USB_STORAGE_KARMA=y
+ CONFIG_USB_STORAGE_CYPRESS_ATACB=y
+ CONFIG_USB_STORAGE_ENE_UB6250=y
+-# CONFIG_USB_UAS is not set
+ # CONFIG_USB_LIBUSUAL is not set
+ 
+ #
+@@ -3472,12 +3474,14 @@ CONFIG_ZLIB_INFLATE=y
+ CONFIG_ZLIB_DEFLATE=y
+ CONFIG_LZO_COMPRESS=y
+ CONFIG_LZO_DECOMPRESS=y
++CONFIG_LZ4_DECOMPRESS=y
+ # CONFIG_XZ_DEC is not set
+ # CONFIG_XZ_DEC_BCJ is not set
+ CONFIG_DECOMPRESS_GZIP=y
+ CONFIG_DECOMPRESS_BZIP2=y
+ CONFIG_DECOMPRESS_LZMA=y
+ CONFIG_DECOMPRESS_LZO=y
++CONFIG_DECOMPRESS_LZ4=y
+ CONFIG_GENERIC_ALLOCATOR=y
+ CONFIG_REED_SOLOMON=y
+ CONFIG_REED_SOLOMON_ENC8=y
+-- 
+1.7.9.5
+

@@ -1,0 +1,117 @@
+From ceee24745f22bc598e02d4aaa38183dd9382c343 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Sat, 2 Nov 2013 06:15:55 +0000
+Subject: [PATCH 013/590] msm: krait: add CPU Voltage control.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/acpuclock-krait.c |   52 +++++++++++++++++++++++++++++++++++
+ drivers/cpufreq/cpufreq.c           |   14 ++++++++++
+ 2 files changed, 66 insertions(+)
+
+diff --git a/arch/arm/mach-msm/acpuclock-krait.c b/arch/arm/mach-msm/acpuclock-krait.c
+index 84e2fc1..0b33e62 100644
+--- a/arch/arm/mach-msm/acpuclock-krait.c
++++ b/arch/arm/mach-msm/acpuclock-krait.c
+@@ -937,6 +937,58 @@ static void __init bus_init(const struct l2_level *l2_level)
+ 		dev_err(drv.dev, "initial bandwidth req failed (%d)\n", ret);
+ }
+ 
++#define MAX_VDD 1300
++#define MIN_VDD 700
++
++ssize_t acpuclk_get_vdd_levels_str(char *buf)
++{
++    
++	int i, len = 0;
++    
++	if (buf) {
++		for (i = 0; drv.acpu_freq_tbl[i].speed.khz; i++) {
++            if (drv.acpu_freq_tbl[i].use_for_scaling) {
++                len += sprintf(buf + len, "%lumhz: %i mV\n",
++                           drv.acpu_freq_tbl[i].speed.khz/1000,
++                           drv.acpu_freq_tbl[i].vdd_core/1000 );
++            }
++		}
++	}
++	return len;
++}
++
++ssize_t acpuclk_set_vdd(char *buf)
++{
++	unsigned int cur_volt;
++	char count[10];
++	int i;
++    int ret = 0;
++    
++	if (!buf)
++		return -EINVAL;
++    
++	for (i = 0; i < drv.acpu_freq_tbl[i].speed.khz; i++) {
++        if (drv.acpu_freq_tbl[i].use_for_scaling) {
++            ret = sscanf(buf, "%d", &cur_volt);
++        
++            if (ret != 1)
++                return -EINVAL;
++        
++            if (cur_volt > MAX_VDD) {
++                cur_volt = MAX_VDD;
++            } else if (cur_volt < MIN_VDD) {
++                cur_volt = MIN_VDD;
++            }
++        
++            drv.acpu_freq_tbl[i].vdd_core = cur_volt*1000;
++                
++            ret = sscanf(buf, "%s", count);
++            buf += (strlen(count)+1);
++        }
++	}
++	return ret;
++}
++
+ #ifdef CONFIG_CPU_FREQ_MSM
+ static struct cpufreq_frequency_table freq_table[NR_CPUS][35];
+ 
+diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+index 374170d..76a3153 100644
+--- a/drivers/cpufreq/cpufreq.c
++++ b/drivers/cpufreq/cpufreq.c
+@@ -623,6 +623,18 @@ static ssize_t show_bios_limit(struct cpufreq_policy *policy, char *buf)
+ 	return sprintf(buf, "%u\n", policy->cpuinfo.max_freq);
+ }
+ 
++extern ssize_t acpuclk_get_vdd_levels_str(char *buf);
++extern void acpuclk_set_vdd(const char *buf);
++
++static ssize_t show_UV_mV_table(struct cpufreq_policy *policy, char *buf) {
++	return acpuclk_get_vdd_levels_str(buf);
++}
++
++static ssize_t store_UV_mV_table(struct cpufreq_policy *policy, const char *buf, size_t count) {
++	acpuclk_set_vdd(buf);
++	return count;
++}
++
+ cpufreq_freq_attr_ro_perm(cpuinfo_cur_freq, 0400);
+ cpufreq_freq_attr_ro(cpuinfo_min_freq);
+ cpufreq_freq_attr_ro(cpuinfo_max_freq);
+@@ -638,6 +650,7 @@ cpufreq_freq_attr_rw(scaling_min_freq);
+ cpufreq_freq_attr_rw(scaling_max_freq);
+ cpufreq_freq_attr_rw(scaling_governor);
+ cpufreq_freq_attr_rw(scaling_setspeed);
++cpufreq_freq_attr_rw(UV_mV_table);
+ 
+ static struct attribute *default_attrs[] = {
+ 	&cpuinfo_min_freq.attr,
+@@ -652,6 +665,7 @@ static struct attribute *default_attrs[] = {
+ 	&scaling_driver.attr,
+ 	&scaling_available_governors.attr,
+ 	&scaling_setspeed.attr,
++	&UV_mV_table.attr,
+ 	NULL
+ };
+ 
+-- 
+1.7.9.5
+

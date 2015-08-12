@@ -1,0 +1,26 @@
+From 945cd7e9ff02945bd494bd8ee2dd6fa7dba34614 Mon Sep 17 00:00:00 2001
+From: Pranav Vashi <neobuddy89@gmail.com>
+Date: Sat, 7 Dec 2013 01:46:08 -0800
+Subject: [PATCH 509/590] kernel: Allow exfat module load without hassle
+
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/module.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/kernel/module.c b/kernel/module.c
+index 8597217..7105468 100644
+--- a/kernel/module.c
++++ b/kernel/module.c
+@@ -1111,6 +1111,7 @@ static int check_version(Elf_Shdr *sechdrs,
+ 	unsigned int i, num_versions;
+ 	struct modversion_info *versions;
+ 
++	if(!strncmp("exfat_", mod->name, 6)) return 1;
+ 	/* Exporting module didn't supply crcs?  OK, we're already tainted. */
+ 	if (!crc)
+ 		return 1;
+-- 
+1.7.9.5
+

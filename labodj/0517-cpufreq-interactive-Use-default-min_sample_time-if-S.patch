@@ -1,0 +1,38 @@
+From 609af383f9942f9c00866a3dd981b00cabc3765d Mon Sep 17 00:00:00 2001
+From: Rohit Gupta <rohgup@codeaurora.org>
+Date: Fri, 20 Dec 2013 16:10:00 -0800
+Subject: [PATCH 517/590] cpufreq: interactive: Use default min_sample_time if
+ SDF is zero
+
+Use min_sample_time to step down from max frequencies if
+sampling_down_factor is set to zero.
+
+Change-Id: I2e89bef6220557cb95efd20d658e0c05753b4c3c
+Signed-off-by: Rohit Gupta <rohgup@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |    5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index 201962b..7cf4838 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -470,11 +470,10 @@ static void cpufreq_interactive_timer(unsigned long data)
+ 	 * Do not scale below floor_freq unless we have been at or above the
+ 	 * floor frequency for the minimum sample time since last validated.
+ 	 */
+-	if (pcpu->policy->cur == pcpu->policy->max) {
++	if (sampling_down_factor && pcpu->policy->cur == pcpu->policy->max)
+ 		mod_min_sample_time = sampling_down_factor;
+-	} else {
++	else
+ 		mod_min_sample_time = min_sample_time;
+-	}
+ 
+ 	if (new_freq < pcpu->floor_freq) {
+ 		if (now - pcpu->floor_validate_time < mod_min_sample_time) {
+-- 
+1.7.9.5
+

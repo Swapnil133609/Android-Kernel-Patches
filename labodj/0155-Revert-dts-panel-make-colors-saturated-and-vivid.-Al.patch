@@ -1,0 +1,31 @@
+From d81bcc20d44ab677623e5c975df7d05a0439ccca Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Tue, 3 Dec 2013 02:01:12 +0000
+Subject: [PATCH 155/590] Revert "dts: panel: make colors saturated and vivid.
+ Also whites are whiter."
+
+According to faux we should not mess with this set of bits, so with lack of better evidence lets revert it.
+
+This reverts commit 6747c5003dba8fda142b7a4041db3033dda6d036.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ .../msm8974-hammerhead-panel.dtsi                  |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-panel.dtsi b/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-panel.dtsi
+index c97f306..15630fa 100644
+--- a/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-panel.dtsi
++++ b/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-panel.dtsi
+@@ -1106,7 +1106,7 @@
+ 		qcom,panel-on-cmds = [
+ 			15 01 00 00 00 00 02 00 00
+ 			39 01 00 00 00 00 05
+-			77 19 02 01 00
++			FF 19 02 01 00
+ 			15 01 00 00 00 00 02 00 80
+ 			39 01 00 00 00 00 03
+ 			FF 19 02
+-- 
+1.7.9.5
+

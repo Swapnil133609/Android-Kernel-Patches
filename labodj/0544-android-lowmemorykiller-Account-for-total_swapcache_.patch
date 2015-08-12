@@ -1,0 +1,56 @@
+From d17f321fddb0ef8b1659e80b989881ca6e717746 Mon Sep 17 00:00:00 2001
+From: Liam Mark <lmark@codeaurora.org>
+Date: Fri, 30 Aug 2013 12:10:39 -0700
+Subject: [PATCH 544/590] android/lowmemorykiller: Account for
+ total_swapcache_pages
+
+The lowmemorykiller relies on NR_FILE_PAGES when measureing
+the amount of reclaimable memory in the system.
+However when swap is enabled swap cache pages are counted
+in NR_FILE_PAGES, and swap cache pages aren't as reclaimable
+in low memory as file cache pages. Therefore a large swap
+cache can result in the lowmemorykiller not running and
+an OOM occuring.
+
+In order to ensure the lowmemorykiller properly evaluates the
+amount of reclaimable memory don't count the swap cache pages.
+
+Change-Id: I38239283e572f814b277c718eaf6be7f92abacbb
+Signed-off-by: Liam Mark <lmark@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/staging/android/lowmemorykiller.c |   11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/staging/android/lowmemorykiller.c b/drivers/staging/android/lowmemorykiller.c
+index 4251968..1ad0054 100644
+--- a/drivers/staging/android/lowmemorykiller.c
++++ b/drivers/staging/android/lowmemorykiller.c
+@@ -40,6 +40,7 @@
+ #include <linux/mutex.h>
+ #include <linux/delay.h>
+ #include <linux/swap.h>
++#include <linux/fs.h>
+ 
+ #ifdef CONFIG_HIGHMEM
+ #define _ZONE ZONE_HIGHMEM
+@@ -246,8 +247,14 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
+ 	}
+ 
+ 	other_free = global_page_state(NR_FREE_PAGES);
+-	other_file = global_page_state(NR_FILE_PAGES) -
+-						global_page_state(NR_SHMEM);
++
++	if (global_page_state(NR_SHMEM) + total_swapcache_pages <
++		global_page_state(NR_FILE_PAGES))
++		other_file = global_page_state(NR_FILE_PAGES) -
++						global_page_state(NR_SHMEM) -
++						total_swapcache_pages;
++	else
++		other_file = 0;
+ 
+ 	tune_lmk_param(&other_free, &other_file, sc);
+ 
+-- 
+1.7.9.5
+

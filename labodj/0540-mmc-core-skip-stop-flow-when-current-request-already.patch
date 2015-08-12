@@ -1,0 +1,38 @@
+From 09f01aa73b9d7c24b027a32f1ef20e432721dbc0 Mon Sep 17 00:00:00 2001
+From: Konstantin Dorfman <kdorfman@codeaurora.org>
+Date: Sun, 22 Sep 2013 15:42:17 +0300
+Subject: [PATCH 540/590] mmc: core: skip stop flow when current request
+ already done
+
+When mmc_stop_request() has no request to stop, because underlying
+host driver reported this, the flow should wait for the mmc done()
+callback marking that urgent still pending.
+
+Change-Id: Iacc95591ee76a965916af05a31a67dd8997c233e
+CRs-Fixed: 538117
+Signed-off-by: Konstantin Dorfman <kdorfman@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/mmc/core/core.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 2a6e43f..478d442 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -744,7 +744,11 @@ static int mmc_wait_for_data_req_done(struct mmc_host *host,
+ 				 */
+ 				mmc_update_clk_scaling(host);
+ 				err = mmc_stop_request(host);
+-				if (err && !context_info->is_done_rcv) {
++				if (err == MMC_BLK_NO_REQ_TO_STOP) {
++					pending_is_urgent = true;
++					/* wait for done/new/urgent event */
++					continue;
++				} else if (err && !context_info->is_done_rcv) {
+ 					err = MMC_BLK_ABORT;
+ 					break;
+ 				}
+-- 
+1.7.9.5
+

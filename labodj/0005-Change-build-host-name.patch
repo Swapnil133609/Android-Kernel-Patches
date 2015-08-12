@@ -1,0 +1,27 @@
+From 6bb6ddb0178a765b9f287e206d575e7ff11211c9 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Fri, 8 Nov 2013 22:33:40 +0100
+Subject: [PATCH 005/590] Change build host/name
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ scripts/mkcompile_h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/scripts/mkcompile_h b/scripts/mkcompile_h
+index f221ddf..c1c29fb 100755
+--- a/scripts/mkcompile_h
++++ b/scripts/mkcompile_h
+@@ -73,7 +73,7 @@ UTS_TRUNCATE="cut -b -$UTS_LEN"
+ 
+   echo \#define UTS_VERSION \"`echo $UTS_VERSION | $UTS_TRUNCATE`\"
+ 
+-  echo \#define LINUX_COMPILE_BY \"`echo $LINUX_COMPILE_BY | $UTS_TRUNCATE`\"
++  echo \#define LINUX_COMPILE_BY \"`echo $KBUILD_BUILD_USER | $UTS_TRUNCATE`\"
+   echo \#define LINUX_COMPILE_HOST \"`echo $LINUX_COMPILE_HOST | $UTS_TRUNCATE`\"
+ 
+   echo \#define LINUX_COMPILER \"`$CC -v 2>&1 | tail -n 1`\"
+-- 
+1.7.9.5
+

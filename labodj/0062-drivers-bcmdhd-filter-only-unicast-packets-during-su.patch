@@ -1,0 +1,42 @@
+From c707e1676165ce532085eb4b9f693ede59299ff6 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Tue, 12 Nov 2013 16:58:02 +0000
+Subject: [PATCH 062/590] drivers: bcmdhd: filter only unicast packets during
+ suspend, hopefully to reduce the wlan_rx wakelock
+ specially during very crowded Wi-Fi networks.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/net/wireless/bcmdhd/dhd_linux.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/net/wireless/bcmdhd/dhd_linux.c b/drivers/net/wireless/bcmdhd/dhd_linux.c
+index 4ef7c70..3605ea2 100644
+--- a/drivers/net/wireless/bcmdhd/dhd_linux.c
++++ b/drivers/net/wireless/bcmdhd/dhd_linux.c
+@@ -4087,9 +4087,10 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
+ 
+ #ifdef PKT_FILTER_SUPPORT
+ 	/* Setup default defintions for pktfilter , enable in suspend */
+-	dhd->pktfilter_count = 6;
++	dhd->pktfilter_count = 1;
+ 	/* Setup filter to allow only unicast */
+-	dhd->pktfilter[DHD_UNICAST_FILTER_NUM] = "100 0 0 0 0x01 0x00";
++	dhd->pktfilter[0] = "100 0 0 0 0x01 0x00";
++#if 0
+ 	dhd->pktfilter[DHD_BROADCAST_FILTER_NUM] = NULL;
+ 	dhd->pktfilter[DHD_MULTICAST4_FILTER_NUM] = NULL;
+ 	dhd->pktfilter[DHD_MULTICAST6_FILTER_NUM] = NULL;
+@@ -4097,7 +4098,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
+ 	dhd->pktfilter[DHD_MDNS_FILTER_NUM] = "104 0 0 0 0xFFFFFFFFFFFF 0x01005E0000FB";
+ 	/* apply APP pktfilter */
+ 	dhd->pktfilter[DHD_ARP_FILTER_NUM] = "105 0 0 12 0xFFFF 0x0806";
+-
++#endif
+ 
+ #if defined(SOFTAP)
+ 	if (ap_fw_loaded) {
+-- 
+1.7.9.5
+

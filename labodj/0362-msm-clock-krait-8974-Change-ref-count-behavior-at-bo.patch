@@ -1,0 +1,48 @@
+From 8871992b02671cd89e9e73333e40b9b28de70b92 Mon Sep 17 00:00:00 2001
+From: Mahesh Sivasubramanian <msivasub@codeaurora.org>
+Date: Thu, 21 Nov 2013 17:40:45 -0700
+Subject: [PATCH 362/590] msm: clock-krait-8974: Change ref count behavior at
+ boot
+
+Set up the refcount of the L2 clock to be equal to the number of online
+cores. This allows the clients of the CPU/L2 clocks that enable/disable
+them to be agnostic of the no. of cores that are online.
+
+For example, the CPU idle code can call clk_disable() on the L2 clock from
+all the cores' idle path without having to figure out if it's the last
+active core. If the core is the last core that's active, the ref count will
+go from 1 to 0 and the clock would get disabled.
+
+Also update cpufreq driver behavior to accomodate this change.
+
+Change-Id: If253a85ad62f0a6a78452dafc7afe86bd112cf73
+Signed-off-by: Mahesh Sivasubramanian <msivasub@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/cpufreq.c |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-msm/cpufreq.c b/arch/arm/mach-msm/cpufreq.c
+index d4ec19f..a156ff7 100644
+--- a/arch/arm/mach-msm/cpufreq.c
++++ b/arch/arm/mach-msm/cpufreq.c
+@@ -405,11 +405,15 @@ static int __cpuinit msm_cpufreq_cpu_callback(struct notifier_block *nfb,
+ 	case CPU_UP_CANCELED:
+ 		if (is_clk) {
+ 			clk_disable_unprepare(cpu_clk[cpu]);
++			clk_disable_unprepare(l2_clk);
+ 			update_l2_bw(NULL);
+ 		}
+ 		break;
+ 	case CPU_UP_PREPARE:
+ 		if (is_clk) {
++			rc = clk_prepare_enable(l2_clk);
++			if (rc < 0)
++				return NOTIFY_BAD;
+ 			rc = clk_prepare_enable(cpu_clk[cpu]);
+ 			if (rc < 0)
+ 				return NOTIFY_BAD;
+-- 
+1.7.9.5
+

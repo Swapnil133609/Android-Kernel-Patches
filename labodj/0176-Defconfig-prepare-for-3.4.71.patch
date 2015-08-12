@@ -1,0 +1,42 @@
+From 0406eed58841642311c7d63cec82c609030db84a Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Wed, 4 Dec 2013 13:08:35 +0100
+Subject: [PATCH 176/590] Defconfig: prepare for 3.4.71
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/labo_defconfig |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/labo_defconfig b/arch/arm/configs/labo_defconfig
+index 1bec29c..7e26fa4 100644
+--- a/arch/arm/configs/labo_defconfig
++++ b/arch/arm/configs/labo_defconfig
+@@ -1,6 +1,6 @@
+ #
+ # Automatically generated file; DO NOT EDIT.
+-# Linux/arm 3.4.0 Kernel Configuration
++# Linux/arm 3.4.71 Kernel Configuration
+ #
+ CONFIG_ARM=y
+ CONFIG_ARM_HAS_SG_CHAIN=y
+@@ -586,6 +586,7 @@ CONFIG_MULTI_IRQ_HANDLER=y
+ # CONFIG_ARM_ERRATA_754327 is not set
+ # CONFIG_ARM_ERRATA_764369 is not set
+ # CONFIG_KSAPI is not set
++# CONFIG_ARM_ERRATA_775420 is not set
+ CONFIG_ARM_GIC=y
+ # CONFIG_FIQ_DEBUGGER is not set
+ 
+@@ -2567,6 +2568,7 @@ CONFIG_SND_SOC_I2C_AND_SPI=y
+ CONFIG_SND_SOC_WCD9320=y
+ CONFIG_SND_SOC_MSM_STUB=y
+ CONFIG_SND_SOC_MSM_HDMI_CODEC_RX=y
++CONFIG_SOUND_CONTROL_HAX_3_GPL=y
+ # CONFIG_SOUND_PRIME is not set
+ CONFIG_HID_SUPPORT=y
+ CONFIG_HID=y
+-- 
+1.7.9.5
+

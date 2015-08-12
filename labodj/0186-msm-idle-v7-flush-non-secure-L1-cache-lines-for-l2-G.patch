@@ -1,0 +1,36 @@
+From 9f769721bca37d8275463062f882699a39e74c07 Mon Sep 17 00:00:00 2001
+From: Murali Nalajala <mnalajal@codeaurora.org>
+Date: Tue, 8 Oct 2013 20:38:57 +0530
+Subject: [PATCH 186/590] msm: idle-v7: flush non secure L1 cache lines for l2
+ GDHS LPM mode
+
+It is LPM driver(HLOS) responsiblity to flush non secure lines of
+L1 cache when the core decide to enter a LPM mode where core get
+powered off. But current code is not flushing the non secure lines
+of L1 cache when the core decide to enter into L2 GDHS LPM mode.
+This change addresses the flushing of non secure lines of L1 cache.
+
+CRs-fixed: 555905
+Change-Id: I721947386091875994bcb71bd8b9b9b793a72349
+Signed-off-by: Murali Nalajala <mnalajal@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/idle-v7.S |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-msm/idle-v7.S b/arch/arm/mach-msm/idle-v7.S
+index 6840f1c..07cd8f0 100644
+--- a/arch/arm/mach-msm/idle-v7.S
++++ b/arch/arm/mach-msm/idle-v7.S
+@@ -110,6 +110,7 @@ ENTRY(msm_pm_collapse)
+ 	mov	r2, #1
+ 	and	r1, r2, r1, ASR #30 /* Check if the cache is write back */
+ 	orr	r1, r0, r1
++	and	r1, r1, #1
+ 	cmp	r1, #1
+ 	bne	skip
+ 	bl	v7_flush_dcache_all
+-- 
+1.7.9.5
+

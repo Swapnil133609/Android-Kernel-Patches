@@ -1,0 +1,38 @@
+From cb200340a99a7bc948f229eeefce9f4d75f33667 Mon Sep 17 00:00:00 2001
+From: Neeti Desai <neetid@codeaurora.org>
+Date: Wed, 31 Jul 2013 14:34:17 -0700
+Subject: [PATCH 458/590] Kconfig: Add config option to support vmalloc
+ savings
+
+The virtual space belonging to any subsystem which is
+expected to have a lifetime of the entire system can be
+reclaimed. Adding config option to enable or disable
+this feature.
+
+Change-Id: I56faef4b71c948185fdfe336054a5951dfa8d011
+Signed-off-by: Neeti Desai <neetid@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/Kconfig |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9735404..a99a2a1 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1858,6 +1858,11 @@ config ENABLE_DMM
+ 
+ config DONT_MAP_HOLE_AFTER_MEMBANK0
+ 	def_bool n
++	depends on ENABLE_VMALLOC_SAVING=n
++
++config ENABLE_VMALLOC_SAVING
++	def_bool n
++	depends on DONT_MAP_HOLE_AFTER_MEMBANK0=n
+ 
+ config HOLES_IN_ZONE
+ 	def_bool n
+-- 
+1.7.9.5
+

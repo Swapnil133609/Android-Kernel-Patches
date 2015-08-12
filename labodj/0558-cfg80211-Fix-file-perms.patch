@@ -1,0 +1,17 @@
+From 7065e296880acef02798ea6dce100be8fab7ed8e Mon Sep 17 00:00:00 2001
+From: myfluxi <linflux@arcor.de>
+Date: Sun, 29 Dec 2013 10:09:20 +0100
+Subject: [PATCH 558/590] cfg80211: Fix file perms
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ 0 files changed
+ mode change 100755 => 100644 net/wireless/reg.c
+
+diff --git a/net/wireless/reg.c b/net/wireless/reg.c
+old mode 100755
+new mode 100644
+-- 
+1.7.9.5
+

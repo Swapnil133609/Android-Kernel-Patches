@@ -1,0 +1,42 @@
+From f4ea9e73b8e27e37574dff7b4261d01bb436b87a Mon Sep 17 00:00:00 2001
+From: Mitchel Humpherys <mitchelh@codeaurora.org>
+Date: Mon, 18 Nov 2013 16:47:00 -0800
+Subject: [PATCH 481/590] gpu: ion: add locking to traversal of volatile rb
+ tree
+
+In ion_debug_heap_show we're iterating over an rb tree (dev->clients)
+that could change while we're iterating. Fix this by taking the lock
+that is used to control access to this tree.
+
+CRs-Fixed: 571918
+Change-Id: I6832e1e98e2d2a69fc653451d3752d43ec3ef269
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/ion/ion.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/gpu/ion/ion.c b/drivers/gpu/ion/ion.c
+index ae66615..c791c49 100644
+--- a/drivers/gpu/ion/ion.c
++++ b/drivers/gpu/ion/ion.c
+@@ -1542,6 +1542,7 @@ static int ion_debug_heap_show(struct seq_file *s, void *unused)
+ 	seq_printf(s, "%16.s %16.s %16.s\n", "client", "pid", "size");
+ 	seq_printf(s, "----------------------------------------------------\n");
+ 
++	down_read(&dev->lock);
+ 	for (n = rb_first(&dev->clients); n; n = rb_next(n)) {
+ 		struct ion_client *client = rb_entry(n, struct ion_client,
+ 						     node);
+@@ -1559,6 +1560,7 @@ static int ion_debug_heap_show(struct seq_file *s, void *unused)
+ 				   client->pid, size);
+ 		}
+ 	}
++	up_read(&dev->lock);
+ 	seq_printf(s, "----------------------------------------------------\n");
+ 	seq_printf(s, "orphaned allocations (info is from last known client):"
+ 		   "\n");
+-- 
+1.7.9.5
+

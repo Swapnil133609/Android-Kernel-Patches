@@ -1,0 +1,28 @@
+From 00d4e89d904ffca7460c8bc86e138e283263ab18 Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Fri, 6 Dec 2013 17:30:11 +0000
+Subject: [PATCH 206/590] Revert "net: wireless: bcmdhd: Fixed a problem of
+ buganizer issue (11190960)"
+
+This reverts commit 24bf61016206ba6fb0edb2b4593f8197fd89137e.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/net/wireless/bcmdhd/wl_cfg80211.c |    1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/net/wireless/bcmdhd/wl_cfg80211.c b/drivers/net/wireless/bcmdhd/wl_cfg80211.c
+index cc2a0e8..0bdaf4e 100644
+--- a/drivers/net/wireless/bcmdhd/wl_cfg80211.c
++++ b/drivers/net/wireless/bcmdhd/wl_cfg80211.c
+@@ -8084,7 +8084,6 @@ wl_notify_sched_scan_results(struct wl_priv *wl, struct net_device *ndev,
+ 				wl_clr_drv_status(wl, SCANNING, ndev);
+ 				goto out_err;
+ 			}
+-			p2p_scan(wl) = false;
+ 		}
+ 
+ 		wl_set_drv_status(wl, SCANNING, ndev);
+-- 
+1.7.9.5
+

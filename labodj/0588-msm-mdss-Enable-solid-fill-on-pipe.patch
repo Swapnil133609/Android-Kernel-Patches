@@ -1,0 +1,185 @@
+From 6ec620675e6af96596cd9171b3b38242e8ab8eee Mon Sep 17 00:00:00 2001
+From: Adrian Salido-Moreno <adrianm@codeaurora.org>
+Date: Wed, 3 Jul 2013 15:41:33 -0700
+Subject: [PATCH 588/590] msm: mdss: Enable solid fill on pipe
+
+Add support to enable solid fill on pipe with an option to
+configure fill-color by userspace. This support does not confine
+to background pipe and can be used to enable solid fill on any source
+surface processing pipes irrespective of the z-order.
+This support can be used in requirements involving constant
+color layers.
+
+Change-Id: Iae3c2968ca2f2f1be161e9c2f857641ffbb859e5
+Signed-off-by: Adrian Salido-Moreno <adrianm@codeaurora.org>
+Signed-off-by: Mayank Chopra <makchopra@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_mdp.h         |    2 ++
+ drivers/video/msm/mdss/mdss_mdp_overlay.c |   12 ++++++--
+ drivers/video/msm/mdss/mdss_mdp_pipe.c    |    5 ++-
+ include/linux/msm_mdp.h                   |   47 ++++++++++++++++++++++++++++-
+ 4 files changed, 62 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_mdp.h b/drivers/video/msm/mdss/mdss_mdp.h
+index edfcc54..9d27a88 100644
+--- a/drivers/video/msm/mdss/mdss_mdp.h
++++ b/drivers/video/msm/mdss/mdss_mdp.h
+@@ -351,6 +351,8 @@ struct mdss_mdp_pipe {
+ 	u8 blend_op;
+ 	u8 overfetch_disable;
+ 	u32 transp;
++	u32 bg_color;
++	u8 has_buf;
+ 
+ 	struct msm_fb_data_type *mfd;
+ 	struct mdss_mdp_mixer *mixer;
+diff --git a/drivers/video/msm/mdss/mdss_mdp_overlay.c b/drivers/video/msm/mdss/mdss_mdp_overlay.c
+index cc57dc7..07df226 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_overlay.c
++++ b/drivers/video/msm/mdss/mdss_mdp_overlay.c
+@@ -517,6 +517,9 @@ static int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
+ 	} else {
+ 		pipe->overfetch_disable = 0;
+ 	}
++	pipe->overfetch_disable = fmt->is_yuv &&
++			!(pipe->flags & MDP_SOURCE_ROTATED_90);
++	pipe->bg_color = req->bg_color;
+ 
+ 	req->id = pipe->ndx;
+ 	pipe->req_data = *req;
+@@ -604,6 +607,7 @@ static int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
+ 	}
+ 
+ 	pipe->params_changed++;
++	pipe->has_buf = 0;
+ 
+ 	req->vert_deci = pipe->vert_deci;
+ 
+@@ -851,8 +855,9 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd)
+ 		} else if (pipe->front_buf.num_planes) {
+ 			buf = &pipe->front_buf;
+ 		} else {
+-			pr_warn("pipe queue w/o buffer\n");
+-			continue;
++			pr_debug("no buf detected pnum=%d use solid fill\n",
++					pipe->num);
++			buf = NULL;
+ 		}
+ 
+ 		ret = mdss_mdp_pipe_queue_data(pipe, buf);
+@@ -1119,6 +1124,7 @@ static int mdss_mdp_overlay_queue(struct msm_fb_data_type *mfd,
+ 	if (IS_ERR_VALUE(ret)) {
+ 		pr_err("src_data pmem error\n");
+ 	}
++	pipe->has_buf = 1;
+ 	mdss_mdp_pipe_unmap(pipe);
+ 
+ 	return ret;
+@@ -1361,6 +1367,7 @@ static void mdss_mdp_overlay_pan_display(struct msm_fb_data_type *mfd)
+ 	buf->p[0].addr += offset;
+ 	buf->p[0].len = fbi->fix.smem_len - offset;
+ 	buf->num_planes = 1;
++	pipe->has_buf = 1;
+ 	mdss_mdp_pipe_unmap(pipe);
+ 
+ 	if (fbi->var.xres > MAX_MIXER_WIDTH || mfd->split_display) {
+@@ -1375,6 +1382,7 @@ static void mdss_mdp_overlay_pan_display(struct msm_fb_data_type *mfd)
+ 			goto pan_display_error;
+ 		}
+ 		pipe->back_buf = *buf;
++		pipe->has_buf = 1;
+ 		mdss_mdp_pipe_unmap(pipe);
+ 	}
+ 	mutex_unlock(&mdp5_data->ov_lock);
+diff --git a/drivers/video/msm/mdss/mdss_mdp_pipe.c b/drivers/video/msm/mdss/mdss_mdp_pipe.c
+index 5b029ed..a00b455 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_pipe.c
++++ b/drivers/video/msm/mdss/mdss_mdp_pipe.c
+@@ -710,6 +710,8 @@ static int mdss_mdp_pipe_solidfill_setup(struct mdss_mdp_pipe *pipe)
+ 	secure = (pipe->flags & MDP_SECURE_OVERLAY_SESSION ? 0xF : 0x0);
+ 
+ 	mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_SSPP_SRC_FORMAT, format);
++	mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_SSPP_SRC_CONSTANT_COLOR,
++		pipe->bg_color);
+ 	mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_SSPP_SRC_ADDR_SW_STATUS, secure);
+ 
+ 	return 0;
+@@ -746,7 +748,8 @@ int mdss_mdp_pipe_queue_data(struct mdss_mdp_pipe *pipe,
+ 			 ((pipe->type == MDSS_MDP_PIPE_TYPE_DMA) &&
+ 			 (pipe->mixer->type == MDSS_MDP_MIXER_TYPE_WRITEBACK)
+ 			 && (ctl->mdata->mixer_switched));
+-	if (src_data == NULL) {
++	if (src_data == NULL || !pipe->has_buf) {
++		pipe->params_changed = 0;
+ 		mdss_mdp_pipe_solidfill_setup(pipe);
+ 		goto update_nobuf;
+ 	}
+diff --git a/include/linux/msm_mdp.h b/include/linux/msm_mdp.h
+index 08a0ec4..b0d0e24 100644
+--- a/include/linux/msm_mdp.h
++++ b/include/linux/msm_mdp.h
+@@ -434,6 +434,50 @@ enum mdss_mdp_blend_op {
+ 	BLEND_OP_MAX,
+ };
+ 
++/**
++ * struct mdp_overlay - overlay surface structure
++ * @src:	Source image information (width, height, format).
++ * @src_rect:	Source crop rectangle, portion of image that will be fetched.
++ *		This should always be within boundaries of source image.
++ * @dst_rect:	Destination rectangle, the position and size of image on screen.
++ *		This should always be within panel boundaries.
++ * @z_order:	Blending stage to occupy in display, if multiple layers are
++ *		present, highest z_order usually means the top most visible
++ *		layer. The range acceptable is from 0-3 to support blending
++ *		up to 4 layers.
++ * @is_fg:	This flag is used to disable blending of any layers with z_order
++ *		less than this overlay. It means that any layers with z_order
++ *		less than this layer will not be blended and will be replaced
++ *		by the background border color.
++ * @alpha:	Used to set plane opacity. The range can be from 0-255, where
++ *		0 means completely transparent and 255 means fully opaque.
++ * @transp_mask: Color used as color key for transparency. Any pixel in fetched
++ *		image matching this color will be transparent when blending.
++ *		The color should be in same format as the source image format.
++ * @flags:	This is used to customize operation of overlay. See MDP flags
++ *		for more information.
++ * @user_data:	DEPRECATED* Used to store user application specific information.
++ * @bg_color:	Solid color used to fill the overlay surface when no source
++ *		buffer is provided.
++ * @horz_deci:	Horizontal decimation value, this indicates the amount of pixels
++ *		dropped for each pixel that is fetched from a line. The value
++ *		given should be power of two of decimation amount.
++ *		0: no decimation
++ *		1: decimate by 2 (drop 1 pixel for each pixel fetched)
++ *		2: decimate by 4 (drop 3 pixels for each pixel fetched)
++ *		3: decimate by 8 (drop 7 pixels for each pixel fetched)
++ *		4: decimate by 16 (drop 15 pixels for each pixel fetched)
++ * @vert_deci:	Vertical decimation value, this indicates the amount of lines
++ *		dropped for each line that is fetched from overlay. The value
++ *		given should be power of two of decimation amount.
++ *		0: no decimation
++ *		1: decimation by 2 (drop 1 line for each line fetched)
++ *		2: decimation by 4 (drop 3 lines for each line fetched)
++ *		3: decimation by 8 (drop 7 lines for each line fetched)
++ *		4: decimation by 16 (drop 15 lines for each line fetched)
++ * @overlay_pp_cfg: Overlay post processing configuration, for more information
++ *		see struct mdp_overlay_pp_params.
++ */
+ struct mdp_overlay {
+ 	struct msmfb_img src;
+ 	struct mdp_rect src_rect;
+@@ -445,7 +489,8 @@ struct mdp_overlay {
+ 	uint32_t transp_mask;
+ 	uint32_t flags;
+ 	uint32_t id;
+-	uint32_t user_data[7];
++	uint32_t user_data[6];
++	uint32_t bg_color;
+ 	uint8_t horz_deci;
+ 	uint8_t vert_deci;
+ 	struct mdp_overlay_pp_params overlay_pp_cfg;
+-- 
+1.7.9.5
+

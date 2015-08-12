@@ -1,0 +1,110 @@
+From 7ee63e25bdd326a95915729cee5d23ee29c3e637 Mon Sep 17 00:00:00 2001
+From: Laura Abbott <lauraa@codeaurora.org>
+Date: Mon, 3 Jun 2013 11:15:06 -0700
+Subject: [PATCH 525/590] gpu: ion: Add support for getting the heap size of
+ CMA regions
+
+Currently, Ion heaps are able to allocate memory from appropriate
+CMA regions without knowing the maximum size of the CMA region. New
+Ion algorithms necessitate having the size of the heap available
+for accounting. Add code to parse the devicetree to get the size of
+the CMA region and associate it with the appropriate heap.
+
+Change-Id: Ia9b560d496c76209c6116fa00f24f7b624c954f3
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/ion/msm/msm_ion.c |   42 +++++++++++++++++++++++++++++++++++------
+ 1 file changed, 36 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/ion/msm/msm_ion.c b/drivers/gpu/ion/msm/msm_ion.c
+index 87717d5..a3bfbb6 100644
+--- a/drivers/gpu/ion/msm/msm_ion.c
++++ b/drivers/gpu/ion/msm/msm_ion.c
+@@ -19,6 +19,7 @@
+ #include <linux/memory_alloc.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
++#include <linux/of_address.h>
+ #include <linux/mm.h>
+ #include <linux/mm_types.h>
+ #include <linux/sched.h>
+@@ -26,6 +27,7 @@
+ #include <linux/uaccess.h>
+ #include <linux/memblock.h>
+ #include <linux/dma-mapping.h>
++#include <linux/dma-contiguous.h>
+ #include <mach/ion.h>
+ #include <mach/msm_memtypes.h>
+ #include <asm/cacheflush.h>
+@@ -671,6 +673,7 @@ static int msm_ion_get_heap_size(struct device_node *node,
+ 	int ret = 0;
+ 	u32 out_values[2];
+ 	const char *memory_name_prop;
++	struct device_node *pnode;
+ 
+ 	ret = of_property_read_u32(node, "qcom,memory-reservation-size", &val);
+ 	if (!ret) {
+@@ -692,14 +695,33 @@ static int msm_ion_get_heap_size(struct device_node *node,
+ 				__func__);
+ 			ret = -EINVAL;
+ 		}
+-	} else {
+-		ret = of_property_read_u32_array(node, "qcom,memory-fixed",
++		goto out;
++	}
++
++	ret = of_property_read_u32_array(node, "qcom,memory-fixed",
+ 								out_values, 2);
+-		if (!ret)
+-			heap->size = out_values[1];
+-		else
+-			ret = 0;
++	if (!ret) {
++		heap->size = out_values[1];
++		goto out;
+ 	}
++
++	pnode = of_parse_phandle(node, "linux,contiguous-region", 0);
++	if (pnode != NULL) {
++		const u32 *addr;
++		u64 size;
++
++		addr = of_get_address(pnode, 0, &size, NULL);
++		if (!addr) {
++			of_node_put(pnode);
++			ret = -EINVAL;
++			goto out;
++		}
++		heap->size = (u32) size;
++		ret = 0;
++		of_node_put(pnode);
++	}
++
++	ret = 0;
+ out:
+ 	return ret;
+ }
+@@ -709,11 +731,19 @@ static void msm_ion_get_heap_base(struct device_node *node,
+ {
+ 	u32 out_values[2];
+ 	int ret = 0;
++	struct device_node *pnode;
+ 
+ 	ret = of_property_read_u32_array(node, "qcom,memory-fixed",
+ 							out_values, 2);
+ 	if (!ret)
+ 		heap->base = out_values[0];
++
++	pnode = of_parse_phandle(node, "linux,contiguous-region", 0);
++	if (pnode != NULL) {
++		heap->base = cma_get_base(heap->priv);
++		of_node_put(pnode);
++	}
++
+ 	return;
+ }
+ 
+-- 
+1.7.9.5
+

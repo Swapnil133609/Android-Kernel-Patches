@@ -1,0 +1,28 @@
+From 9af7dcb4d445cd530a9b92e53bd3c5b8beaaa89c Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Mon, 11 Nov 2013 05:37:02 +0000
+Subject: [PATCH 060/590] backlight: use exponential backlight control instead
+ of linear.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/backlight/lm3630_bl.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/video/backlight/lm3630_bl.c b/drivers/video/backlight/lm3630_bl.c
+index 3263d90..f686074 100644
+--- a/drivers/video/backlight/lm3630_bl.c
++++ b/drivers/video/backlight/lm3630_bl.c
+@@ -586,7 +586,7 @@ static int lm3630_probe(struct i2c_client *client,
+ 		dev->boost_ctrl_reg = pdata->boost_ctrl_reg;
+ 		dev->bank_sel = pdata->bank_sel;
+ 		dev->linear_map = pdata->linear_map;
+-		dev->max_current = pdata->max_current;
++		dev->max_current = pdata->max_current &= ~(2);
+ 		dev->min_brightness = pdata->min_brightness;
+ 		dev->default_brightness = pdata->default_brightness;
+ 		dev->max_brightness = pdata->max_brightness;
+-- 
+1.7.9.5
+

@@ -1,0 +1,48 @@
+From 4aa68f1ae8a60e9831a695b04a7e8c06ce970143 Mon Sep 17 00:00:00 2001
+From: Mihir Shete <smihir@codeaurora.org>
+Date: Tue, 29 Oct 2013 19:54:03 +0530
+Subject: [PATCH 553/590] cfg80211: fix set_regdom() to cancel requests with
+ same alpha2
+
+Use a different error code if the regdomain is same and then
+set the request processed so that it doesn't block new
+requests.
+
+Git-commit: 959085352b7c44ff9bae4d8a4d76146193260e4c
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/linville/wireless-testing.git
+Author: Kalle Valo <kvalo@qca.qualcomm.com>
+Date: Thu Jul 12 15:33:58 2012 +0300
+
+Change-Id: I8cbcf80bb43d983c72cf9037f30e11ae8d329b06
+Signed-off-by: Mihir Shete <smihir@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ net/wireless/reg.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/net/wireless/reg.c b/net/wireless/reg.c
+index b1cea17..160b3b6 100755
+--- a/net/wireless/reg.c
++++ b/net/wireless/reg.c
+@@ -2145,7 +2145,7 @@ static int __set_regdom(const struct ieee80211_regdomain *rd)
+ 		 * checking if the alpha2 changes if CRDA was already called
+ 		 */
+ 		if (!regdom_changes(rd->alpha2))
+-			return -EINVAL;
++			return -EALREADY;
+ 	}
+ 
+ 	/*
+@@ -2270,6 +2270,9 @@ int set_regdom(const struct ieee80211_regdomain *rd)
+ 	/* Note that this doesn't update the wiphys, this is done below */
+ 	r = __set_regdom(rd);
+ 	if (r) {
++		if (r == -EALREADY)
++			reg_set_request_processed();
++
+ 		kfree(rd);
+ 		mutex_unlock(&reg_mutex);
+ 		return r;
+-- 
+1.7.9.5
+

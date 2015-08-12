@@ -1,0 +1,59 @@
+From d0da40c90b6be0f944909f802b20f5383e6cfff9 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Wed, 27 Nov 2013 19:05:37 +0000
+Subject: [PATCH 134/590] cpufreq: interactive: instead of bumping the
+ target_cpu freq to the source_cpu current freq make
+ it boost to SYNC_FREQ instead at 960MHz (maybe
+ configurable in the future?) and that should be
+ enough and help with the performance/battery ratio.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |   13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index d95b121..bd8f0cf 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -68,7 +68,7 @@ static struct mutex gov_lock;
+ static unsigned int hispeed_freq = 1728000;
+ 
+ /* Go to hi speed when CPU load at or above this value. */
+-#define DEFAULT_GO_HISPEED_LOAD 85
++#define DEFAULT_GO_HISPEED_LOAD 95
+ static unsigned long go_hispeed_load = DEFAULT_GO_HISPEED_LOAD;
+ 
+ /* Target load.  Lower values result in higher CPU speeds. */
+@@ -124,6 +124,8 @@ static bool io_is_busy = true;
+ #define DEFAULT_INPUT_BOOST_FREQ 1267200
+ static int input_boost_freq = DEFAULT_INPUT_BOOST_FREQ;
+ 
++#define CPU_SYNC_FREQ 960000
++
+ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
+ 		unsigned int event);
+ 
+@@ -699,14 +701,13 @@ static int thread_migration_notify(struct notifier_block *nb,
+ 				unsigned long target_cpu, void *arg)
+ {
+ 	unsigned long flags;
+-	struct cpufreq_interactive_cpuinfo *target, *source;
++	struct cpufreq_interactive_cpuinfo *target;
+ 	target = &per_cpu(cpuinfo, target_cpu);
+-	source = &per_cpu(cpuinfo, (int)arg);
+ 	
+-	if (target->policy->cur < source->policy->cur)
++	if (target->policy->cur < CPU_SYNC_FREQ)
+ 	{
+-		target->target_freq = source->policy->cur;
+-		target->floor_freq = source->policy->cur;
++		target->target_freq = CPU_SYNC_FREQ;
++		target->floor_freq = CPU_SYNC_FREQ;
+ 		target->floor_validate_time = ktime_to_us(ktime_get());
+ 
+ 		spin_lock_irqsave(&speedchange_cpumask_lock, flags);
+-- 
+1.7.9.5
+

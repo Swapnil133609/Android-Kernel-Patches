@@ -1,0 +1,27 @@
+From 7bd586ab162dcd5e685b6894c45aacfe706d5a88 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Mon, 16 Dec 2013 13:02:06 +0100
+Subject: [PATCH 391/590] Defconfig: r22
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/labo_defconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/labo_defconfig b/arch/arm/configs/labo_defconfig
+index 335a958..15ef9cb 100644
+--- a/arch/arm/configs/labo_defconfig
++++ b/arch/arm/configs/labo_defconfig
+@@ -481,7 +481,7 @@ CONFIG_MSM_DIRECT_SCLK_ACCESS=y
+ CONFIG_IOMMU_API=y
+ CONFIG_MSM_GPIOMUX=y
+ CONFIG_MSM_NATIVE_RESTART=y
+-CONFIG_MSM_PM8X60=y
++CONFIG_MSM_PM=y
+ CONFIG_MSM_EVENT_TIMER=y
+ CONFIG_MSM_BUS_SCALING=y
+ # CONFIG_MSM_BUS_RPM_MULTI_TIER_ENABLED is not set
+-- 
+1.7.9.5
+

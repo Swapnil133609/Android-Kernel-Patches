@@ -1,0 +1,85 @@
+From 984aa1fdb651cc045d1f2d27df0c7fd1629af1db Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Tue, 26 Nov 2013 21:40:03 +0000
+Subject: [PATCH 121/590] Temporarily remove suspend_frequency, it seems some
+ users are experiencing audio stutter on screen off
+ if theres a connectivity change eg. Wi-Fi powering
+ up or 2G to 3G.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/kernel/mako_hotplug.c      |   14 --------------
+ drivers/misc/mako_hotplug_control.c |    2 --
+ 2 files changed, 16 deletions(-)
+
+diff --git a/arch/arm/kernel/mako_hotplug.c b/arch/arm/kernel/mako_hotplug.c
+index 74ea2d1..3f46a3c 100644
+--- a/arch/arm/kernel/mako_hotplug.c
++++ b/arch/arm/kernel/mako_hotplug.c
+@@ -199,35 +199,22 @@ static void hotplug_suspend(struct work_struct *work)
+     stats.counter[0] = 0;
+     stats.counter[1] = 0;
+ 
+-    /* cap max frequency to 1190MHz by default */
+ 	for_each_possible_cpu(cpu)
+ 	{
+-    	msm_cpufreq_set_freq_limits(cpu, MSM_CPUFREQ_NO_LIMIT, 
+-            stats.suspend_frequency);
+-
+ 		if (cpu_online(cpu) && cpu)
+ 			cpu_down(cpu);
+ 	}
+-
+-    pr_info("Cpulimit: Suspend - limit cpus max frequency to: %dMHz\n", 
+-			stats.suspend_frequency/1000);
+ }
+ 
+ static void __ref hotplug_resume(struct work_struct *work)
+ {  
+     int cpu;
+ 
+-	/* restore max frequency */
+ 	for_each_possible_cpu(cpu)
+ 	{
+-    	msm_cpufreq_set_freq_limits(cpu, MSM_CPUFREQ_NO_LIMIT, 
+-				MSM_CPUFREQ_NO_LIMIT);
+-
+ 		if (cpu_is_offline(cpu) && cpu)
+ 			cpu_up(cpu);
+ 	}
+-
+-    pr_info("Cpulimit: Resume - restore cpus max frequency.\n");
+     
+     pr_info("Resume starting Hotplug work...\n");
+     queue_delayed_work(wq, &decide_hotplug, HZ);
+@@ -236,7 +223,6 @@ static void __ref hotplug_resume(struct work_struct *work)
+ static int __ref lcd_notifier_callback(struct notifier_block *this,
+ 				unsigned long event, void *data)
+ {
+-
+ 	switch (event) {
+ 	case LCD_EVENT_ON_START:
+ 		pr_info("LCD is on.\n");
+diff --git a/drivers/misc/mako_hotplug_control.c b/drivers/misc/mako_hotplug_control.c
+index 7114719..7b6653d 100644
+--- a/drivers/misc/mako_hotplug_control.c
++++ b/drivers/misc/mako_hotplug_control.c
+@@ -80,14 +80,12 @@ static ssize_t mako_hotplug_control_version(struct device *dev, struct device_at
+ }
+ 
+ static DEVICE_ATTR(first_level, 0777, first_level_show, first_level_store);
+-static DEVICE_ATTR(suspend_frequency, 0777, suspend_frequency_show, suspend_frequency_store);
+ static DEVICE_ATTR(cores_on_touch, 0777, cores_on_touch_show, cores_on_touch_store);
+ static DEVICE_ATTR(version, 0777 , mako_hotplug_control_version, NULL);
+ 
+ static struct attribute *mako_hotplug_control_attributes[] =
+ {
+ 	&dev_attr_first_level.attr,
+-    &dev_attr_suspend_frequency.attr,
+     &dev_attr_cores_on_touch.attr,
+ 	&dev_attr_version.attr,
+ 	NULL
+-- 
+1.7.9.5
+

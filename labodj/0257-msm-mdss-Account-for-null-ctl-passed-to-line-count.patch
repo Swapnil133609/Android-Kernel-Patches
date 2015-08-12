@@ -1,0 +1,44 @@
+From 815816b52ca5defe265ffe53cc189be86e581fa0 Mon Sep 17 00:00:00 2001
+From: Ajay Dudani <adudani@codeaurora.org>
+Date: Sat, 12 Oct 2013 16:21:40 -0700
+Subject: [PATCH 257/590] msm: mdss: Account for null ctl passed to line count
+
+Line count could be passed a null ctl structure,
+which would cause a kernel panic. To prevent this,
+line count will just return 0 if a null parameter
+is passed.
+
+Change-Id: I2b52533e6b67b842542de5b81be5b43fccc364dc
+CRs-Fixed: 551701
+Signed-off-by: Casey Piper <cpiper@codeaurora.org>
+Signed-off-by: Ajay Dudani <adudani@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_mdp_intf_video.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_mdp_intf_video.c b/drivers/video/msm/mdss/mdss_mdp_intf_video.c
+index 68df04a..9faf953 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_intf_video.c
++++ b/drivers/video/msm/mdss/mdss_mdp_intf_video.c
+@@ -76,11 +76,15 @@ static inline u32 mdp_video_read(struct mdss_mdp_video_ctx *ctx,
+ 
+ static inline u32 mdss_mdp_video_line_count(struct mdss_mdp_ctl *ctl)
+ {
+-	struct mdss_mdp_video_ctx *ctx = ctl->priv_data;
++	struct mdss_mdp_video_ctx *ctx;
+ 	u32 line_cnt = 0;
++	if (!ctl || !ctl->priv_data)
++		goto line_count_exit;
++	ctx = ctl->priv_data;
+ 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
+ 	line_cnt = mdp_video_read(ctx, MDSS_MDP_REG_INTF_LINE_COUNT);
+ 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
++line_count_exit:
+ 	return line_cnt;
+ }
+ 
+-- 
+1.7.9.5
+

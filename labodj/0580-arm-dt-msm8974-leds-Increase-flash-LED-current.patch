@@ -1,0 +1,38 @@
+From e9c6086ed439f9fbee0265b9406030f9046f3404 Mon Sep 17 00:00:00 2001
+From: Pranav Vashi <neobuddy89@gmail.com>
+Date: Fri, 27 Dec 2013 09:00:09 -0800
+Subject: [PATCH 580/590] arm/dt: msm8974-leds: Increase flash LED current
+
+By increasing LED flash current, camera gets better image quality.
+
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/boot/dts/msm8974-leds.dtsi |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/msm8974-leds.dtsi b/arch/arm/boot/dts/msm8974-leds.dtsi
+index b08ed4b..b047f6b 100644
+--- a/arch/arm/boot/dts/msm8974-leds.dtsi
++++ b/arch/arm/boot/dts/msm8974-leds.dtsi
+@@ -75,7 +75,7 @@
+ 					"flash0_trigger";
+ 				qcom,id = <1>;
+ 				linux,name = "led:flash_0";
+-				qcom,current = <620>;
++				qcom,current = <1000>;
+ 			};
+ 
+ 			pm8941_flash1: qcom,flash_1 {
+@@ -91,7 +91,7 @@
+ 				label = "flash";
+ 				qcom,id = <2>;
+ 				linux,name = "led:flash_1";
+-				qcom,current = <620>;
++				qcom,current = <1000>;
+ 			};
+ 
+ 			pm8941_torch: qcom,flash_torch {
+-- 
+1.7.9.5
+

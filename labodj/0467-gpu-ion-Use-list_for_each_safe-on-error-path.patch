@@ -1,0 +1,33 @@
+From 03f8b7d9438cf7568c67dbd9f118085048103858 Mon Sep 17 00:00:00 2001
+From: Laura Abbott <lauraa@codeaurora.org>
+Date: Thu, 14 Nov 2013 07:24:29 -0800
+Subject: [PATCH 467/590] gpu: ion: Use list_for_each_safe on error path
+
+On an error, the list of pages is walked and destroyed. Since the list
+is being destroyed, use list_for_each_safe to avoid list corruption.
+
+Change-Id: Ia397a11d2d890b3458745820c79df2adaa088ade
+CRs-Fixed: 565183
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/ion/ion_system_heap.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/ion/ion_system_heap.c b/drivers/gpu/ion/ion_system_heap.c
+index 44bb86f..e1b3383 100644
+--- a/drivers/gpu/ion/ion_system_heap.c
++++ b/drivers/gpu/ion/ion_system_heap.c
+@@ -212,7 +212,7 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
+ err1:
+ 	kfree(table);
+ err:
+-	list_for_each_entry(info, &pages, list) {
++	list_for_each_entry_safe(info, tmp_info, &pages, list) {
+ 		free_buffer_page(sys_heap, buffer, info->page, info->order);
+ 		kfree(info);
+ 	}
+-- 
+1.7.9.5
+

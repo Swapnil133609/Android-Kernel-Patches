@@ -1,0 +1,129 @@
+From 133d72090f65641ed6ad2ee7b24349483080d33c Mon Sep 17 00:00:00 2001
+From: Jeremy Gebben <jgebben@codeaurora.org>
+Date: Thu, 24 Oct 2013 14:07:34 -0600
+Subject: [PATCH 238/590] msm: kgsl: always check kgsl_active_count_get()
+ result
+
+Getting an active count can fail if the hardware doesn't
+actually wake up. Make active count get functions __mustcheck
+to remind people of this and fix existing calls to
+handle the error.
+
+Change-Id: I5a0202c824ac7e436b9061da6d8f638e44e8b7f6
+Signed-off-by: Jeremy Gebben <jgebben@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/msm/kgsl.c         |   26 +++++++++++++++-----------
+ drivers/gpu/msm/kgsl_pwrctrl.h |    4 ++--
+ drivers/gpu/msm/z180.c         |    6 ++++--
+ 3 files changed, 21 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/gpu/msm/kgsl.c b/drivers/gpu/msm/kgsl.c
+index ffbd52d..42eb1ef 100644
+--- a/drivers/gpu/msm/kgsl.c
++++ b/drivers/gpu/msm/kgsl.c
+@@ -930,21 +930,16 @@ int kgsl_close_device(struct kgsl_device *device)
+ 	device->open_count--;
+ 	if (device->open_count == 0) {
+ 
+-		/* Wait for the active count to go to 1 */
+-		kgsl_active_count_wait(device, 1);
++		/* Wait for the active count to go to 0 */
++		kgsl_active_count_wait(device, 0);
+ 
+ 		/* Fail if the wait times out */
+-		BUG_ON(atomic_read(&device->active_cnt) > 1);
++		BUG_ON(atomic_read(&device->active_cnt) > 0);
+ 
++		/* Force power on to do the stop */
++		kgsl_pwrctrl_enable(device);
+ 		result = device->ftbl->stop(device);
+ 		kgsl_pwrctrl_set_state(device, KGSL_STATE_INIT);
+-		/*
+-		 * active_cnt special case: we just stopped the device,
+-		 * so no need to use kgsl_active_count_put()
+-		 */
+-		atomic_dec(&device->active_cnt);
+-	} else {
+-		kgsl_active_count_put(device);
+ 	}
+ 	return result;
+ 
+@@ -960,10 +955,11 @@ static int kgsl_release(struct inode *inodep, struct file *filep)
+ 	struct kgsl_context *context;
+ 	int next = 0;
+ 
++	bool have_active_count = false;
++
+ 	filep->private_data = NULL;
+ 
+ 	mutex_lock(&device->mutex);
+-	kgsl_active_count_get(device);
+ 
+ 	while (1) {
+ 		read_lock(&device->context_lock);
+@@ -980,6 +976,11 @@ static int kgsl_release(struct inode *inodep, struct file *filep)
+ 			 */
+ 
+ 			if (_kgsl_context_get(context)) {
++				if (!have_active_count) {
++					result = kgsl_active_count_get(device);
++					BUG_ON(result);
++					have_active_count = true;
++				}
+ 				kgsl_context_detach(context);
+ 				kgsl_context_put(context);
+ 			}
+@@ -995,6 +996,9 @@ static int kgsl_release(struct inode *inodep, struct file *filep)
+ 	 */
+ 	kgsl_cancel_events(device, dev_priv);
+ 
++	if (have_active_count)
++		kgsl_active_count_put(device);
++
+ 	result = kgsl_close_device(device);
+ 	mutex_unlock(&device->mutex);
+ 
+diff --git a/drivers/gpu/msm/kgsl_pwrctrl.h b/drivers/gpu/msm/kgsl_pwrctrl.h
+index 71a0fdd..9f18160 100644
+--- a/drivers/gpu/msm/kgsl_pwrctrl.h
++++ b/drivers/gpu/msm/kgsl_pwrctrl.h
+@@ -120,8 +120,8 @@ static inline unsigned long kgsl_get_clkrate(struct clk *clk)
+ void kgsl_pwrctrl_set_state(struct kgsl_device *device, unsigned int state);
+ void kgsl_pwrctrl_request_state(struct kgsl_device *device, unsigned int state);
+ 
+-int kgsl_active_count_get(struct kgsl_device *device);
+-int kgsl_active_count_get_light(struct kgsl_device *device);
++int __must_check kgsl_active_count_get(struct kgsl_device *device);
++int __must_check kgsl_active_count_get_light(struct kgsl_device *device);
+ void kgsl_active_count_put(struct kgsl_device *device);
+ int kgsl_active_count_wait(struct kgsl_device *device, int count);
+ 
+diff --git a/drivers/gpu/msm/z180.c b/drivers/gpu/msm/z180.c
+index f98c078..4c64603 100644
+--- a/drivers/gpu/msm/z180.c
++++ b/drivers/gpu/msm/z180.c
+@@ -406,7 +406,9 @@ z180_cmdstream_issueibcmds(struct kgsl_device_private *dev_priv,
+ 
+ 	mutex_lock(&device->mutex);
+ 
+-	kgsl_active_count_get(device);
++	result = kgsl_active_count_get(device);
++	if (result)
++		goto error_active_count;
+ 
+ 	if (cmdbatch == NULL) {
+ 		result = EINVAL;
+@@ -515,7 +517,7 @@ error:
+ 		*timestamp, cmdbatch ? cmdbatch->flags : 0, result, 0);
+ 
+ 	kgsl_active_count_put(device);
+-
++error_active_count:
+ 	mutex_unlock(&device->mutex);
+ 
+ 	return (int)result;
+-- 
+1.7.9.5
+

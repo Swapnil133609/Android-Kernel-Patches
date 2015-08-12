@@ -1,0 +1,38 @@
+From a63592543f6a826a56851492e2a888be0645e882 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Sat, 30 Nov 2013 16:44:26 +0000
+Subject: [PATCH 153/590] Revert "arm: remove tracing options."
+
+This reverts commit d2cee3fb26f90825f872226902d20c013a4157f6.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/Kconfig |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 3511ce6..1c82d9f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -12,13 +12,13 @@ config ARM
+ 	select GENERIC_ATOMIC64 if (CPU_V6 || !CPU_32v6K || !AEABI)
+ 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
+ 	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL
+-	#select HAVE_ARCH_KGDB
++	select HAVE_ARCH_KGDB
+ 	select HAVE_KPROBES if !XIP_KERNEL
+ 	select HAVE_KRETPROBES if (HAVE_KPROBES)
+-	#select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
+-	#select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+-	#select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
+-	#select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
++	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
++	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
++	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
++	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
+ 	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
+ 	select HAVE_GENERIC_DMA_COHERENT
+ 	select HAVE_KERNEL_GZIP
+-- 
+1.7.9.5
+

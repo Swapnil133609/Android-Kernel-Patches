@@ -1,0 +1,55 @@
+From b167410920977b760d3359563767dae624029aed Mon Sep 17 00:00:00 2001
+From: Laura Abbott <lauraa@codeaurora.org>
+Date: Wed, 19 Jun 2013 10:07:21 -0700
+Subject: [PATCH 482/590] gpu: ion: Explictly mark DMA allocations as
+ GFP_KERNEL
+
+For legacy reasons, the GFP allocation for dma allocations is currently
+marked as 0, which corresponds to atomic allocations. These allocations
+should not be marked as atomic since the atomic pool is very small.
+Switch to properly using GFP_KERNEL to always allocate from the
+correct pool.
+
+Change-Id: Id3ce68b538a3d6dbdc8857109cca9ec8706ca4ef
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/ion/ion_cma_heap.c        |    4 ++--
+ drivers/gpu/ion/ion_cma_secure_heap.c |    3 ++-
+ 2 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/ion/ion_cma_heap.c b/drivers/gpu/ion/ion_cma_heap.c
+index ca79f96..d4bbab7 100644
+--- a/drivers/gpu/ion/ion_cma_heap.c
++++ b/drivers/gpu/ion/ion_cma_heap.c
+@@ -76,10 +76,10 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
+ 
+ 	if (!ION_IS_CACHED(flags))
+ 		info->cpu_addr = dma_alloc_writecombine(dev, len,
+-					&(info->handle), 0);
++					&(info->handle), GFP_KERNEL);
+ 	else
+ 		info->cpu_addr = dma_alloc_nonconsistent(dev, len,
+-					&(info->handle), 0);
++					&(info->handle), GFP_KERNEL);
+ 
+ 	if (!info->cpu_addr) {
+ 		dev_err(dev, "Fail to allocate buffer\n");
+diff --git a/drivers/gpu/ion/ion_cma_secure_heap.c b/drivers/gpu/ion/ion_cma_secure_heap.c
+index 043f0e0..bdf48b3 100644
+--- a/drivers/gpu/ion/ion_cma_secure_heap.c
++++ b/drivers/gpu/ion/ion_cma_secure_heap.c
+@@ -83,7 +83,8 @@ static struct ion_secure_cma_buffer_info *__ion_secure_cma_allocate(
+ 		return ION_CMA_ALLOCATE_FAILED;
+ 	}
+ 
+-	info->cpu_addr = dma_alloc_attrs(dev, len, &(info->handle), 0, &attrs);
++	info->cpu_addr = dma_alloc_attrs(dev, len, &(info->handle), GFP_KERNEL,
++						&attrs);
+ 
+ 	if (!info->cpu_addr) {
+ 		dev_err(dev, "Fail to allocate buffer\n");
+-- 
+1.7.9.5
+

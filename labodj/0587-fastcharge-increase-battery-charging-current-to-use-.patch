@@ -1,0 +1,33 @@
+From 46efd4a957f9fbed99e8b5ff2e72a5a7abda8a86 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Fri, 3 Jan 2014 19:39:52 -0800
+Subject: [PATCH 587/590] fastcharge: increase battery charging current to use
+ higher input current
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/power/bq24192_charger.c |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/power/bq24192_charger.c b/drivers/power/bq24192_charger.c
+index a82c9d0..2068ddb 100644
+--- a/drivers/power/bq24192_charger.c
++++ b/drivers/power/bq24192_charger.c
+@@ -167,8 +167,13 @@ struct current_limit_entry {
+ };
+ 
+ static struct current_limit_entry adap_tbl[] = {
++#ifdef CONFIG_FORCE_FAST_CHARGE
++	{1500, 1280},
++	{2000, 1696},
++#else
+ 	{1200, 1024},
+ 	{2000, 1536},
++#endif
+ };
+ 
+ static int bq24192_step_down_detect_disable(struct bq24192_chip *chip);
+-- 
+1.7.9.5
+

@@ -1,0 +1,135 @@
+From cb1064f8ec59df48ed14bcdd9bb785c3734a0a54 Mon Sep 17 00:00:00 2001
+From: Minchan Kim <minchan@kernel.org>
+Date: Wed, 3 Jul 2013 15:01:24 -0700
+Subject: [PATCH 452/590] mm: remove compressed copy from zram in-memory
+
+Swap subsystem does lazy swap slot free with expecting the page would be
+swapped out again so we can avoid unnecessary write.
+
+But the problem in in-memory swap(ex, zram) is that it consumes memory
+space until vm_swap_full(ie, used half of all of swap device) condition
+meet.  It could be bad if we use multiple swap device, small in-memory
+swap and big storage swap or in-memory swap alone.
+
+This patch makes swap subsystem free swap slot as soon as swap-read is
+completed and make the swapcache page dirty so the page should be
+written out the swap device to reclaim it.  It means we never lose it.
+
+I tested this patch with kernel compile workload.
+
+1. before
+
+   compile time : 9882.42
+   zram max wasted space by fragmentation: 13471881 byte
+   memory space consumed by zram: 174227456 byte
+   the number of slot free notify: 206684
+
+2. after
+
+   compile time : 9653.90
+   zram max wasted space by fragmentation: 11805932 byte
+   memory space consumed by zram: 154001408 byte
+   the number of slot free notify: 426972
+
+Change-Id: Ida7dcf6fbd67408e2429483c28c75f59f83310d3
+[akpm@linux-foundation.org: tweak comment text]
+[artem.savkov@gmail.com: fix BUG due to non-swapcache pages in end_swap_bio_read()]
+[akpm@linux-foundation.org: invert unlikely() test, augment comment, 80-col cleanup]
+Signed-off-by: Dan Magenheimer <dan.magenheimer@oracle.com>
+Signed-off-by: Minchan Kim <minchan@kernel.org>
+Signed-off-by: Artem Savkov <artem.savkov@gmail.com>
+Cc: Hugh Dickins <hughd@google.com>
+Cc: Seth Jennings <sjenning@linux.vnet.ibm.com>
+Cc: Nitin Gupta <ngupta@vflare.org>
+Cc: Konrad Rzeszutek Wilk <konrad@darnok.org>
+Cc: Shaohua Li <shli@kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Git-commit: b430e9d1c6d416306d44dbf3aa3148be7af78abc
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+[ohaugan@codeaurora.org: Resolved merge issues]
+Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/page_io.c |   51 +++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 49 insertions(+), 2 deletions(-)
+
+diff --git a/mm/page_io.c b/mm/page_io.c
+index dc76b4d..e60e43f 100644
+--- a/mm/page_io.c
++++ b/mm/page_io.c
+@@ -1,3 +1,4 @@
++
+ /*
+  *  linux/mm/page_io.c
+  *
+@@ -18,6 +19,7 @@
+ #include <linux/bio.h>
+ #include <linux/swapops.h>
+ #include <linux/writeback.h>
++#include <linux/blkdev.h>
+ #include <asm/pgtable.h>
+ 
+ static struct bio *get_swap_bio(gfp_t gfp_flags,
+@@ -78,9 +80,54 @@ void end_swap_bio_read(struct bio *bio, int err)
+ 				imajor(bio->bi_bdev->bd_inode),
+ 				iminor(bio->bi_bdev->bd_inode),
+ 				(unsigned long long)bio->bi_sector);
+-	} else {
+-		SetPageUptodate(page);
++		goto out;
++	}
++
++	SetPageUptodate(page);
++
++	/*
++	 * There is no guarantee that the page is in swap cache - the software
++	 * suspend code (at least) uses end_swap_bio_read() against a non-
++	 * swapcache page.  So we must check PG_swapcache before proceeding with
++	 * this optimization.
++	 */
++	if (likely(PageSwapCache(page))) {
++		struct swap_info_struct *sis;
++
++		sis = page_swap_info(page);
++		if (sis->flags & SWP_BLKDEV) {
++			/*
++			 * The swap subsystem performs lazy swap slot freeing,
++			 * expecting that the page will be swapped out again.
++			 * So we can avoid an unnecessary write if the page
++			 * isn't redirtied.
++			 * This is good for real swap storage because we can
++			 * reduce unnecessary I/O and enhance wear-leveling
++			 * if an SSD is used as the as swap device.
++			 * But if in-memory swap device (eg zram) is used,
++			 * this causes a duplicated copy between uncompressed
++			 * data in VM-owned memory and compressed data in
++			 * zram-owned memory.  So let's free zram-owned memory
++			 * and make the VM-owned decompressed page *dirty*,
++			 * so the page should be swapped out somewhere again if
++			 * we again wish to reclaim it.
++			 */
++			struct gendisk *disk = sis->bdev->bd_disk;
++			if (disk->fops->swap_slot_free_notify) {
++				swp_entry_t entry;
++				unsigned long offset;
++
++				entry.val = page_private(page);
++				offset = swp_offset(entry);
++
++				SetPageDirty(page);
++				disk->fops->swap_slot_free_notify(sis->bdev,
++						offset);
++			}
++		}
+ 	}
++
++out:
+ 	unlock_page(page);
+ 	bio_put(bio);
+ }
+-- 
+1.7.9.5
+

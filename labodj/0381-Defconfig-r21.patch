@@ -1,0 +1,46 @@
+From 8d877573a0ad6c31792d56296ce592415002a5e1 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Mon, 16 Dec 2013 01:59:55 +0100
+Subject: [PATCH 381/590] Defconfig: r21
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/labo_defconfig |    8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/configs/labo_defconfig b/arch/arm/configs/labo_defconfig
+index 42e96d9..335a958 100644
+--- a/arch/arm/configs/labo_defconfig
++++ b/arch/arm/configs/labo_defconfig
+@@ -1,6 +1,6 @@
+ #
+ # Automatically generated file; DO NOT EDIT.
+-# Linux/arm 3.4.73 Kernel Configuration
++# Linux/arm 3.4.74 Kernel Configuration
+ #
+ CONFIG_ARM=y
+ CONFIG_ARM_HAS_SG_CHAIN=y
+@@ -677,7 +677,9 @@ CONFIG_ZBOOT_ROM_BSS=0
+ # CONFIG_ARM_APPENDED_DTB is not set
+ CONFIG_CMDLINE=""
+ # CONFIG_XIP_KERNEL is not set
+-# CONFIG_KEXEC is not set
++CONFIG_KEXEC=y
++# CONFIG_ATAGS_PROC is not set
++CONFIG_KEXEC_HARDBOOT=y
+ # CONFIG_CRASH_DUMP is not set
+ # CONFIG_AUTO_ZRELADDR is not set
+ 
+@@ -1264,7 +1266,7 @@ CONFIG_OF=y
+ #
+ # Device Tree and Open Firmware support
+ #
+-# CONFIG_PROC_DEVICETREE is not set
++CONFIG_PROC_DEVICETREE=y
+ # CONFIG_OF_SELFTEST is not set
+ CONFIG_OF_FLATTREE=y
+ CONFIG_OF_EARLY_FLATTREE=y
+-- 
+1.7.9.5
+

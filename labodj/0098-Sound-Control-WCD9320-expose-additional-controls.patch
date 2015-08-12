@@ -1,0 +1,80 @@
+From d38dea6f7482aa73f6e6a8e4bdf0c5d7763b830e Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sat, 2 Nov 2013 19:04:08 -0500
+Subject: [PATCH 098/590] Sound Control: WCD9320: expose additional controls
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ sound/soc/codecs/wcd9320.c |   27 +++++++++++++++++++++++++--
+ 1 file changed, 25 insertions(+), 2 deletions(-)
+
+diff --git a/sound/soc/codecs/wcd9320.c b/sound/soc/codecs/wcd9320.c
+index 658f885..1b4dec6 100644
+--- a/sound/soc/codecs/wcd9320.c
++++ b/sound/soc/codecs/wcd9320.c
+@@ -4010,7 +4010,10 @@ static int taiko_volatile(struct snd_soc_codec *ssc, unsigned int reg)
+ 	return 0;
+ }
+ 
+-static int taiko_write(struct snd_soc_codec *codec, unsigned int reg,
++#ifndef CONFIG_SOUND_CONTROL_HAX_3_GPL
++static
++#endif
++int taiko_write(struct snd_soc_codec *codec, unsigned int reg,
+ 	unsigned int value)
+ {
+ 	int ret;
+@@ -4029,7 +4032,14 @@ static int taiko_write(struct snd_soc_codec *codec, unsigned int reg,
+ 
+ 	return wcd9xxx_reg_write(codec->control_data, reg, value);
+ }
+-static unsigned int taiko_read(struct snd_soc_codec *codec,
++#ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
++EXPORT_SYMBOL(taiko_write);
++#endif
++
++#ifndef CONFIG_SOUND_CONTROL_HAX_3_GPL 
++static
++#endif
++unsigned int taiko_read(struct snd_soc_codec *codec,
+ 				unsigned int reg)
+ {
+ 	unsigned int val;
+@@ -4053,6 +4063,9 @@ static unsigned int taiko_read(struct snd_soc_codec *codec,
+ 	val = wcd9xxx_reg_read(codec->control_data, reg);
+ 	return val;
+ }
++#ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
++EXPORT_SYMBOL(taiko_read);
++#endif
+ 
+ static int taiko_startup(struct snd_pcm_substream *substream,
+ 		struct snd_soc_dai *dai)
+@@ -6363,6 +6376,11 @@ static struct regulator *taiko_codec_find_regulator(struct snd_soc_codec *codec,
+ 	return NULL;
+ }
+ 
++#ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
++struct snd_soc_codec *fauxsound_codec_ptr;
++EXPORT_SYMBOL(fauxsound_codec_ptr);
++#endif
++
+ static int taiko_codec_probe(struct snd_soc_codec *codec)
+ {
+ 	struct wcd9xxx *control;
+@@ -6375,6 +6393,11 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
+ 	void *ptr = NULL;
+ 	struct wcd9xxx *core = dev_get_drvdata(codec->dev->parent);
+ 
++#ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
++	pr_info("taiko codec probe...\n");
++	fauxsound_codec_ptr = codec;
++#endif
++
+ 	codec->control_data = dev_get_drvdata(codec->dev->parent);
+ 	control = codec->control_data;
+ 
+-- 
+1.7.9.5
+

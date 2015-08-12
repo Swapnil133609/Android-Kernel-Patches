@@ -1,0 +1,48 @@
+From 84fc69bbb04c781ac551c21b4ef66fafa5b40f25 Mon Sep 17 00:00:00 2001
+From: Ecco Park <eccopark@broadcom.com>
+Date: Tue, 5 Nov 2013 07:41:18 +0900
+Subject: [PATCH 054/590] net: wireless: bcmdhd: reduced the wakelock time of
+ RX packet
+
+	Reduce time : 1secs -> 500ms
+	Problem : [Issue 11512235] 34% battery eaten overnight
+		  [Issue 11374623] OS + Wifi used 41% of battery,
+		  wlan_rx_wake
+Signed-off-by: Ecco Park <eccopark@broadcom.com>
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/net/wireless/bcmdhd/Makefile |    2 +-
+ drivers/net/wireless/bcmdhd/dhd.h    |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/wireless/bcmdhd/Makefile b/drivers/net/wireless/bcmdhd/Makefile
+index 8afcbfd..dc070e3 100644
+--- a/drivers/net/wireless/bcmdhd/Makefile
++++ b/drivers/net/wireless/bcmdhd/Makefile
+@@ -41,7 +41,7 @@ DHDCFLAGS += -DWL_IFACE_COMB_NUM_CHANNELS
+ DHDCFLAGS += -DCUSTOM_ROAM_TRIGGER_SETTING=-75
+ DHDCFLAGS += -DCUSTOM_ROAM_DELTA_SETTING=10
+ DHDCFLAGS += -DCUSTOM_KEEP_ALIVE_SETTING=28000
+-DHDCFLAGS += -DCUSTOM_PNO_EVENT_LOCK_xTIME=7
++DHDCFLAGS += -DCUSTOM_PNO_EVENT_LOCK_xTIME=10
+ endif
+ ifneq ($(CONFIG_DHD_USE_SCHED_SCAN),)
+ DHDCFLAGS += -DWL_SCHED_SCAN
+diff --git a/drivers/net/wireless/bcmdhd/dhd.h b/drivers/net/wireless/bcmdhd/dhd.h
+index ee0e19e..22dd810 100644
+--- a/drivers/net/wireless/bcmdhd/dhd.h
++++ b/drivers/net/wireless/bcmdhd/dhd.h
+@@ -451,7 +451,7 @@ inline static void MUTEX_UNLOCK_SOFTAP_SET(dhd_pub_t * dhdp)
+ 	dhd_os_wake_lock_ctrl_timeout_enable(pub, val)
+ #define DHD_OS_WAKE_LOCK_CTRL_TIMEOUT_CANCEL(pub) \
+ 	dhd_os_wake_lock_ctrl_timeout_cancel(pub)
+-#define DHD_PACKET_TIMEOUT_MS	1000
++#define DHD_PACKET_TIMEOUT_MS	500
+ #define DHD_EVENT_TIMEOUT_MS	1500
+ 
+ 
+-- 
+1.7.9.5
+

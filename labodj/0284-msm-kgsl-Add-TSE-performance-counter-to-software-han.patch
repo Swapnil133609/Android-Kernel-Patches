@@ -1,0 +1,80 @@
+From 99acd88fb5afc383f2d62277e56a38c6ff0b67e2 Mon Sep 17 00:00:00 2001
+From: Tarun Karra <tkarra@codeaurora.org>
+Date: Fri, 22 Nov 2013 08:47:42 -0700
+Subject: [PATCH 284/590] msm: kgsl: Add TSE performance counter to software
+ hang detection
+
+Our current hang detection logic covers rendering pass by checking for
+shader performance counters but it does not cover the case where there
+is long binning or resolve pass. For long binning pass shader is inactive
+making our current hang detection logic faulty. Checking for TSE number of
+input primitives covers binning and resolve passes and makes our hang
+detection logic robust.
+
+CRs-fixed: 521284
+Change-Id: Ifdec4b53685903456feb367f64380119b1485408
+Signed-off-by: Tarun Karra <tkarra@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/msm/a3xx_reg.h    |    3 +++
+ drivers/gpu/msm/adreno.h      |    2 +-
+ drivers/gpu/msm/adreno_a3xx.c |    8 +++++++-
+ 3 files changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/msm/a3xx_reg.h b/drivers/gpu/msm/a3xx_reg.h
+index 676f46d..be179ac 100644
+--- a/drivers/gpu/msm/a3xx_reg.h
++++ b/drivers/gpu/msm/a3xx_reg.h
+@@ -775,6 +775,9 @@
+ #define SP0_ICL1_MISSES                0x1A
+ #define SP_FS_CFLOW_INSTRUCTIONS       0x0C
+ 
++/* COUNTABLE FOR TSE PERFCOUNTER */
++#define TSE_INPUT_PRIM_NUM             0x0
++
+ /* VBIF PERFCOUNTER ENA/CLR values */
+ #define VBIF_PERF_CNT_0 BIT(0)
+ #define VBIF_PERF_CNT_1 BIT(1)
+diff --git a/drivers/gpu/msm/adreno.h b/drivers/gpu/msm/adreno.h
+index 7e7b552..6429420 100644
+--- a/drivers/gpu/msm/adreno.h
++++ b/drivers/gpu/msm/adreno.h
+@@ -388,7 +388,7 @@ struct adreno_gpudev {
+ 	void (*postmortem_dump)(struct adreno_device *adreno_dev);
+ };
+ 
+-#define FT_DETECT_REGS_COUNT 12
++#define FT_DETECT_REGS_COUNT 14
+ 
+ struct log_field {
+ 	bool show;
+diff --git a/drivers/gpu/msm/adreno_a3xx.c b/drivers/gpu/msm/adreno_a3xx.c
+index 4642f8d..16ce8c9 100644
+--- a/drivers/gpu/msm/adreno_a3xx.c
++++ b/drivers/gpu/msm/adreno_a3xx.c
+@@ -3998,7 +3998,9 @@ static int a3xx_perfcounter_init(struct adreno_device *adreno_dev)
+ 	 * USP L1 instruction miss request.
+ 	 * Set SP to count SP_FS_FULL_ALU_INSTRUCTIONS, it
+ 	 * counts USP flow control instruction execution.
+-	 * we will use this to augment our hang detection
++	 * Set TSE to count TSE_INPUT_PRIM_NUM, it counts
++	 * number of input primitives in TSE.
++	 * we will use above countables for our hang detection
+ 	 */
+ 	if (adreno_dev->fast_hang_detect) {
+ 		ret = adreno_perfcounter_get(adreno_dev,
+@@ -4022,6 +4024,10 @@ static int a3xx_perfcounter_init(struct adreno_device *adreno_dev)
+ 		if (ret)
+ 			goto err;
+ 		ft_detect_regs[11] = ft_detect_regs[10] + 1;
++		adreno_perfcounter_get(adreno_dev, KGSL_PERFCOUNTER_GROUP_TSE,
++			TSE_INPUT_PRIM_NUM, &ft_detect_regs[12],
++			PERFCOUNTER_FLAG_KERNEL);
++		ft_detect_regs[13] = ft_detect_regs[12] + 1;
+ 	}
+ 
+ 	ret = adreno_perfcounter_get(adreno_dev, KGSL_PERFCOUNTER_GROUP_SP,
+-- 
+1.7.9.5
+

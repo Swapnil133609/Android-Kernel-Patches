@@ -1,0 +1,39 @@
+From 49e9c1b8a058efa80d81ff0293a6578b2d0c21a0 Mon Sep 17 00:00:00 2001
+From: Tatyana Brokhman <tlinder@codeaurora.org>
+Date: Thu, 25 Jul 2013 13:45:21 +0300
+Subject: [PATCH 534/590] block: row: Remove warning massage from add_request
+
+Regular priority queues is marked as "starved" if it skipped a dispatch
+due to being empty. When a new request is added to a "starved" queue
+it will be marked as urgent.
+The removed WARN_ON was warning about an impossible case when a regular
+priority (read) queue was marked as starved but wasn't empty. This is
+a possible case due to the bellow:
+If the device driver fetched a read request that is pending for
+transmission and an URGENT request arrives, the fetched read will be
+reinserted back to the scheduler. Its possible that the queue it will be
+reinserted to was marked as "starved" in the meanwhile due to being empty.
+
+CRs-fixed: 517800
+Change-Id: Iaae642ea0ed9c817c41745b0e8ae2217cc684f0c
+Signed-off-by: Tatyana Brokhman <tlinder@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ block/row-iosched.c |    1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/block/row-iosched.c b/block/row-iosched.c
+index 7904c0e..cfb5e98 100644
+--- a/block/row-iosched.c
++++ b/block/row-iosched.c
+@@ -396,7 +396,6 @@ static void row_add_request(struct request_queue *q,
+ 				"added urgent request (total on queue=%d)",
+ 				rqueue->nr_req);
+ 			rq->cmd_flags |= REQ_URGENT;
+-			WARN_ON(rqueue->nr_req > 1);
+ 			rd->pending_urgent_rq = rq;
+ 		}
+ 	} else
+-- 
+1.7.9.5
+

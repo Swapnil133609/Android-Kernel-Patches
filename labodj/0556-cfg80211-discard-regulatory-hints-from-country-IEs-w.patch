@@ -1,0 +1,38 @@
+From 6b4b3424f8679068a5b2cf39d30559b51eaca5d7 Mon Sep 17 00:00:00 2001
+From: Mihir Shete <smihir@codeaurora.org>
+Date: Mon, 16 Dec 2013 09:27:19 +0530
+Subject: [PATCH 556/590] cfg80211: discard regulatory hints from country IEs
+ with undefined wiphy
+
+Regulatory hints are processed in a worker thread and by the
+time this thread gets a chance to schedule driver can deregister
+the wiphy on which the country IE was discovered. There is no need
+to process the hints which are coming from such invalid wiphy
+devices and we should drop them.
+
+Change-Id: I44f6f7b29ed1d0927151a88f3ea9e0c17044bd7e
+CRs-Fixed: 588103
+Signed-off-by: Mihir Shete <smihir@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ net/wireless/reg.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/net/wireless/reg.c b/net/wireless/reg.c
+index d100366..6361158 100755
+--- a/net/wireless/reg.c
++++ b/net/wireless/reg.c
+@@ -1523,8 +1523,8 @@ static void reg_process_hint(struct regulatory_request *reg_request,
+ 	if (wiphy_idx_valid(reg_request->wiphy_idx))
+ 		wiphy = wiphy_idx_to_wiphy(reg_request->wiphy_idx);
+ 
+-	if (reg_initiator == NL80211_REGDOM_SET_BY_DRIVER &&
+-	    !wiphy) {
++	if ((reg_initiator == NL80211_REGDOM_SET_BY_DRIVER ||
++	     reg_initiator == NL80211_REGDOM_SET_BY_COUNTRY_IE) && !wiphy) {
+ 		kfree(reg_request);
+ 		return;
+ 	}
+-- 
+1.7.9.5
+

@@ -1,0 +1,47 @@
+From 4a01b8f50f40034b3d2fad73e3b1e5b71d73e255 Mon Sep 17 00:00:00 2001
+From: Pranav Vashi <neobuddy89@gmail.com>
+Date: Tue, 31 Dec 2013 08:03:40 -0800
+Subject: [PATCH 581/590] msm: use of swp{b} is deprecated for ARMv6+
+
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/remote_spinlock.c |    8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-msm/remote_spinlock.c b/arch/arm/mach-msm/remote_spinlock.c
+index a9ebd7c..ba14b6d 100644
+--- a/arch/arm/mach-msm/remote_spinlock.c
++++ b/arch/arm/mach-msm/remote_spinlock.c
+@@ -70,6 +70,10 @@
+ #define CURRENT_MODE_INIT AUTO_MODE;
+ #endif
+ 
++#if defined(CONFIG_THUMB2_KERNEL) || defined(CONFIG_ARCH_MSM8974)
++#define SWP_OFF
++#endif
++
+ static int current_mode = CURRENT_MODE_INIT;
+ 
+ static int is_hw_lock_type;
+@@ -144,7 +148,7 @@ static int __raw_remote_dek_spin_owner(raw_remote_spinlock_t *lock)
+ }
+ /* end dekkers implementation ----------------------------------------------- */
+ 
+-#ifndef CONFIG_THUMB2_KERNEL
++#ifndef SWP_OFF
+ /* swp implementation ------------------------------------------------------- */
+ static void __raw_remote_swp_spin_lock(raw_remote_spinlock_t *lock)
+ {
+@@ -434,7 +438,7 @@ static void initialize_ops(void)
+ 		current_ops.owner = __raw_remote_dek_spin_owner;
+ 		is_hw_lock_type = 0;
+ 		break;
+-#ifndef CONFIG_THUMB2_KERNEL
++#ifndef SWP_OFF
+ 	case SWP_MODE:
+ 		current_ops.lock = __raw_remote_swp_spin_lock;
+ 		current_ops.unlock = __raw_remote_swp_spin_unlock;
+-- 
+1.7.9.5
+

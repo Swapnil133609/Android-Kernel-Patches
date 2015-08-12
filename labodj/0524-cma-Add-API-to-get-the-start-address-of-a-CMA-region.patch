@@ -1,0 +1,69 @@
+From 1e8f70c69e6d8ff15fc1053bae0201bf8a700d31 Mon Sep 17 00:00:00 2001
+From: Laura Abbott <lauraa@codeaurora.org>
+Date: Mon, 3 Jun 2013 19:14:08 -0700
+Subject: [PATCH 524/590] cma: Add API to get the start address of a CMA
+ region
+
+When setting CMA up at a fixed region, it is possible for the address
+to be shared between multiple subsystems. If the address is placed
+dynamically, there is no mechanism to be able to get the start address
+of the region. Drivers may wish to do keep track of allocations relative
+to the start address so add an API to get the start region of a CMA
+address.
+
+Change-Id: If0730c64496c876d3143064d767b22b984c6dc84
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/base/dma-contiguous.c  |    7 +++++++
+ include/linux/dma-contiguous.h |    9 +++++++++
+ 2 files changed, 16 insertions(+)
+
+diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+index 45c9023..885721f 100644
+--- a/drivers/base/dma-contiguous.c
++++ b/drivers/base/dma-contiguous.c
+@@ -447,6 +447,13 @@ static int __init cma_init_reserved_areas(void)
+ }
+ core_initcall(cma_init_reserved_areas);
+ 
++phys_addr_t cma_get_base(struct device *dev)
++{
++	struct cma *cma = dev_get_cma_area(dev);
++
++	return cma->base_pfn << PAGE_SHIFT;
++}
++
+ /**
+  * dma_alloc_from_contiguous() - allocate pages from contiguous area
+  * @dev:   Pointer to device for which the allocation is performed.
+diff --git a/include/linux/dma-contiguous.h b/include/linux/dma-contiguous.h
+index 8a1b3a1..78e57cd 100644
+--- a/include/linux/dma-contiguous.h
++++ b/include/linux/dma-contiguous.h
+@@ -65,6 +65,9 @@ struct device;
+  */
+ #define MAX_CMA_AREAS	(1 + CONFIG_CMA_AREAS)
+ 
++
++phys_addr_t cma_get_base(struct device *dev);
++
+ extern struct cma *dma_contiguous_def_area;
+ 
+ void dma_contiguous_reserve(phys_addr_t addr_limit);
+@@ -129,6 +132,12 @@ bool dma_release_from_contiguous(struct device *dev, struct page *pages,
+ 	return false;
+ }
+ 
++
++static inline phys_addr_t cma_get_base(struct device *dev)
++{
++	return 0;
++}
++
+ #endif
+ 
+ #endif
+-- 
+1.7.9.5
+

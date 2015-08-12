@@ -1,0 +1,52 @@
+From b0b7e108a7aac8582b0652ef02e00b80ddfe81f0 Mon Sep 17 00:00:00 2001
+From: Jan Kara <jack@suse.cz>
+Date: Fri, 28 Jun 2013 21:32:27 +0200
+Subject: [PATCH 489/590] block: Reserve only one queue tag for sync IO if
+ only 3 tags are available
+
+In case a device has three tags available we still reserve two of them
+for sync IO. That leaves only a single tag for async IO such as
+writeback from flusher thread which results in poor performance.
+
+Allow async IO to consume two tags in case queue has three tag availabe
+to get a decent async write performance.
+
+This patch improves streaming write performance on a machine with such disk
+from ~21 MB/s to ~52 MB/s. Also postmark throughput in presence of
+streaming writer improves from 8 to 12 transactions per second so sync
+IO doesn't seem to be harmed in presence of heavy async writer.
+
+Signed-off-by: Jan Kara <jack@suse.cz>
+Signed-off-by: Jens Axboe <axboe@kernel.dk>
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ block/blk-tag.c |   11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/block/blk-tag.c b/block/blk-tag.c
+index 4af6f5c..bc25b6e 100644
+--- a/block/blk-tag.c
++++ b/block/blk-tag.c
+@@ -350,9 +350,16 @@ int blk_queue_start_tag(struct request_queue *q, struct request *rq)
+ 	 */
+ 	max_depth = bqt->max_depth;
+ 	if (!rq_is_sync(rq) && max_depth > 1) {
+-		max_depth -= 2;
+-		if (!max_depth)
++		switch (max_depth) {
++		case 2:
+ 			max_depth = 1;
++			break;
++		case 3:
++			max_depth = 2;
++			break;
++		default:
++			max_depth -= 2;
++		}
+ 		if (q->in_flight[BLK_RW_ASYNC] > max_depth)
+ 			return 1;
+ 	}
+-- 
+1.7.9.5
+

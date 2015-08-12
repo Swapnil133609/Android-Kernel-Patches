@@ -1,0 +1,50 @@
+From 4b7abfd0451c0f29655640ebb72239fdffedd30d Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Thu, 7 Nov 2013 03:30:33 +0000
+Subject: [PATCH 047/590] cpufreq: interactive: remove cpu_online() check,
+ cpufreq takes care of that by itself. Also update
+ the input_boost_freq to a valid freq from the
+ cpufreq table for msm8974 and increase hispeed_freq
+ for some extra performance juice when needed.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |    7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index 6ea4265..7f0645f 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -64,7 +64,7 @@ static spinlock_t speedchange_cpumask_lock;
+ static struct mutex gov_lock;
+ 
+ /* Hi speed to bump to from lo speed when load burst (default max) */
+-static unsigned int hispeed_freq = 1242000;
++static unsigned int hispeed_freq = 1728000;
+ 
+ /* Go to hi speed when CPU load at or above this value. */
+ #define DEFAULT_GO_HISPEED_LOAD 95
+@@ -120,7 +120,7 @@ static bool io_is_busy = true;
+  * The CPU will be boosted to this frequency when the screen is
+  * touched. input_boost needs to be enabled.
+  */
+-#define DEFAULT_INPUT_BOOST_FREQ 1134000
++#define DEFAULT_INPUT_BOOST_FREQ 1190400
+ static int input_boost_freq = DEFAULT_INPUT_BOOST_FREQ;
+ 
+ bool interactive_selected = true;
+@@ -1073,9 +1073,6 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
+ 
+ 	switch (event) {
+ 	case CPUFREQ_GOV_START:
+-		if (!cpu_online(policy->cpu))
+-			return -EINVAL;
+-
+ 		mutex_lock(&gov_lock);
+ 
+ 		freq_table =
+-- 
+1.7.9.5
+

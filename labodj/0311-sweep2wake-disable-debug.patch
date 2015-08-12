@@ -1,0 +1,27 @@
+From 65373f5ee5ec73da3c9590c0fdc57c36e515f21f Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sun, 17 Nov 2013 03:27:02 +0100
+Subject: [PATCH 311/590] sweep2wake: disable debug
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/sweep2wake.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/input/touchscreen/sweep2wake.c b/drivers/input/touchscreen/sweep2wake.c
+index 3d73f63..183dfe2 100644
+--- a/drivers/input/touchscreen/sweep2wake.c
++++ b/drivers/input/touchscreen/sweep2wake.c
+@@ -28,7 +28,7 @@
+ #include <linux/input/sweep2wake.h>
+ 
+ /* Tuneables */
+-#define DEBUG                   1
++#define DEBUG                   0
+ #define S2W_PWRKEY_DUR          60
+ 
+ #ifdef CONFIG_MACH_MSM8974_HAMMERHEAD
+-- 
+1.7.9.5
+

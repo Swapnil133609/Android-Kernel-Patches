@@ -1,0 +1,41 @@
+From 175b6e8f648a92fa0fd3b911b33a16b3adf03534 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Sat, 14 Dec 2013 01:49:42 +0100
+Subject: [PATCH 373/590] Fixes for screen dimmer and fast charge modules
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/power/bq24192_charger.c     |    2 +-
+ drivers/video/backlight/lm3630_bl.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/power/bq24192_charger.c b/drivers/power/bq24192_charger.c
+index cba1005..0012f82 100644
+--- a/drivers/power/bq24192_charger.c
++++ b/drivers/power/bq24192_charger.c
+@@ -188,7 +188,7 @@ static int bq24192_read_reg(struct i2c_client *client, int reg, u8 *val)
+ 	return 0;
+ }
+ 
+-static int bq24192_write_reg(struct i2c_client *client, int reg, u8 val)
++noinline static int bq24192_write_reg(struct i2c_client *client, int reg, u8 val)
+ {
+ 	s32 ret;
+ 
+diff --git a/drivers/video/backlight/lm3630_bl.c b/drivers/video/backlight/lm3630_bl.c
+index f686074..bfb5653 100644
+--- a/drivers/video/backlight/lm3630_bl.c
++++ b/drivers/video/backlight/lm3630_bl.c
+@@ -207,7 +207,7 @@ static void lm3630_set_brightness_reg(struct lm3630_device *dev, int level)
+ 	}
+ }
+ 
+-static void lm3630_set_main_current_level(struct i2c_client *client, int level)
++noinline static void lm3630_set_main_current_level(struct i2c_client *client, int level)
+ {
+ 	struct lm3630_device *dev = i2c_get_clientdata(client);
+ 
+-- 
+1.7.9.5
+

@@ -1,0 +1,33 @@
+From 4bcf07fab95533a5fe71ac9f4483a65c0f47f52f Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Wed, 4 Dec 2013 12:52:46 +0100
+Subject: [PATCH 171/590] Avoid + sign in local version
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ scripts/setlocalversion |    8 --------
+ 1 file changed, 8 deletions(-)
+
+diff --git a/scripts/setlocalversion b/scripts/setlocalversion
+index 5e57025..7c9eb3c 100755
+--- a/scripts/setlocalversion
++++ b/scripts/setlocalversion
+@@ -177,14 +177,6 @@ res="${res}${CONFIG_LOCALVERSION}${LOCALVERSION}"
+ if test "$CONFIG_LOCALVERSION_AUTO" = "y"; then
+ 	# full scm version string
+ 	res="$res$(scm_version)"
+-else
+-	# append a plus sign if the repository is not in a clean
+-	# annotated or signed tagged state (as git describe only
+-	# looks at signed or annotated tags - git tag -a/-s) and
+-	# LOCALVERSION= is not specified
+-	if test "${LOCALVERSION+set}" != "set"; then
+-		scm=$(scm_version --short)
+-	fi
+ fi
+ 
+ echo "$res"
+-- 
+1.7.9.5
+

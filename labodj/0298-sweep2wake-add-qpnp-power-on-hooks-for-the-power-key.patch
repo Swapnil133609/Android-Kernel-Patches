@@ -1,0 +1,72 @@
+From 7b75ef47540ca2a64e7ee2fb1d050553eab4d0f4 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sat, 9 Nov 2013 23:44:04 +0100
+Subject: [PATCH 298/590] sweep2wake: add qpnp-power-on hooks for the power
+ key
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/Kconfig    |   19 +++++++++++++++++++
+ drivers/platform/msm/qpnp-power-on.c |   10 ++++++++++
+ 2 files changed, 29 insertions(+)
+
+diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+index 22d18f0..29ca2db 100644
+--- a/drivers/input/touchscreen/Kconfig
++++ b/drivers/input/touchscreen/Kconfig
+@@ -1035,4 +1035,23 @@ config TOUCHSCREEN_CHARGER_NOTIFY
+ config TOUCHSCREEN_SWEEP2WAKE
+         tristate "Sweep2Wake for touchscreens"
+         default n
++
++choice
++	prompt "Sweep2wake power key device?"
++	depends on TOUCHSCREEN_SWEEP2WAKE
++	default TOUCHSCREEN_SWEEP2WAKE_QPNP_PON if MACH_MSM8974_HAMMERHEAD
++	default n
++	help
++	  This option sets which pwrkey driver sweep2wake should use to emulate
++	  the power key presses. Selecting the wrong one will lead to null
++	  pointer exceptions!
++
++config TOUCHSCREEN_SWEEP2WAKE_QPNP_PON
++        bool "Use qpnp-power-on to emulate power button presses."
++	help
++	  This uses the qpnp driver to register the sweep2wake power key device
++	  used to emulate the power key presses on touch events.
++
++endchoice
++
+ endif
+diff --git a/drivers/platform/msm/qpnp-power-on.c b/drivers/platform/msm/qpnp-power-on.c
+index 67ce1b5..65ccefb 100644
+--- a/drivers/platform/msm/qpnp-power-on.c
++++ b/drivers/platform/msm/qpnp-power-on.c
+@@ -24,6 +24,10 @@
+ #include <linux/log2.h>
+ #include <linux/qpnp/power-on.h>
+ 
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_QPNP_PON
++#include <linux/input/sweep2wake.h>
++#endif
++
+ /* Common PNP defines */
+ #define QPNP_PON_REVISION2(base)		(base + 0x01)
+ 
+@@ -833,6 +837,12 @@ static int __devinit qpnp_pon_config_init(struct qpnp_pon *pon)
+ 				"Can't register pon key: %d\n", rc);
+ 			goto free_input_dev;
+ 		}
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_QPNP_PON
++		else {
++			sweep2wake_setdev(pon->pon_input);
++			printk(KERN_INFO "[sweep2wake]: set device %s\n", pon->pon_input->name);
++		}
++#endif
+ 	}
+ 
+ 	for (i = 0; i < pon->num_pon_config; i++) {
+-- 
+1.7.9.5
+

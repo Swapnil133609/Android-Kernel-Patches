@@ -1,0 +1,379 @@
+From 048a32da60704785bb33be1fc0cd92e18c1fa090 Mon Sep 17 00:00:00 2001
+From: Carter Cooper <ccooper@codeaurora.org>
+Date: Thu, 24 Oct 2013 14:05:56 -0600
+Subject: [PATCH 237/590] msm: kgsl: Add IB submission gate for device suspend
+
+Add IB submission gate to stop the system from making requests
+while suspend is requested.  This will force users to wait for
+the system to resume before making more requests.
+
+Change-Id: I2460ef9b4237b586a31d4cea64b6dd74d30b08d9
+Signed-off-by: Carter Cooper <ccooper@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/msm/adreno.c            |   18 ++----
+ drivers/gpu/msm/adreno.h            |    9 ++-
+ drivers/gpu/msm/adreno_dispatch.c   |  112 +++++++++++++----------------------
+ drivers/gpu/msm/adreno_postmortem.c |    2 +-
+ drivers/gpu/msm/adreno_ringbuffer.c |    3 +
+ drivers/gpu/msm/kgsl_device.h       |    2 +
+ 6 files changed, 59 insertions(+), 87 deletions(-)
+
+diff --git a/drivers/gpu/msm/adreno.c b/drivers/gpu/msm/adreno.c
+index 0b65cc6..5d4cec0 100644
+--- a/drivers/gpu/msm/adreno.c
++++ b/drivers/gpu/msm/adreno.c
+@@ -1744,7 +1744,7 @@ static int adreno_start(struct kgsl_device *device)
+ 		goto error_rb_stop;
+ 
+ 	/* Start the dispatcher */
+-	adreno_dispatcher_start(adreno_dev);
++	adreno_dispatcher_start(device);
+ 
+ 	device->reset_counter++;
+ 
+@@ -2416,14 +2416,13 @@ int adreno_idle(struct kgsl_device *device)
+  * adreno_drain() - Drain the dispatch queue
+  * @device: Pointer to the KGSL device structure for the GPU
+  *
+- * Tell the dispatcher to pause - this has the effect of draining the inflight
+- * command batches
++ * Drain the dispatcher of existing command batches.  This halts
++ * additional commands from being issued until the gate is completed.
+  */
+ static int adreno_drain(struct kgsl_device *device)
+ {
+-	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
++	INIT_COMPLETION(device->cmdbatch_gate);
+ 
+-	adreno_dispatcher_pause(adreno_dev);
+ 	return 0;
+ }
+ 
+@@ -2831,13 +2830,6 @@ static unsigned int adreno_gpuid(struct kgsl_device *device,
+ 	return (0x0003 << 16) | ((int) adreno_dev->gpurev);
+ }
+ 
+-static void adreno_resume(struct kgsl_device *device)
+-{
+-	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+-
+-	adreno_dispatcher_resume(adreno_dev);
+-}
+-
+ static const struct kgsl_functable adreno_functable = {
+ 	/* Mandatory functions */
+ 	.regread = adreno_regread,
+@@ -2869,7 +2861,7 @@ static const struct kgsl_functable adreno_functable = {
+ 	.setproperty = adreno_setproperty,
+ 	.postmortem_dump = adreno_dump,
+ 	.drawctxt_sched = adreno_drawctxt_sched,
+-	.resume = adreno_resume,
++	.resume = adreno_dispatcher_start,
+ };
+ 
+ static struct platform_driver adreno_platform_driver = {
+diff --git a/drivers/gpu/msm/adreno.h b/drivers/gpu/msm/adreno.h
+index 8c6c8b8..8561f06 100644
+--- a/drivers/gpu/msm/adreno.h
++++ b/drivers/gpu/msm/adreno.h
+@@ -125,7 +125,7 @@ enum coresight_debug_reg {
+  */
+ struct adreno_dispatcher {
+ 	struct mutex mutex;
+-	unsigned int state;
++	unsigned long priv;
+ 	struct timer_list timer;
+ 	struct timer_list fault_timer;
+ 	unsigned int inflight;
+@@ -139,6 +139,10 @@ struct adreno_dispatcher {
+ 	struct kobject kobj;
+ };
+ 
++enum adreno_dispatcher_flags {
++	ADRENO_DISPATCHER_POWER = 0,
++};
++
+ struct adreno_gpudev;
+ 
+ struct adreno_device {
+@@ -472,7 +476,7 @@ struct kgsl_memdesc *adreno_find_ctxtmem(struct kgsl_device *device,
+ void *adreno_snapshot(struct kgsl_device *device, void *snapshot, int *remain,
+ 		int hang);
+ 
+-void adreno_dispatcher_start(struct adreno_device *adreno_dev);
++void adreno_dispatcher_start(struct kgsl_device *device);
+ int adreno_dispatcher_init(struct adreno_device *adreno_dev);
+ void adreno_dispatcher_close(struct adreno_device *adreno_dev);
+ int adreno_dispatcher_idle(struct adreno_device *adreno_dev,
+@@ -486,7 +490,6 @@ int adreno_dispatcher_queue_cmd(struct adreno_device *adreno_dev,
+ 
+ void adreno_dispatcher_schedule(struct kgsl_device *device);
+ void adreno_dispatcher_pause(struct adreno_device *adreno_dev);
+-void adreno_dispatcher_resume(struct adreno_device *adreno_dev);
+ void adreno_dispatcher_queue_context(struct kgsl_device *device,
+ 	struct adreno_context *drawctxt);
+ int adreno_reset(struct kgsl_device *device);
+diff --git a/drivers/gpu/msm/adreno_dispatch.c b/drivers/gpu/msm/adreno_dispatch.c
+index cd663d5..92e03ca 100644
+--- a/drivers/gpu/msm/adreno_dispatch.c
++++ b/drivers/gpu/msm/adreno_dispatch.c
+@@ -22,9 +22,6 @@
+ #include "adreno_ringbuffer.h"
+ #include "adreno_trace.h"
+ 
+-#define ADRENO_DISPATCHER_ACTIVE 0
+-#define ADRENO_DISPATCHER_PAUSE 1
+-
+ #define CMDQUEUE_NEXT(_i, _s) (((_i) + 1) % (_s))
+ 
+ /* Number of commands that can be queued in a context before it sleeps */
+@@ -257,7 +254,9 @@ static int sendcmd(struct adreno_device *adreno_dev,
+ 
+ 	dispatcher->inflight++;
+ 
+-	if (dispatcher->inflight == 1) {
++	if (dispatcher->inflight == 1 &&
++			!test_bit(ADRENO_DISPATCHER_POWER, &dispatcher->priv)) {
++
+ 		/* Time to make the donuts.  Turn on the GPU */
+ 		ret = kgsl_active_count_get(device);
+ 		if (ret) {
+@@ -265,6 +264,8 @@ static int sendcmd(struct adreno_device *adreno_dev,
+ 			mutex_unlock(&device->mutex);
+ 			return ret;
+ 		}
++
++		set_bit(ADRENO_DISPATCHER_POWER, &dispatcher->priv);
+ 	}
+ 
+ 	ret = adreno_ringbuffer_submitcmd(adreno_dev, cmdbatch);
+@@ -277,8 +278,10 @@ static int sendcmd(struct adreno_device *adreno_dev,
+ 	if (dispatcher->inflight == 1) {
+ 		if (ret == 0)
+ 			fault_detect_read(device);
+-		else
++		else {
+ 			kgsl_active_count_put(device);
++			clear_bit(ADRENO_DISPATCHER_POWER, &dispatcher->priv);
++		}
+ 	}
+ 
+ 	mutex_unlock(&device->mutex);
+@@ -341,9 +344,6 @@ static int dispatcher_context_sendcmds(struct adreno_device *adreno_dev,
+ 		int ret;
+ 		struct kgsl_cmdbatch *cmdbatch;
+ 
+-		if (dispatcher->state != ADRENO_DISPATCHER_ACTIVE)
+-			break;
+-
+ 		if (adreno_gpu_fault(adreno_dev) != 0)
+ 			break;
+ 
+@@ -426,8 +426,7 @@ static int _adreno_dispatcher_issuecmds(struct adreno_device *adreno_dev)
+ 	int ret;
+ 
+ 	/* Leave early if the dispatcher isn't in a happy state */
+-	if ((dispatcher->state != ADRENO_DISPATCHER_ACTIVE) ||
+-		adreno_gpu_fault(adreno_dev) != 0)
++	if (adreno_gpu_fault(adreno_dev) != 0)
+ 			return 0;
+ 
+ 	plist_head_init(&requeue);
+@@ -436,8 +435,7 @@ static int _adreno_dispatcher_issuecmds(struct adreno_device *adreno_dev)
+ 	while (dispatcher->inflight < _dispatcher_inflight) {
+ 
+ 		/* Stop doing things if the dispatcher is paused or faulted */
+-		if ((dispatcher->state != ADRENO_DISPATCHER_ACTIVE) ||
+-			adreno_gpu_fault(adreno_dev) != 0)
++		if (adreno_gpu_fault(adreno_dev) != 0)
+ 			break;
+ 
+ 		spin_lock(&dispatcher->plist_lock);
+@@ -1200,10 +1198,6 @@ replay:
+ 		}
+ 	}
+ 
+-	mutex_lock(&device->mutex);
+-	kgsl_active_count_put(device);
+-	mutex_unlock(&device->mutex);
+-
+ 	kfree(replay);
+ 
+ 	return 1;
+@@ -1382,19 +1376,16 @@ static void adreno_dispatcher_work(struct work_struct *work)
+ 	 */
+ 	if (!fault_handled && dispatcher_do_fault(device))
+ 		goto done;
++
+ 	/*
+-	 * Decrement the active count to 0 - this will allow the system to go
+-	 * into suspend even if there are queued command batches
++	 * If inflight went to 0, queue back up the event processor to catch
++	 * stragglers
+ 	 */
+-
+-	mutex_lock(&device->mutex);
+ 	if (count && dispatcher->inflight == 0) {
+-		del_timer_sync(&dispatcher->fault_timer);
+-		kgsl_active_count_put(device);
+-		/* Queue back up the event processor to catch stragglers */
++		mutex_lock(&device->mutex);
+ 		queue_work(device->work_queue, &device->ts_expired_ws);
++		mutex_unlock(&device->mutex);
+ 	}
+-	mutex_unlock(&device->mutex);
+ 
+ 	/* Dispatch new commands if we have the room */
+ 	if (dispatcher->inflight < _dispatcher_inflight)
+@@ -1420,12 +1411,29 @@ done:
+ 				cmdbatch->context->id, cmdbatch->priority,
+ 				cmdbatch->timestamp);
+ 		}
+-	}
+ 
+-	/* Before leaving update the pwrscale information */
+-	mutex_lock(&device->mutex);
+-	kgsl_pwrscale_idle(device);
+-	mutex_unlock(&device->mutex);
++		/* There are still things in flight - update the idle counts */
++		mutex_lock(&device->mutex);
++		kgsl_pwrscale_idle(device);
++		mutex_unlock(&device->mutex);
++	} else {
++		/* There is nothing left in the pipeline.  Shut 'er down boys */
++		mutex_lock(&device->mutex);
++
++		/*
++		 * Stop the fault timer before decrementing the active count to
++		 * avoid reading the hardware registers while we are trying to
++		 * turn clocks off
++		 */
++		del_timer_sync(&dispatcher->fault_timer);
++
++		if (test_bit(ADRENO_DISPATCHER_POWER, &dispatcher->priv)) {
++			kgsl_active_count_put(device);
++			clear_bit(ADRENO_DISPATCHER_POWER, &dispatcher->priv);
++		}
++
++		mutex_unlock(&device->mutex);
++	}
+ 
+ 	mutex_unlock(&dispatcher->mutex);
+ }
+@@ -1519,50 +1527,16 @@ void adreno_dispatcher_irq_fault(struct kgsl_device *device)
+ }
+ 
+ /**
+- * adreno_dispatcher_pause() - stop the dispatcher
+- * @adreno_dev: pointer to the adreno device structure
+- *
+- * Pause the dispather so it doesn't accept any new commands
+- */
+-void adreno_dispatcher_pause(struct adreno_device *adreno_dev)
+-{
+-	struct adreno_dispatcher *dispatcher = &adreno_dev->dispatcher;
+-
+-	/*
+-	 * This will probably get called while holding other mutexes so don't
+-	 * take the dispatcher mutex.  The biggest penalty is that another
+-	 * command might be submitted while we are in here but thats okay
+-	 * because whoever is waiting for the drain will just have another
+-	 * command batch to wait for
+-	 */
+-
+-	dispatcher->state = ADRENO_DISPATCHER_PAUSE;
+-}
+-
+-/**
+- * adreno_dispatcher_resume() - resume the dispatcher
+- * @adreno_dev: pointer to the adreno device structure
+- *
+- * Set the dispatcher active so it can start accepting commands again
+- */
+-void adreno_dispatcher_resume(struct adreno_device *adreno_dev)
+-{
+-	struct adreno_dispatcher *dispatcher = &adreno_dev->dispatcher;
+-
+-	if (dispatcher->state != ADRENO_DISPATCHER_ACTIVE) {
+-		dispatcher->state = ADRENO_DISPATCHER_ACTIVE;
+-		adreno_dispatcher_schedule(&adreno_dev->dev);
+-	}
+-}
+-
+-/**
+  * adreno_dispatcher_start() - activate the dispatcher
+  * @adreno_dev: pointer to the adreno device structure
+  *
+  */
+-void adreno_dispatcher_start(struct adreno_device *adreno_dev)
++void adreno_dispatcher_start(struct kgsl_device *device)
+ {
+-	adreno_dispatcher_resume(adreno_dev);
++	complete_all(&device->cmdbatch_gate);
++
++	/* Schedule the work loop to get things going */
++	adreno_dispatcher_schedule(device);
+ }
+ 
+ /**
+@@ -1749,8 +1723,6 @@ int adreno_dispatcher_init(struct adreno_device *adreno_dev)
+ 	plist_head_init(&dispatcher->pending);
+ 	spin_lock_init(&dispatcher->plist_lock);
+ 
+-	dispatcher->state = ADRENO_DISPATCHER_ACTIVE;
+-
+ 	ret = kobject_init_and_add(&dispatcher->kobj, &ktype_dispatcher,
+ 		&device->dev->kobj, "dispatch");
+ 
+diff --git a/drivers/gpu/msm/adreno_postmortem.c b/drivers/gpu/msm/adreno_postmortem.c
+index f6b8f53..9f259eb 100644
+--- a/drivers/gpu/msm/adreno_postmortem.c
++++ b/drivers/gpu/msm/adreno_postmortem.c
+@@ -630,7 +630,7 @@ error_vfree:
+ end:
+ 	/* Restart the dispatcher after a manually triggered dump */
+ 	if (manual)
+-		adreno_dispatcher_start(adreno_dev);
++		adreno_dispatcher_start(device);
+ 
+ 	return result;
+ }
+diff --git a/drivers/gpu/msm/adreno_ringbuffer.c b/drivers/gpu/msm/adreno_ringbuffer.c
+index f12385f..16e927a 100644
+--- a/drivers/gpu/msm/adreno_ringbuffer.c
++++ b/drivers/gpu/msm/adreno_ringbuffer.c
+@@ -1011,6 +1011,9 @@ adreno_ringbuffer_issueibcmds(struct kgsl_device_private *dev_priv,
+ 	/* For now everybody has the same priority */
+ 	cmdbatch->priority = ADRENO_CONTEXT_DEFAULT_PRIORITY;
+ 
++	/* wait for the suspend gate */
++	wait_for_completion(&device->cmdbatch_gate);
++
+ 	/* Queue the command in the ringbuffer */
+ 	ret = adreno_dispatcher_queue_cmd(adreno_dev, drawctxt, cmdbatch,
+ 		timestamp);
+diff --git a/drivers/gpu/msm/kgsl_device.h b/drivers/gpu/msm/kgsl_device.h
+index a9661c9..23b3ea5 100644
+--- a/drivers/gpu/msm/kgsl_device.h
++++ b/drivers/gpu/msm/kgsl_device.h
+@@ -242,6 +242,7 @@ struct kgsl_device {
+ 	struct kgsl_mh mh;
+ 	struct kgsl_mmu mmu;
+ 	struct completion hwaccess_gate;
++	struct completion cmdbatch_gate;
+ 	const struct kgsl_functable *ftbl;
+ 	struct work_struct idle_check_ws;
+ 	struct timer_list idle_timer;
+@@ -313,6 +314,7 @@ void kgsl_process_events(struct work_struct *work);
+ 
+ #define KGSL_DEVICE_COMMON_INIT(_dev) \
+ 	.hwaccess_gate = COMPLETION_INITIALIZER((_dev).hwaccess_gate),\
++	.cmdbatch_gate = COMPLETION_INITIALIZER((_dev).cmdbatch_gate),\
+ 	.idle_check_ws = __WORK_INITIALIZER((_dev).idle_check_ws,\
+ 			kgsl_idle_check),\
+ 	.ts_expired_ws  = __WORK_INITIALIZER((_dev).ts_expired_ws,\
+-- 
+1.7.9.5
+

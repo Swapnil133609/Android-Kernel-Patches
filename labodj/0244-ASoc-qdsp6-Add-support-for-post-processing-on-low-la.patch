@@ -1,0 +1,291 @@
+From 33cb24094f070eb8a325dfd136aa1753123687aa Mon Sep 17 00:00:00 2001
+From: Ravi Kumar Alamanda <ralama@codeaurora.org>
+Date: Mon, 21 Oct 2013 13:57:12 -0700
+Subject: [PATCH 244/590] ASoc: qdsp6: Add support for post processing on low
+ latency path
+
+Current implementation does not send audio calibration data to
+DSP if the playback goes throug low latency path. This results
+poor quality audio on Speaker if it needs tuning.
+Update ADM and RTAC drivers to send audio calibration data
+to DSP and update properly in the QACT tool.
+
+Bug: 11077919
+
+Signed-off-by: Ravi Kumar Alamanda <ralama@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/include/mach/qdsp6v2/rtac.h |    2 +-
+ include/sound/q6adm-v2.h                      |    3 +
+ sound/soc/msm/qdsp6v2/q6adm.c                 |   91 +++++++++++++++----------
+ sound/soc/msm/qdsp6v2/rtac.c                  |   10 ++-
+ 4 files changed, 66 insertions(+), 40 deletions(-)
+
+diff --git a/arch/arm/mach-msm/include/mach/qdsp6v2/rtac.h b/arch/arm/mach-msm/include/mach/qdsp6v2/rtac.h
+index 07be428..523d5e5 100644
+--- a/arch/arm/mach-msm/include/mach/qdsp6v2/rtac.h
++++ b/arch/arm/mach-msm/include/mach/qdsp6v2/rtac.h
+@@ -20,7 +20,7 @@
+ #define RTAC_VOICE_MODES	2
+ 
+ void rtac_add_adm_device(u32 port_id, u32 copp_id, u32 path_id, u32 popp_id);
+-void rtac_remove_adm_device(u32 port_id);
++void rtac_remove_adm_device(u32 port_id, u32 copp_id);
+ void rtac_remove_popp_from_adm_devices(u32 popp_id);
+ void rtac_add_voice(u32 cvs_handle, u32 cvp_handle, u32 rx_afe_port,
+ 	u32 tx_afe_port, u32 session_id);
+diff --git a/include/sound/q6adm-v2.h b/include/sound/q6adm-v2.h
+index 7c38a94..e43d3ce 100644
+--- a/include/sound/q6adm-v2.h
++++ b/include/sound/q6adm-v2.h
+@@ -57,7 +57,10 @@ int adm_connect_afe_port(int mode, int session_id, int port_id);
+ 
+ void adm_ec_ref_rx_id(int  port_id);
+ 
++#ifdef CONFIG_RTAC
+ int adm_get_copp_id(int port_id);
++int adm_get_lowlatency_copp_id(int port_id);
++#endif
+ 
+ void adm_set_multi_ch_map(char *channel_map);
+ 
+diff --git a/sound/soc/msm/qdsp6v2/q6adm.c b/sound/soc/msm/qdsp6v2/q6adm.c
+index 19b8dc2..2413f47 100644
+--- a/sound/soc/msm/qdsp6v2/q6adm.c
++++ b/sound/soc/msm/qdsp6v2/q6adm.c
+@@ -690,7 +690,7 @@ done:
+ 	return;
+ }
+ 
+-static int send_adm_cal_block(int port_id, struct acdb_cal_block *aud_cal)
++static int send_adm_cal_block(int port_id, struct acdb_cal_block *aud_cal, int perf_mode)
+ {
+ 	s32				result = 0;
+ 	struct adm_cmd_set_pp_params_v5	adm_params;
+@@ -719,7 +719,13 @@ static int send_adm_cal_block(int port_id, struct acdb_cal_block *aud_cal)
+ 	adm_params.hdr.src_port = port_id;
+ 	adm_params.hdr.dest_svc = APR_SVC_ADM;
+ 	adm_params.hdr.dest_domain = APR_DOMAIN_ADSP;
+-	adm_params.hdr.dest_port = atomic_read(&this_adm.copp_id[index]);
++
++	if(!perf_mode) {
++	    adm_params.hdr.dest_port = atomic_read(&this_adm.copp_id[index]);
++	} else {
++	    adm_params.hdr.dest_port = atomic_read(&this_adm.copp_low_latency_id[index]);
++	}
++
+ 	adm_params.hdr.token = port_id;
+ 	adm_params.hdr.opcode = ADM_CMD_SET_PP_PARAMS_V5;
+ 	adm_params.payload_addr_lsw = aud_cal->cal_paddr;
+@@ -755,7 +761,7 @@ done:
+ 	return result;
+ }
+ 
+-static void send_adm_cal(int port_id, int path)
++static void send_adm_cal(int port_id, int path, int perf_mode)
+ {
+ 	int			result = 0;
+ 	s32			acdb_path;
+@@ -793,7 +799,7 @@ static void send_adm_cal(int port_id, int path)
+ 		}
+ 	}
+ 
+-	if (!send_adm_cal_block(port_id, &aud_cal))
++	if (!send_adm_cal_block(port_id, &aud_cal, perf_mode))
+ 		pr_debug("%s: Audproc cal sent for port id: %#x, path %d\n",
+ 			__func__, port_id, acdb_path);
+ 	else
+@@ -827,7 +833,7 @@ static void send_adm_cal(int port_id, int path)
+ 		}
+ 	}
+ 
+-	if (!send_adm_cal_block(port_id, &aud_cal))
++	if (!send_adm_cal_block(port_id, &aud_cal, perf_mode))
+ 		pr_debug("%s: Audvol cal sent for port id: %#x, path %d\n",
+ 			__func__, port_id, acdb_path);
+ 	else
+@@ -1015,9 +1021,6 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
+ 			(open.topology_id == VPM_TX_DM_FLUENCE_COPP_TOPOLOGY))
+ 				rate = 16000;
+ 
+-		if (perf_mode)
+-			open.topology_id = NULL_COPP_TOPOLOGY;
+-
+ 		open.dev_num_channel = channel_mode & 0x00FF;
+ 		open.bit_width = bits_per_sample;
+ 		open.sample_rate  = rate;
+@@ -1209,8 +1212,7 @@ int adm_matrix_map(int session_id, int path, int num_copps,
+ 		else
+ 			continue;
+ 		pr_debug("%s: port_id[%#x]: %d, index: %d act coppid[0x%x]\n",
+-			__func__, i, port_id[i], tmp,
+-			atomic_read(&this_adm.copp_id[tmp]));
++			__func__, i, port_id[i], tmp, copps_list[i] );
+ 	}
+ 	atomic_set(&this_adm.copp_stat[index], 0);
+ 
+@@ -1230,25 +1232,27 @@ int adm_matrix_map(int session_id, int path, int num_copps,
+ 		ret = -EINVAL;
+ 		goto fail_cmd;
+ 	}
+-	if (!perf_mode) {
+-		for (i = 0; i < num_copps; i++)
+-			send_adm_cal(port_id[i], path);
+-
+-		for (i = 0; i < num_copps; i++) {
+-			int tmp;
+-			tmp = afe_get_port_index(port_id[i]);
+-			if (tmp >= 0 && tmp < AFE_MAX_PORTS) {
+-				rtac_add_adm_device(port_id[i],
+-					atomic_read(&this_adm.copp_id[tmp]),
+-					path, session_id);
+-				pr_debug("%s, copp_id: %d\n", __func__,
+-					atomic_read(&this_adm.copp_id[tmp]));
+-			} else {
+-				pr_debug("%s: Invalid port index %d",
+-					__func__, tmp);
+-			}
++
++	for (i = 0; i < num_copps; i++)
++		send_adm_cal(port_id[i], path, perf_mode);
++
++	for (i = 0; i < num_copps; i++) {
++		int tmp, copp_id;
++		tmp = afe_get_port_index(port_id[i]);
++		if (tmp >= 0 && tmp < AFE_MAX_PORTS) {
++			if(!perf_mode)
++				copp_id = atomic_read(&this_adm.copp_id[tmp]);
++			else
++				copp_id =
++				atomic_read(&this_adm.copp_low_latency_id[tmp]);
++			rtac_add_adm_device(port_id[i],
++						copp_id, path, session_id);
++			pr_debug("%s, copp_id: %d\n", __func__, copp_id);
++		} else {
++			pr_debug("%s: Invalid port index %d", __func__, tmp);
+ 		}
+ 	}
++
+ fail_cmd:
+ 	kfree(matrix_map);
+ 	return ret;
+@@ -1400,6 +1404,7 @@ fail_cmd:
+ 	return ret;
+ }
+ 
++#ifdef CONFIG_RTAC
+ int adm_get_copp_id(int port_index)
+ {
+ 	pr_debug("%s\n", __func__);
+@@ -1412,6 +1417,19 @@ int adm_get_copp_id(int port_index)
+ 	return atomic_read(&this_adm.copp_id[port_index]);
+ }
+ 
++int adm_get_lowlatency_copp_id(int port_index)
++{
++	pr_debug("%s\n", __func__);
++
++	if (port_index < 0) {
++		pr_err("%s: invalid port_id = %d\n", __func__, port_index);
++		return -EINVAL;
++	}
++
++	return atomic_read(&this_adm.copp_low_latency_id[port_index]);
++}
++#endif //#ifdef CONFIG_RTAC
++
+ void adm_ec_ref_rx_id(int port_id)
+ {
+ 	this_adm.ec_ref_rx = port_id;
+@@ -1424,6 +1442,7 @@ int adm_close(int port_id, bool perf_mode)
+ 
+ 	int ret = 0;
+ 	int index = 0;
++	int copp_id = RESET_COPP_ID;
+ 
+ 	port_id = q6audio_convert_virtual_to_portid(port_id);
+ 
+@@ -1474,17 +1493,19 @@ int adm_close(int port_id, bool perf_mode)
+ 		atomic_set(&this_adm.copp_stat[index], 0);
+ 
+ 		if (perf_mode) {
++			copp_id = atomic_read(&this_adm.copp_low_latency_id[index]);
+ 			pr_debug("%s:coppid %d portid=%#x index=%d coppcnt=%d\n",
+-			    __func__,
+-			    atomic_read(&this_adm.copp_low_latency_id[index]),
+-			    port_id, index,
+-			    atomic_read(&this_adm.copp_low_latency_cnt[index]));
++				__func__,
++				copp_id,
++				port_id, index,
++				atomic_read(&this_adm.copp_low_latency_cnt[index]));
+ 			atomic_set(&this_adm.copp_low_latency_id[index],
+ 				RESET_COPP_ID);
+ 		} else {
++			copp_id = atomic_read(&this_adm.copp_id[index]);
+ 			pr_debug("%s:coppid %d portid=%#x index=%d coppcnt=%d\n",
+ 				__func__,
+-				atomic_read(&this_adm.copp_id[index]),
++				copp_id,
+ 				port_id, index,
+ 				atomic_read(&this_adm.copp_cnt[index]));
+ 			atomic_set(&this_adm.copp_id[index],
+@@ -1509,10 +1530,8 @@ int adm_close(int port_id, bool perf_mode)
+ 		}
+ 	}
+ 
+-	if (!perf_mode) {
+-		pr_debug("%s: remove adm device from rtac\n", __func__);
+-		rtac_remove_adm_device(port_id);
+-	}
++	pr_debug("%s: remove adm device from rtac\n", __func__);
++	rtac_remove_adm_device(port_id, copp_id);
+ 
+ fail_cmd:
+ 	return ret;
+diff --git a/sound/soc/msm/qdsp6v2/rtac.c b/sound/soc/msm/qdsp6v2/rtac.c
+index a4a4b7c..848f470 100644
+--- a/sound/soc/msm/qdsp6v2/rtac.c
++++ b/sound/soc/msm/qdsp6v2/rtac.c
+@@ -169,7 +169,8 @@ void rtac_add_adm_device(u32 port_id, u32 copp_id, u32 path_id, u32 popp_id)
+ 	/* Check if device already added */
+ 	if (rtac_adm_data.num_of_dev != 0) {
+ 		for (; i < rtac_adm_data.num_of_dev; i++) {
+-			if (rtac_adm_data.device[i].afe_port == port_id) {
++			if (rtac_adm_data.device[i].afe_port == port_id &&
++			    rtac_adm_data.device[i].copp == copp_id) {
+ 				add_popp(i, port_id, popp_id);
+ 				goto done;
+ 			}
+@@ -222,7 +223,7 @@ static void shift_popp(u32 copp_idx, u32 popp_idx)
+ 	}
+ }
+ 
+-void rtac_remove_adm_device(u32 port_id)
++void rtac_remove_adm_device(u32 port_id, u32 copp_id)
+ {
+ 	s32 i;
+ 	pr_debug("%s: port_id = %d\n", __func__, port_id);
+@@ -230,7 +231,8 @@ void rtac_remove_adm_device(u32 port_id)
+ 	mutex_lock(&rtac_adm_mutex);
+ 	/* look for device */
+ 	for (i = 0; i < rtac_adm_data.num_of_dev; i++) {
+-		if (rtac_adm_data.device[i].afe_port == port_id) {
++		if (rtac_adm_data.device[i].afe_port == port_id &&
++		    rtac_adm_data.device[i].copp == copp_id) {
+ 			memset(&rtac_adm_data.device[i], 0,
+ 				   sizeof(rtac_adm_data.device[i]));
+ 			rtac_adm_data.num_of_dev--;
+@@ -483,6 +485,8 @@ u32 send_adm_apr(void *buf, u32 opcode)
+ 	for (port_index = 0; port_index < AFE_MAX_PORTS; port_index++) {
+ 		if (adm_get_copp_id(port_index) == copp_id)
+ 			break;
++		if (adm_get_lowlatency_copp_id(port_index) == copp_id)
++			break;
+ 	}
+ 	if (port_index >= AFE_MAX_PORTS) {
+ 		pr_err("%s: Could not find port index for copp = %d\n",
+-- 
+1.7.9.5
+

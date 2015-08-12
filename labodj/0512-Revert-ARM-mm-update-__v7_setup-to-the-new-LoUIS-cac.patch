@@ -1,0 +1,29 @@
+From 7a56e056f23bcc2361fa02ff33cf21adf12d2cda Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Wed, 25 Dec 2013 19:12:16 +0100
+Subject: [PATCH 512/590] Revert "ARM: mm: update __v7_setup() to the new
+ LoUIS cache maintenance API"
+
+This reverts commit 5f1f2b5362446f89bda68503b69422b975775296.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mm/proc-v7.S |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index ce5045c..ba93e68 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -175,7 +175,7 @@ __v7_ca15mp_setup:
+ __v7_setup:
+ 	adr	r12, __v7_setup_stack		@ the local stack
+ 	stmia	r12, {r0-r5, r7, r9, r11, lr}
+-	bl      v7_flush_dcache_louis
++	bl	v7_flush_dcache_all
+ 	ldmia	r12, {r0-r5, r7, r9, r11, lr}
+ 
+ 	mrc	p15, 0, r0, c0, c0, 0		@ read main ID register
+-- 
+1.7.9.5
+

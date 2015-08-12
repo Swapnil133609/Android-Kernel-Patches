@@ -1,0 +1,52 @@
+From 01f5fd2a7df37ea8fee0b583c21d840b213f2224 Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Sat, 21 Dec 2013 02:30:22 +0000
+Subject: [PATCH 486/590] msm: thermal: do not trigger the verify within
+ limits when cpus go online/offline. Also do not
+ make the workqueue available to the freezer path,
+ we want the workqueue to be active and ready to
+ recieve new works even during freezer phase.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/thermal/msm_thermal.c |   15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/thermal/msm_thermal.c b/drivers/thermal/msm_thermal.c
+index 7fa8224..72427fc 100644
+--- a/drivers/thermal/msm_thermal.c
++++ b/drivers/thermal/msm_thermal.c
+@@ -55,13 +55,14 @@ static int  msm_thermal_cpufreq_callback(struct notifier_block *nfb,
+ {
+ 	struct cpufreq_policy *policy = data;
+ 
+-	switch (event) {
+-	case CPUFREQ_INCOMPATIBLE:
++	if (event != CPUFREQ_ADJUST)
++		return 0;
++
++	if (policy->max != cpu_stats.limited_max_freq)
+ 		cpufreq_verify_within_limits(policy, policy->min,
+-			cpu_stats.limited_max_freq);
+-		break;
+-	}
+-	return NOTIFY_OK;
++				cpu_stats.limited_max_freq);
++
++	return 0;
+ }
+ 
+ static struct notifier_block msm_thermal_cpufreq_notifier = {
+@@ -149,7 +150,7 @@ int __devinit msm_thermal_init(struct msm_thermal_data *pdata)
+ 	BUG_ON(pdata->sensor_id >= TSENS_MAX_SENSORS);
+ 	memcpy(&msm_thermal_info, pdata, sizeof(struct msm_thermal_data));
+     
+-	wq = alloc_workqueue("msm_thermal_workqueue", WQ_FREEZABLE | WQ_UNBOUND, 0);
++	wq = alloc_workqueue("msm_thermal_workqueue", WQ_UNBOUND, 0);
+     
+     if (!wq)
+         return -ENOMEM;
+-- 
+1.7.9.5
+

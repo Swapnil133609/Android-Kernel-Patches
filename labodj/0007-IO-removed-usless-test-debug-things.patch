@@ -1,0 +1,78 @@
+From 905ed80cd5073d2326c5e0b73b089ebaa5dadd91 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Sat, 9 Nov 2013 01:12:58 +0100
+Subject: [PATCH 007/590] IO: removed usless test & debug things
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ block/Kconfig.iosched     |    2 +-
+ block/Makefile            |    2 +-
+ drivers/mmc/card/Kconfig  |    2 ++
+ drivers/mmc/card/Makefile |    4 ++--
+ 4 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/block/Kconfig.iosched b/block/Kconfig.iosched
+index 5fd98ea..1c70143 100644
+--- a/block/Kconfig.iosched
++++ b/block/Kconfig.iosched
+@@ -15,7 +15,7 @@ config IOSCHED_NOOP
+ config IOSCHED_TEST
+ 	tristate "Test I/O scheduler"
+ 	depends on DEBUG_FS
+-	default m
++	default n
+ 	---help---
+ 	  The test I/O scheduler is a duplicate of the noop scheduler with
+ 	  addition of test utlity.
+diff --git a/block/Makefile b/block/Makefile
+index b5e6637..d0f182b 100644
+--- a/block/Makefile
++++ b/block/Makefile
+@@ -16,7 +16,7 @@ obj-$(CONFIG_IOSCHED_NOOP)	+= noop-iosched.o
+ obj-$(CONFIG_IOSCHED_DEADLINE)	+= deadline-iosched.o
+ obj-$(CONFIG_IOSCHED_ROW)	+= row-iosched.o
+ obj-$(CONFIG_IOSCHED_CFQ)	+= cfq-iosched.o
+-obj-$(CONFIG_IOSCHED_TEST)	+= test-iosched.o
++#obj-$(CONFIG_IOSCHED_TEST)	+= test-iosched.o
+ 
+ obj-$(CONFIG_BLOCK_COMPAT)	+= compat_ioctl.o
+ obj-$(CONFIG_BLK_DEV_INTEGRITY)	+= blk-integrity.o
+diff --git a/drivers/mmc/card/Kconfig b/drivers/mmc/card/Kconfig
+index 33f0600..97edbaf 100644
+--- a/drivers/mmc/card/Kconfig
++++ b/drivers/mmc/card/Kconfig
+@@ -67,6 +67,7 @@ config SDIO_UART
+ 
+ config MMC_TEST
+ 	tristate "MMC host test driver"
++	default n
+ 	help
+ 	  Development driver that performs a series of reads and writes
+ 	  to a memory card in order to expose certain well known bugs
+@@ -80,6 +81,7 @@ config MMC_TEST
+ config MMC_BLOCK_TEST
+ 	tristate "MMC block test"
+ 	depends on MMC_BLOCK && IOSCHED_TEST
++	default n
+ 	help
+ 	  MMC block test can be used with test iosched to test the MMC block
+ 	  device.
+diff --git a/drivers/mmc/card/Makefile b/drivers/mmc/card/Makefile
+index d55107f..616c420 100644
+--- a/drivers/mmc/card/Makefile
++++ b/drivers/mmc/card/Makefile
+@@ -4,8 +4,8 @@
+ 
+ obj-$(CONFIG_MMC_BLOCK)		+= mmc_block.o
+ mmc_block-objs			:= block.o queue.o
+-obj-$(CONFIG_MMC_TEST)		+= mmc_test.o
++#obj-$(CONFIG_MMC_TEST)		+= mmc_test.o
+ 
+ obj-$(CONFIG_SDIO_UART)		+= sdio_uart.o
+ 
+-obj-$(CONFIG_MMC_BLOCK_TEST)		+= mmc_block_test.o
++#obj-$(CONFIG_MMC_BLOCK_TEST)		+= mmc_block_test.o
+-- 
+1.7.9.5
+

@@ -1,0 +1,33 @@
+From d812925f2cc443f064e3ec389b5fd007fa61389d Mon Sep 17 00:00:00 2001
+From: Pranav Vashi <neobuddy89@gmail.com>
+Date: Tue, 3 Dec 2013 14:38:06 -0800
+Subject: [PATCH 168/590] staging: android: Lower reserved logger RAM
+
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/staging/android/logger.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/staging/android/logger.c b/drivers/staging/android/logger.c
+index e9bd267..11ece12 100644
+--- a/drivers/staging/android/logger.c
++++ b/drivers/staging/android/logger.c
+@@ -734,10 +734,10 @@ static struct logger_log VAR = { \
+ 	.size = SIZE, \
+ };
+ 
+-DEFINE_LOGGER_DEVICE(log_main, LOGGER_LOG_MAIN, 256*1024)
+-DEFINE_LOGGER_DEVICE(log_events, LOGGER_LOG_EVENTS, 256*1024)
+-DEFINE_LOGGER_DEVICE(log_radio, LOGGER_LOG_RADIO, 256*1024)
+-DEFINE_LOGGER_DEVICE(log_system, LOGGER_LOG_SYSTEM, 256*1024)
++DEFINE_LOGGER_DEVICE(log_main, LOGGER_LOG_MAIN, 32*1024)
++DEFINE_LOGGER_DEVICE(log_events, LOGGER_LOG_EVENTS, 32*1024)
++DEFINE_LOGGER_DEVICE(log_radio, LOGGER_LOG_RADIO, 32*1024)
++DEFINE_LOGGER_DEVICE(log_system, LOGGER_LOG_SYSTEM, 32*1024)
+ 
+ static struct logger_log *get_log_from_minor(int minor)
+ {
+-- 
+1.7.9.5
+

@@ -1,0 +1,79 @@
+From cbed83c0186e8ccec5b6899364a58b2e90a8d4b8 Mon Sep 17 00:00:00 2001
+From: Mitchel Humpherys <mitchelh@codeaurora.org>
+Date: Tue, 10 Dec 2013 12:59:52 -0800
+Subject: [PATCH 532/590] ion: msm: update custom caching ioctls for new
+ handle format
+
+The userspace API for Ion handles has changed slightly. Update the MSM
+caching ioctls to work with the new format.
+
+Change-Id: I6dee3190f5cad117a4d7059f1c7f0f01e05692c0
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/ion/msm/msm_ion.c |   31 +++++++++++++++----------------
+ 1 file changed, 15 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/gpu/ion/msm/msm_ion.c b/drivers/gpu/ion/msm/msm_ion.c
+index a3bfbb6..51e50ac 100644
+--- a/drivers/gpu/ion/msm/msm_ion.c
++++ b/drivers/gpu/ion/msm/msm_ion.c
+@@ -921,11 +921,18 @@ static long msm_ion_custom_ioctl(struct ion_client *client,
+ 					sizeof(struct ion_flush_data)))
+ 			return -EFAULT;
+ 
+-		if (!data.handle) {
++		if (data.handle >= 0) {
++			handle = ion_handle_get_by_id(client, (int)data.handle);
++			if (IS_ERR(handle)) {
++				pr_info("%s: Could not find handle: %d\n",
++					__func__, (int)data.handle);
++				return PTR_ERR(handle);
++			}
++		} else {
+ 			handle = ion_import_dma_buf(client, data.fd);
+ 			if (IS_ERR(handle)) {
+-				pr_info("%s: Could not import handle: %d\n",
+-					__func__, (int)handle);
++				pr_info("%s: Could not import handle: %p\n",
++					__func__, handle);
+ 				return -EINVAL;
+ 			}
+ 		}
+@@ -936,28 +943,20 @@ static long msm_ion_custom_ioctl(struct ion_client *client,
+ 		end = (unsigned long) data.vaddr + data.length;
+ 
+ 		if (start && check_vaddr_bounds(start, end)) {
+-			up_read(&mm->mmap_sem);
+ 			pr_err("%s: virtual address %p is out of bounds\n",
+ 				__func__, data.vaddr);
+-			if (!data.handle)
+-				ion_free(client, handle);
+-			return -EINVAL;
++			ret = -EINVAL;
++		} else {
++			ret = ion_do_cache_op(client, handle, data.vaddr,
++					data.offset, data.length, cmd);
+ 		}
+-
+-		ret = ion_do_cache_op(client,
+-				data.handle ? data.handle : handle,
+-				data.vaddr, data.offset, data.length,
+-				cmd);
+-
+ 		up_read(&mm->mmap_sem);
+ 
+-		if (!data.handle)
+-			ion_free(client, handle);
++		ion_free(client, handle);
+ 
+ 		if (ret < 0)
+ 			return ret;
+ 		break;
+-
+ 	}
+ 	case ION_IOC_PREFETCH:
+ 	{
+-- 
+1.7.9.5
+

@@ -1,0 +1,33 @@
+From f8f44a333196d0c1727cf1c33db23e9e2b4533f2 Mon Sep 17 00:00:00 2001
+From: Subbaraman Narayanamurthy <subbaram@codeaurora.org>
+Date: Fri, 20 Sep 2013 15:23:56 -0700
+Subject: [PATCH 449/590] debug-pagealloc: Panic on pagealloc corruption
+
+Currently, we just print the pagealloc corruption warnings and
+proceed. Sometimes, we are getting multiple errors printed down
+the line. It will be good to get the device state as early as
+possible when we get the first pagealloc error.
+
+Change-Id: I79155ac8a039b30a3a98d5dd1384d3923082712f
+Signed-off-by: Subbaraman Narayanamurthy <subbaram@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/debug-pagealloc.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/mm/debug-pagealloc.c b/mm/debug-pagealloc.c
+index 789ff70..bc91cba 100644
+--- a/mm/debug-pagealloc.c
++++ b/mm/debug-pagealloc.c
+@@ -69,6 +69,7 @@ static void check_poison_mem(unsigned char *mem, size_t bytes)
+ 
+ 	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 16, 1, start,
+ 			end - start + 1, 1);
++	BUG_ON(PANIC_CORRUPTION);
+ 	dump_stack();
+ }
+ 
+-- 
+1.7.9.5
+

@@ -1,0 +1,28 @@
+From 3bc7a9960743194f0fb14e4b364b4ab9186d3992 Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Fri, 6 Dec 2013 23:44:23 +0000
+Subject: [PATCH 288/590] cpufreq: interactive: lets push the input_boost_freq
+ a notch.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_interactive.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/cpufreq_interactive.c b/drivers/cpufreq/cpufreq_interactive.c
+index 4bf9325..8d81ce5 100644
+--- a/drivers/cpufreq/cpufreq_interactive.c
++++ b/drivers/cpufreq/cpufreq_interactive.c
+@@ -126,7 +126,7 @@ static bool io_is_busy = true;
+  * The CPU will be boosted to this frequency when the screen is
+  * touched. input_boost needs to be enabled.
+  */
+-#define DEFAULT_INPUT_BOOST_FREQ 1267200
++#define DEFAULT_INPUT_BOOST_FREQ 1574400
+ static int input_boost_freq = DEFAULT_INPUT_BOOST_FREQ;
+ static struct workqueue_struct *input_wq;
+ static struct work_struct input_work;
+-- 
+1.7.9.5
+

@@ -1,0 +1,28 @@
+From 7a2cf6acefaee479ba4779a2f32aa3e05d9e13fd Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 18 Nov 2013 23:08:06 +0100
+Subject: [PATCH 321/590] touch_synaptics_ds5: don't wait for irq events to be
+ handled, just disable the irq
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/touch_synaptics_ds5.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/input/touchscreen/touch_synaptics_ds5.c b/drivers/input/touchscreen/touch_synaptics_ds5.c
+index 9905f1d..23f5bf5 100644
+--- a/drivers/input/touchscreen/touch_synaptics_ds5.c
++++ b/drivers/input/touchscreen/touch_synaptics_ds5.c
+@@ -1736,7 +1736,7 @@ static int lcd_notifier_callback(struct notifier_block *this,
+ 		{
+ 			mutex_lock(&ts->input_dev->mutex);
+ 			if (!cancel_delayed_work_sync(&ts->work_init))
+-				disable_irq(ts->client->irq);
++				disable_irq_nosync(ts->client->irq);
+ 		}
+ 		break;
+ 	case LCD_EVENT_OFF_END:
+-- 
+1.7.9.5
+

@@ -1,0 +1,1552 @@
+From e17887207c14c3c9a0ba84bc188baa03327724f2 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Tue, 19 Nov 2013 18:13:51 +0100
+Subject: [PATCH 001/590] Fix warnings and compilation errors with gcc 4.8
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/boot/compressed/Makefile      |    8 ++
+ arch/arm/kernel/return_address.c       |    2 +-
+ arch/arm/lib/memset.S                  |  100 ++++++++-------
+ arch/arm/mach-msm/clock-generic.c      |    2 +-
+ arch/arm/mach-msm/sensors_adsp.c       |    2 +-
+ arch/arm/mach-msm/smd_rpc_sym.c        |  209 ++++++++++++++++++++++++++++++++
+ drivers/char/msm_rotator.c             |    2 +-
+ drivers/media/common/tuners/xc4000.c   |   10 +-
+ drivers/media/common/tuners/xc5000.c   |    8 +-
+ drivers/mfd/wcd9xxx-core.c             |    5 +-
+ drivers/net/ppp/ppp_generic.c          |    4 +-
+ drivers/net/usb/sierra_net.c           |    6 +-
+ drivers/net/usb/smsc95xx.c             |   12 +-
+ drivers/net/wireless/bcmdhd/bcmutils.c |    2 +-
+ drivers/power/pm8921-bms.c             |    2 +-
+ drivers/power/pm8xxx-ccadc.c           |    2 +-
+ drivers/usb/core/hub.c                 |   17 ++-
+ drivers/usb/gadget/f_qdss.c            |    4 +-
+ drivers/usb/host/ehci-sched.c          |    2 +-
+ drivers/usb/storage/transport.c        |    4 +-
+ drivers/video/msm/mdss/mdss_mdp_util.c |   14 ++-
+ fs/fs-writeback.c                      |   11 +-
+ fs/fuse/control.c                      |    8 +-
+ fs/jbd/journal.c                       |    8 +-
+ fs/jbd2/journal.c                      |    6 +-
+ fs/namei.c                             |   10 +-
+ fs/namespace.c                         |    6 +-
+ include/scsi/scsi.h                    |    2 +-
+ ipc/shm.c                              |    2 +-
+ kernel/auditsc.c                       |    2 +-
+ kernel/cgroup.c                        |    2 +
+ kernel/sysctl.c                        |    4 +-
+ kernel/workqueue.c                     |   13 +-
+ net/bluetooth/hci_conn.c               |    2 +-
+ net/bluetooth/l2cap_core.c             |   10 +-
+ net/bridge/br_multicast.c              |    6 +
+ net/ipv4/tcp_input.c                   |    3 +-
+ net/netfilter/nf_conntrack_h323_main.c |   12 +-
+ net/socket.c                           |    4 +-
+ net/unix/af_unix.c                     |   24 ++--
+ sound/usb/mixer.c                      |   38 +++---
+ 41 files changed, 413 insertions(+), 177 deletions(-)
+ create mode 100644 arch/arm/mach-msm/smd_rpc_sym.c
+
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index bb26756..6474de0 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -22,6 +22,11 @@ OBJS		+= sdhi-sh7372.o
+ endif
+ 
+ AFLAGS_head.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
++
++AFLAGS_head.o += -Wa,-march=armv7-a$(plus_sec)
++AFLAGS_misc.o +=-Wa,-march=armv7-a$(plus_sec)
++AFLAGS_decompress.o += -Wa,-march=armv7-a$(plus_sec)
++
+ HEAD	= head.o
+ OBJS	+= misc.o decompress.o
+ FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
+@@ -149,6 +154,7 @@ LDFLAGS_vmlinux += -X
+ LDFLAGS_vmlinux += -T
+ 
+ # For __aeabi_uidivmod
++AFLAGS_lib1funcs.o +=-Wa,-march=armv7-a$(plus_sec)
+ lib1funcs = $(obj)/lib1funcs.o
+ 
+ $(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
+@@ -157,6 +163,7 @@ $(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
+ # For __aeabi_llsl
+ ashldi3 = $(obj)/ashldi3.o
+ 
++AFLAGS_ashldi3.o +=-Wa,-march=armv7-a$(plus_sec)
+ $(obj)/ashldi3.S: $(srctree)/arch/$(SRCARCH)/lib/ashldi3.S
+ 	$(call cmd,shipped)
+ 
+@@ -189,6 +196,7 @@ $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
+ $(obj)/piggy.$(suffix_y): $(obj)/../Image FORCE
+ 	$(call if_changed,$(suffix_y))
+ 
++AFLAGS_piggy.$(suffix_y).o += -Wa,-march=armv7-a$(plus_sec)
+ $(obj)/piggy.$(suffix_y).o:  $(obj)/piggy.$(suffix_y) FORCE
+ 
+ CFLAGS_font.o := -Dstatic=
+diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
+index 8085417..58278eb 100644
+--- a/arch/arm/kernel/return_address.c
++++ b/arch/arm/kernel/return_address.c
+@@ -58,7 +58,7 @@ void *return_address(unsigned int level)
+ 
+ #else /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) */
+ 
+-#if defined(CONFIG_ARM_UNWIND)
++#if 0
+ #warning "TODO: return_address should use unwind tables"
+ #endif
+ 
+diff --git a/arch/arm/lib/memset.S b/arch/arm/lib/memset.S
+index 650d592..94b0650 100644
+--- a/arch/arm/lib/memset.S
++++ b/arch/arm/lib/memset.S
+@@ -14,27 +14,15 @@
+ 
+ 	.text
+ 	.align	5
+-	.word	0
+-
+-1:	subs	r2, r2, #4		@ 1 do we have enough
+-	blt	5f			@ 1 bytes to align with?
+-	cmp	r3, #2			@ 1
+-	strltb	r1, [r0], #1		@ 1
+-	strleb	r1, [r0], #1		@ 1
+-	strb	r1, [r0], #1		@ 1
+-	add	r2, r2, r3		@ 1 (r2 = r2 - (4 - r3))
+-/*
+- * The pointer is now aligned and the length is adjusted.  Try doing the
+- * memset again.
+- */
+ 
+ ENTRY(memset)
+ 	ands	r3, r0, #3		@ 1 unaligned?
+-	bne	1b			@ 1
++	mov	ip, r0			@ preserve r0 as return value
++	bne	6f			@ 1
+ /*
+- * we know that the pointer in r0 is aligned to a word boundary.
++ * we know that the pointer in ip is aligned to a word boundary.
+  */
+-	orr	r1, r1, r1, lsl #8
++1:	orr	r1, r1, r1, lsl #8
+ 	orr	r1, r1, r1, lsl #16
+ 	mov	r3, r1
+ 	cmp	r2, #16
+@@ -43,29 +31,28 @@ ENTRY(memset)
+ #if ! CALGN(1)+0
+ 
+ /*
+- * We need an extra register for this loop - save the return address and
+- * use the LR
++ * We need 2 extra registers for this loop - use r8 and the LR
+  */
+-	str	lr, [sp, #-4]!
+-	mov	ip, r1
++	stmfd	sp!, {r8, lr}
++	mov	r8, r1
+ 	mov	lr, r1
+ 
+ 2:	subs	r2, r2, #64
+-	stmgeia	r0!, {r1, r3, ip, lr}	@ 64 bytes at a time.
+-	stmgeia	r0!, {r1, r3, ip, lr}
+-	stmgeia	r0!, {r1, r3, ip, lr}
+-	stmgeia	r0!, {r1, r3, ip, lr}
++	stmgeia	ip!, {r1, r3, r8, lr}	@ 64 bytes at a time.
++	stmgeia	ip!, {r1, r3, r8, lr}
++	stmgeia	ip!, {r1, r3, r8, lr}
++	stmgeia	ip!, {r1, r3, r8, lr}
+ 	bgt	2b
+-	ldmeqfd	sp!, {pc}		@ Now <64 bytes to go.
++	ldmeqfd	sp!, {r8, pc}		@ Now <64 bytes to go.
+ /*
+  * No need to correct the count; we're only testing bits from now on
+  */
+ 	tst	r2, #32
+-	stmneia	r0!, {r1, r3, ip, lr}
+-	stmneia	r0!, {r1, r3, ip, lr}
++	stmneia	ip!, {r1, r3, r8, lr}
++	stmneia	ip!, {r1, r3, r8, lr}
+ 	tst	r2, #16
+-	stmneia	r0!, {r1, r3, ip, lr}
+-	ldr	lr, [sp], #4
++	stmneia	ip!, {r1, r3, r8, lr}
++	ldmfd	sp!, {r8, lr}
+ 
+ #else
+ 
+@@ -74,54 +61,63 @@ ENTRY(memset)
+  * whole cache lines at once.
+  */
+ 
+-	stmfd	sp!, {r4-r7, lr}
++	stmfd	sp!, {r4-r8, lr}
+ 	mov	r4, r1
+ 	mov	r5, r1
+ 	mov	r6, r1
+ 	mov	r7, r1
+-	mov	ip, r1
++	mov	r8, r1
+ 	mov	lr, r1
+ 
+ 	cmp	r2, #96
+-	tstgt	r0, #31
++	tstgt	ip, #31
+ 	ble	3f
+ 
+-	and	ip, r0, #31
+-	rsb	ip, ip, #32
+-	sub	r2, r2, ip
+-	movs	ip, ip, lsl #(32 - 4)
+-	stmcsia	r0!, {r4, r5, r6, r7}
+-	stmmiia	r0!, {r4, r5}
+-	tst	ip, #(1 << 30)
+-	mov	ip, r1
+-	strne	r1, [r0], #4
++	and	r8, ip, #31
++	rsb	r8, r8, #32
++	sub	r2, r2, r8
++	movs	r8, r8, lsl #(32 - 4)
++	stmcsia	ip!, {r4, r5, r6, r7}
++	stmmiia	ip!, {r4, r5}
++	tst	r8, #(1 << 30)
++	mov	r8, r1
++	strne	r1, [ip], #4
+ 
+ 3:	subs	r2, r2, #64
+-	stmgeia	r0!, {r1, r3-r7, ip, lr}
+-	stmgeia	r0!, {r1, r3-r7, ip, lr}
++	stmgeia	ip!, {r1, r3-r8, lr}
++	stmgeia	ip!, {r1, r3-r8, lr}
+ 	bgt	3b
+-	ldmeqfd	sp!, {r4-r7, pc}
++	ldmeqfd	sp!, {r4-r8, pc}
+ 
+ 	tst	r2, #32
+-	stmneia	r0!, {r1, r3-r7, ip, lr}
++	stmneia	ip!, {r1, r3-r8, lr}
+ 	tst	r2, #16
+-	stmneia	r0!, {r4-r7}
+-	ldmfd	sp!, {r4-r7, lr}
++	stmneia	ip!, {r4-r7}
++	ldmfd	sp!, {r4-r8, lr}
+ 
+ #endif
+ 
+ 4:	tst	r2, #8
+-	stmneia	r0!, {r1, r3}
++	stmneia	ip!, {r1, r3}
+ 	tst	r2, #4
+-	strne	r1, [r0], #4
++	strne	r1, [ip], #4
+ /*
+  * When we get here, we've got less than 4 bytes to zero.  We
+  * may have an unaligned pointer as well.
+  */
+ 5:	tst	r2, #2
+-	strneb	r1, [r0], #1
+-	strneb	r1, [r0], #1
++	strneb	r1, [ip], #1
++	strneb	r1, [ip], #1
+ 	tst	r2, #1
+-	strneb	r1, [r0], #1
++	strneb	r1, [ip], #1
+ 	mov	pc, lr
++
++6:	subs	r2, r2, #4		@ 1 do we have enough
++	blt	5b			@ 1 bytes to align with?
++	cmp	r3, #2			@ 1
++	strltb	r1, [ip], #1		@ 1
++	strleb	r1, [ip], #1		@ 1
++	strb	r1, [ip], #1		@ 1
++	add	r2, r2, r3		@ 1 (r2 = r2 - (4 - r3))
++	b	1b
+ ENDPROC(memset)
+diff --git a/arch/arm/mach-msm/clock-generic.c b/arch/arm/mach-msm/clock-generic.c
+index 4d74533..be45739 100644
+--- a/arch/arm/mach-msm/clock-generic.c
++++ b/arch/arm/mach-msm/clock-generic.c
+@@ -256,7 +256,7 @@ static long div_round_rate(struct clk *c, unsigned long rate)
+ static int div_set_rate(struct clk *c, unsigned long rate)
+ {
+ 	struct div_clk *d = to_div_clk(c);
+-	int div, rc = 0;
++	int div = 0, rc = 0;
+ 	long rrate, old_prate;
+ 
+ 	rrate = __div_round_rate(c, rate, &div);
+diff --git a/arch/arm/mach-msm/sensors_adsp.c b/arch/arm/mach-msm/sensors_adsp.c
+index 1534358..4548b26 100644
+--- a/arch/arm/mach-msm/sensors_adsp.c
++++ b/arch/arm/mach-msm/sensors_adsp.c
+@@ -874,7 +874,7 @@ static int sns_ocmem_map_send(void)
+ 
+ 	vectors = ocmem_get_vectors(SNS_OCMEM_CLIENT_ID, sns_ctl.buf);
+ 	if ((vectors != NULL)) {
+-		memcpy(&msg.vectors, vectors, sizeof(vectors));
++		memcpy(&msg.vectors, vectors, sizeof(*vectors));
+ 		/* TODO: set vectors_len */
+ 		msg.vectors_valid = true;
+ 		msg.vectors_len = 0;
+diff --git a/arch/arm/mach-msm/smd_rpc_sym.c b/arch/arm/mach-msm/smd_rpc_sym.c
+new file mode 100644
+index 0000000..32308d6
+--- /dev/null
++++ b/arch/arm/mach-msm/smd_rpc_sym.c
+@@ -0,0 +1,209 @@
++/* Autogenerated by mkrpcsym.pl.  Do not edit */
++
++
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/debugfs.h>
++#include <linux/module.h>
++
++struct sym {
++	const char *str;
++};
++
++const char *smd_rpc_syms[] = {
++	"CB CM_FUSION",				/*0x30010000*/
++	"CB DB",				/*0x30000001*/
++	"CB SND",				/*0x30000002*/
++	"CB WMS_FUSION",			/*0x30010003*/
++	"CB PDSM",				/*0x30000004*/
++	"CB MISC_MODEM_APIS",			/*0x30000005*/
++	"CB MISC_APPS_APIS",			/*0x30000006*/
++	"CB JOYST",				/*0x30000007*/
++	"CB UNDEFINED",
++	"CB UNDEFINED",
++	"CB ADSPRTOSATOM",			/*0x3000000A*/
++	"CB ADSPRTOSMTOA",			/*0x3000000B*/
++	"CB I2C",				/*0x3000000C*/
++	"CB TIME_REMOTE",			/*0x3000000D*/
++	"CB NV_FUSION",				/*0x3001000E*/
++	"CB CLKRGM_SEC_FUSION",			/*0x3001000F*/
++	"CB RDEVMAP",				/*0x30000010*/
++	"CB UNDEFINED",
++	"CB PBMLIB_FUSION",			/*0x30010012*/
++	"CB AUDMGR",				/*0x30000013*/
++	"CB MVS",				/*0x30000014*/
++	"CB DOG_KEEPALIVE",			/*0x30000015*/
++	"CB GSDI_EXP_FUSION",			/*0x30010016*/
++	"CB AUTH",				/*0x30000017*/
++	"CB NVRUIMI",				/*0x30000018*/
++	"CB MMGSDILIB_FUSION",			/*0x30010019*/
++	"CB CHARGER",				/*0x3000001A*/
++	"CB UIM_FUSION",			/*0x3001001B*/
++	"CB UNDEFINED",
++	"CB PDSM_ATL",				/*0x3000001D*/
++	"CB FS_XMOUNT",				/*0x3000001E*/
++	"CB SECUTIL",				/*0x3000001F*/
++	"CB MCCMEID",				/*0x30000020*/
++	"CB PM_STROBE_FLASH",			/*0x30000021*/
++	"CB UNDEFINED",
++	"CB SMD_BRIDGE",			/*0x30000023*/
++	"CB SMD_PORT_MGR_FUSION",		/*0x30010024*/
++	"CB BUS_PERF",				/*0x30000025*/
++	"CB BUS_MON_REMOTE",			/*0x30000026*/
++	"CB MC",				/*0x30000027*/
++	"CB MCCAP",				/*0x30000028*/
++	"CB MCCDMA",				/*0x30000029*/
++	"CB MCCDS",				/*0x3000002A*/
++	"CB MCCSCH",				/*0x3000002B*/
++	"CB MCCSRID",				/*0x3000002C*/
++	"CB SNM",				/*0x3000002D*/
++	"CB MCCSYOBJ",				/*0x3000002E*/
++	"CB UNDEFINED",
++	"CB UNDEFINED",
++	"CB DSRLP_APIS",			/*0x30000031*/
++	"CB RLP_APIS",				/*0x30000032*/
++	"CB DS_MP_SHIM_MODEM",			/*0x30000033*/
++	"CB UNDEFINED",
++	"CB DSHDR_MDM_APIS",			/*0x30000035*/
++	"CB DS_MP_SHIM_APPS",			/*0x30000036*/
++	"CB HDRMC_APIS",			/*0x30000037*/
++	"CB UNDEFINED",
++	"CB UNDEFINED",
++	"CB PMAPP_OTG",				/*0x3000003A*/
++	"CB DIAG",				/*0x3000003B*/
++	"CB GSTK_EXP_FUSION",			/*0x3001003C*/
++	"CB DSBC_MDM_APIS",			/*0x3000003D*/
++	"CB HDRMRLP_MDM_APIS",			/*0x3000003E*/
++	"CB UNDEFINED",
++	"CB HDRMC_MRLP_APIS",			/*0x30000040*/
++	"CB PDCOMM_APP_API",			/*0x30000041*/
++	"CB DSAT_APIS",				/*0x30000042*/
++	"CB RFM",				/*0x30000043*/
++	"CB CMIPAPP",				/*0x30000044*/
++	"CB DSMP_UMTS_MODEM_APIS",		/*0x30000045*/
++	"CB UNDEFINED",
++	"CB DSUCSDMPSHIM",			/*0x30000047*/
++	"CB TIME_REMOTE_ATOM",			/*0x30000048*/
++	"CB UNDEFINED",
++	"CB SD",				/*0x3000004A*/
++	"CB MMOC",				/*0x3000004B*/
++	"CB UNDEFINED",
++	"CB WLAN_CP_CM",			/*0x3000004D*/
++	"CB FTM_WLAN",				/*0x3000004E*/
++	"CB UNDEFINED",
++	"CB CPRMINTERFACE",			/*0x30000050*/
++	"CB DATA_ON_MODEM_MTOA_APIS",		/*0x30000051*/
++	"CB UNDEFINED",
++	"CB MISC_MODEM_APIS_NONWINMOB",		/*0x30000053*/
++	"CB MISC_APPS_APIS_NONWINMOB",		/*0x30000054*/
++	"CB PMEM_REMOTE",			/*0x30000055*/
++	"CB TCXOMGR",				/*0x30000056*/
++	"CB UNDEFINED",
++	"CB BT",				/*0x30000058*/
++	"CB PD_COMMS_API",			/*0x30000059*/
++	"CB PD_COMMS_CLIENT_API",		/*0x3000005A*/
++	"CB PDAPI",				/*0x3000005B*/
++	"CB UNDEFINED",
++	"CB TIME_REMOTE_MTOA",			/*0x3000005D*/
++	"CB FTM_BT",				/*0x3000005E*/
++	"CB DSUCSDAPPIF_APIS",			/*0x3000005F*/
++	"CB PMAPP_GEN",				/*0x30000060*/
++	"CB PM_LIB_FUSION",			/*0x30010061*/
++	"CB UNDEFINED",
++	"CB HSU_APP_APIS",			/*0x30000063*/
++	"CB HSU_MDM_APIS",			/*0x30000064*/
++	"CB ADIE_ADC_REMOTE_ATOM",		/*0x30000065*/
++	"CB TLMM_REMOTE_ATOM",			/*0x30000066*/
++	"CB UI_CALLCTRL",			/*0x30000067*/
++	"CB UIUTILS",				/*0x30000068*/
++	"CB PRL",				/*0x30000069*/
++	"CB HW",				/*0x3000006A*/
++	"CB OEM_RAPI_FUSION",			/*0x3001006B*/
++	"CB WMSPM",				/*0x3000006C*/
++	"CB BTPF",				/*0x3000006D*/
++	"CB UNDEFINED",
++	"CB USB_APPS_RPC",			/*0x3000006F*/
++	"CB USB_MODEM_RPC",			/*0x30000070*/
++	"CB ADC",				/*0x30000071*/
++	"CB CAMERAREMOTED",			/*0x30000072*/
++	"CB SECAPIREMOTED",			/*0x30000073*/
++	"CB DSATAPI",				/*0x30000074*/
++	"CB CLKCTL_RPC",			/*0x30000075*/
++	"CB BREWAPPCOORD",			/*0x30000076*/
++	"CB UNDEFINED",
++	"CB WLAN_TRP_UTILS",			/*0x30000078*/
++	"CB GPIO_RPC",				/*0x30000079*/
++	"CB UNDEFINED",
++	"CB UNDEFINED",
++	"CB L1_DS",				/*0x3000007C*/
++	"CB UNDEFINED",
++	"CB UNDEFINED",
++	"CB OSS_RRCASN_REMOTE",			/*0x3000007F*/
++	"CB PMAPP_OTG_REMOTE",			/*0x30000080*/
++	"CB PING_LTE_RPC",			/*0x30010081*/
++	"CB UNDEFINED",
++	"CB UNDEFINED",
++	"CB UNDEFINED",
++	"CB UNDEFINED",
++	"CB UNDEFINED",
++	"CB UKCC_IPC_APIS",			/*0x30000087*/
++	"CB UNDEFINED",
++	"CB VBATT_REMOTE",			/*0x30000089*/
++	"CB MFPAL_FPS",				/*0x3000008A*/
++	"CB DSUMTSPDPREG",			/*0x3000008B*/
++	"CB LOC_API",				/*0x3000008C*/
++	"CB UNDEFINED",
++	"CB CMGAN",				/*0x3000008E*/
++	"CB ISENSE",				/*0x3000008F*/
++	"CB TIME_SECURE",			/*0x30000090*/
++	"CB HS_REM",				/*0x30000091*/
++	"CB ACDB",				/*0x30000092*/
++	"CB NET",				/*0x30000093*/
++	"CB LED",				/*0x30000094*/
++	"CB DSPAE",				/*0x30000095*/
++	"CB MFKAL",				/*0x30000096*/
++	"CB UNDEFINED",
++	"CB UNDEFINED",
++	"CB UNDEFINED",
++	"CB UNDEFINED",
++	"CB TEST_API",				/*0x3000009B*/
++	"CB REMOTEFS_SRV_API_FUSION",		/*0x3001009C*/
++	"CB ISI_TRANSPORT",			/*0x3000009D*/
++	"CB OEM_FTM",				/*0x3000009E*/
++	"CB TOUCH_SCREEN_ADC",			/*0x3000009F*/
++	"CB SMD_BRIDGE_APPS_FUSION",		/*0x300100A0*/
++	"CB SMD_BRIDGE_MODEM_FUSION",		/*0x300100A1*/
++	"CB DOG_KEEPALIVE_MODEM",		/*0x300000A2*/
++	"CB VOEM_IF",				/*0x300000A3*/
++	"CB NPA_REMOTE",			/*0x300000A4*/
++	"CB MMGSDISESSIONLIB_FUSION",		/*0x300100A5*/
++	"CB IFTA_REMOTE",			/*0x300000A6*/
++	"CB REMOTE_STORAGE",			/*0x300000A7*/
++	"CB MF_REMOTE_FILE",			/*0x300000A8*/
++	"CB MFSC_CHUNKED_TRANSPORT",		/*0x300000A9*/
++	"CB MFIM3",				/*0x300000AA*/
++	"CB FM_WAN_API",			/*0x300000AB*/
++	"CB WLAN_RAPI",				/*0x300000AC*/
++	"CB DSMGR_APIS",			/*0x300000AD*/
++	"CB CM_MM_FUSION",			/*0x300100AE*/
++};
++
++static struct sym_tbl {
++	const char **data;
++	int size;
++} tbl = { smd_rpc_syms, ARRAY_SIZE(smd_rpc_syms)};
++
++const char *smd_rpc_get_sym(uint32_t val)
++{
++	int idx = val & 0xFFFF;
++	if (idx < tbl.size) {
++		if (val & 0x01000000)
++			return tbl.data[idx];
++		else
++			return tbl.data[idx] + 3;
++	}
++	return 0;
++}
++EXPORT_SYMBOL(smd_rpc_get_sym);
++
+diff --git a/drivers/char/msm_rotator.c b/drivers/char/msm_rotator.c
+index 156a2a5..6fd7b67 100644
+--- a/drivers/char/msm_rotator.c
++++ b/drivers/char/msm_rotator.c
+@@ -921,7 +921,7 @@ static int msm_rotator_do_rotate(unsigned long arg)
+ 	struct file *srcp1_file = NULL, *dstp1_file = NULL;
+ 	struct ion_handle *srcp0_ihdl = NULL, *dstp0_ihdl = NULL;
+ 	struct ion_handle *srcp1_ihdl = NULL, *dstp1_ihdl = NULL;
+-	int ps0_need, p_need;
++	int ps0_need = 0, p_need;
+ 	unsigned int in_chroma_paddr = 0, out_chroma_paddr = 0;
+ 	unsigned int in_chroma2_paddr = 0;
+ 	struct msm_rotator_img_info *img_info;
+diff --git a/drivers/media/common/tuners/xc4000.c b/drivers/media/common/tuners/xc4000.c
+index 6839711..aa91565 100644
+--- a/drivers/media/common/tuners/xc4000.c
++++ b/drivers/media/common/tuners/xc4000.c
+@@ -933,7 +933,7 @@ static int check_firmware(struct dvb_frontend *fe, unsigned int type,
+ 	struct xc4000_priv         *priv = fe->tuner_priv;
+ 	struct firmware_properties new_fw;
+ 	int			   rc = 0, is_retry = 0;
+-	u16			   hwmodel;
++	u16			   hwmodel = 0;
+ 	v4l2_std_id		   std0;
+ 	u8			   hw_major, hw_minor, fw_major, fw_minor;
+ 
+@@ -1095,12 +1095,12 @@ fail:
+ 
+ static void xc_debug_dump(struct xc4000_priv *priv)
+ {
+-	u16	adc_envelope;
++	u16	adc_envelope = 0;
+ 	u32	freq_error_hz = 0;
+-	u16	lock_status;
++	u16	lock_status = 0;
+ 	u32	hsync_freq_hz = 0;
+-	u16	frame_lines;
+-	u16	quality;
++	u16	frame_lines = 0;
++	u16	quality = 0;
+ 	u16	signal = 0;
+ 	u16	noise = 0;
+ 	u8	hw_majorversion = 0, hw_minorversion = 0;
+diff --git a/drivers/media/common/tuners/xc5000.c b/drivers/media/common/tuners/xc5000.c
+index eab2ea4..e6c8ece 100644
+--- a/drivers/media/common/tuners/xc5000.c
++++ b/drivers/media/common/tuners/xc5000.c
+@@ -641,12 +641,12 @@ out:
+ 
+ static void xc_debug_dump(struct xc5000_priv *priv)
+ {
+-	u16 adc_envelope;
++	u16 adc_envelope = 0;
+ 	u32 freq_error_hz = 0;
+-	u16 lock_status;
++	u16 lock_status = 0;
+ 	u32 hsync_freq_hz = 0;
+-	u16 frame_lines;
+-	u16 quality;
++	u16 frame_lines = 0;
++	u16 quality = 0;
+ 	u8 hw_majorversion = 0, hw_minorversion = 0;
+ 	u8 fw_majorversion = 0, fw_minorversion = 0;
+ 	u16 fw_buildversion = 0;
+diff --git a/drivers/mfd/wcd9xxx-core.c b/drivers/mfd/wcd9xxx-core.c
+index 31750af..141d9f2 100644
+--- a/drivers/mfd/wcd9xxx-core.c
++++ b/drivers/mfd/wcd9xxx-core.c
+@@ -719,8 +719,9 @@ static int wcd9xxx_enable_static_supplies(struct wcd9xxx *wcd9xxx,
+ 	}
+ 
+ 	while (ret && --i)
+-		if (!pdata->regulator[i].ondemand)
+-			regulator_disable(wcd9xxx->supplies[i].consumer);
++		if (i < wcd9xxx->num_of_supplies)
++			if (!pdata->regulator[i].ondemand)
++				regulator_disable(wcd9xxx->supplies[i].consumer);
+ 
+ 	return ret;
+ }
+diff --git a/drivers/net/ppp/ppp_generic.c b/drivers/net/ppp/ppp_generic.c
+index 21d7151..2de3ec5 100644
+--- a/drivers/net/ppp/ppp_generic.c
++++ b/drivers/net/ppp/ppp_generic.c
+@@ -741,7 +741,7 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ #ifdef CONFIG_PPP_FILTER
+ 	case PPPIOCSPASS:
+ 	{
+-		struct sock_filter *code;
++		struct sock_filter *code = NULL;
+ 		err = get_filter(argp, &code);
+ 		if (err >= 0) {
+ 			ppp_lock(ppp);
+@@ -755,7 +755,7 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 	}
+ 	case PPPIOCSACTIVE:
+ 	{
+-		struct sock_filter *code;
++		struct sock_filter *code = NULL;
+ 		err = get_filter(argp, &code);
+ 		if (err >= 0) {
+ 			ppp_lock(ppp);
+diff --git a/drivers/net/usb/sierra_net.c b/drivers/net/usb/sierra_net.c
+index b59cf20..87debc3 100644
+--- a/drivers/net/usb/sierra_net.c
++++ b/drivers/net/usb/sierra_net.c
+@@ -484,7 +484,8 @@ static void sierra_net_kevent(struct work_struct *work)
+ 			netdev_err(dev->net,
+ 				"usb_control_msg failed, status %d\n", len);
+ 		} else {
+-			struct hip_hdr	hh;
++			struct hip_hdr hh;
++			hh.extmsgid.word = 0;
+ 
+ 			dev_dbg(&dev->udev->dev, "%s: Received status message,"
+ 				" %04x bytes", __func__, len);
+@@ -845,8 +846,9 @@ static struct sk_buff *sierra_net_skb_clone(struct usbnet *dev,
+ static int sierra_net_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
+ {
+ 	int err;
+-	struct hip_hdr  hh;
++	struct hip_hdr hh;
+ 	struct sk_buff *new_skb;
++	hh.extmsgid.word = 0;
+ 
+ 	dev_dbg(&dev->udev->dev, "%s", __func__);
+ 
+diff --git a/drivers/net/usb/smsc95xx.c b/drivers/net/usb/smsc95xx.c
+index 94ae669..a20b5db 100644
+--- a/drivers/net/usb/smsc95xx.c
++++ b/drivers/net/usb/smsc95xx.c
+@@ -119,7 +119,7 @@ static int smsc95xx_write_reg(struct usbnet *dev, u32 index, u32 data)
+ static int smsc95xx_phy_wait_not_busy(struct usbnet *dev)
+ {
+ 	unsigned long start_time = jiffies;
+-	u32 val;
++	u32 val = 0;
+ 
+ 	do {
+ 		smsc95xx_read_reg(dev, MII_ADDR, &val);
+@@ -133,7 +133,7 @@ static int smsc95xx_phy_wait_not_busy(struct usbnet *dev)
+ static int smsc95xx_mdio_read(struct net_device *netdev, int phy_id, int idx)
+ {
+ 	struct usbnet *dev = netdev_priv(netdev);
+-	u32 val, addr;
++	u32 val = 0, addr;
+ 
+ 	mutex_lock(&dev->phy_mutex);
+ 
+@@ -196,7 +196,7 @@ static void smsc95xx_mdio_write(struct net_device *netdev, int phy_id, int idx,
+ static int smsc95xx_wait_eeprom(struct usbnet *dev)
+ {
+ 	unsigned long start_time = jiffies;
+-	u32 val;
++	u32 val = 0;
+ 
+ 	do {
+ 		smsc95xx_read_reg(dev, E2P_CMD, &val);
+@@ -216,7 +216,7 @@ static int smsc95xx_wait_eeprom(struct usbnet *dev)
+ static int smsc95xx_eeprom_confirm_not_busy(struct usbnet *dev)
+ {
+ 	unsigned long start_time = jiffies;
+-	u32 val;
++	u32 val = 0;
+ 
+ 	do {
+ 		smsc95xx_read_reg(dev, E2P_CMD, &val);
+@@ -234,7 +234,7 @@ static int smsc95xx_eeprom_confirm_not_busy(struct usbnet *dev)
+ static int smsc95xx_read_eeprom(struct usbnet *dev, u32 offset, u32 length,
+ 				u8 *data)
+ {
+-	u32 val;
++	u32 val = 0;
+ 	int i, ret;
+ 
+ 	BUG_ON(!dev);
+@@ -264,7 +264,7 @@ static int smsc95xx_read_eeprom(struct usbnet *dev, u32 offset, u32 length,
+ static int smsc95xx_write_eeprom(struct usbnet *dev, u32 offset, u32 length,
+ 				 u8 *data)
+ {
+-	u32 val;
++	u32 val = 0;
+ 	int i, ret;
+ 
+ 	BUG_ON(!dev);
+diff --git a/drivers/net/wireless/bcmdhd/bcmutils.c b/drivers/net/wireless/bcmdhd/bcmutils.c
+index 23fc03e..70d3897 100644
+--- a/drivers/net/wireless/bcmdhd/bcmutils.c
++++ b/drivers/net/wireless/bcmdhd/bcmutils.c
+@@ -1014,7 +1014,7 @@ int
+ bcm_ether_atoe(const char *p, struct ether_addr *ea)
+ {
+ 	int i = 0;
+-	char *ep;
++	char *ep = NULL;
+ 
+ 	for (;;) {
+ 		ea->octet[i++] = (char) bcm_strtoul(p, &ep, 16);
+diff --git a/drivers/power/pm8921-bms.c b/drivers/power/pm8921-bms.c
+index a969a8d..2794386 100644
+--- a/drivers/power/pm8921-bms.c
++++ b/drivers/power/pm8921-bms.c
+@@ -2675,7 +2675,7 @@ EXPORT_SYMBOL(pm8921_bms_get_vsense_avg);
+ 
+ int pm8921_bms_get_battery_current(int *result_ua)
+ {
+-	int vsense_uv;
++	int vsense_uv = 0;
+ 	int rc = 0;
+ 
+ 	*result_ua = 0;
+diff --git a/drivers/power/pm8xxx-ccadc.c b/drivers/power/pm8xxx-ccadc.c
+index c53bcd2..58006b2 100644
+--- a/drivers/power/pm8xxx-ccadc.c
++++ b/drivers/power/pm8xxx-ccadc.c
+@@ -680,7 +680,7 @@ DEFINE_SIMPLE_ATTRIBUTE(reg_fops, get_reg, set_reg, "0x%02llx\n");
+ 
+ static int get_calc(void *data, u64 * val)
+ {
+-	int ibat, rc;
++	int ibat = 0, rc;
+ 
+ 	rc = pm8xxx_ccadc_get_battery_current(&ibat);
+ 	*val = ibat;
+diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
+index 95e0785..d2b9693 100644
+--- a/drivers/usb/core/hub.c
++++ b/drivers/usb/core/hub.c
+@@ -2210,8 +2210,7 @@ static int hub_port_wait_reset(struct usb_hub *hub, int port1,
+ 			struct usb_device *udev, unsigned int delay, bool warm)
+ {
+ 	int delay_time, ret;
+-	u16 portstatus;
+-	u16 portchange;
++	u16 portstatus = 0, portchange = 0;
+ 
+ 	for (delay_time = 0;
+ 			delay_time < HUB_RESET_TIMEOUT;
+@@ -2744,7 +2743,7 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
+ 	struct usb_hub	*hub = hdev_to_hub(udev->parent);
+ 	int		port1 = udev->portnum;
+ 	int		status;
+-	u16		portchange, portstatus;
++	u16		portchange = 0, portstatus = 0;
+ 
+ 	/* Skip the initial Clear-Suspend step for a remote wakeup */
+ 	status = hub_port_status(hub, port1, &portstatus, &portchange);
+@@ -2850,7 +2849,7 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
+ 	struct usb_hub	*hub = hdev_to_hub(udev->parent);
+ 	int		port1 = udev->portnum;
+ 	int		status;
+-	u16		portchange, portstatus;
++	u16		portchange = 0, portstatus = 0;
+ 
+ 	status = hub_port_status(hub, port1, &portstatus, &portchange);
+ 	status = check_port_resume_type(udev,
+@@ -2968,7 +2967,7 @@ static int hub_port_debounce(struct usb_hub *hub, int port1)
+ {
+ 	int ret;
+ 	int total_time, stable_time = 0;
+-	u16 portchange, portstatus;
++	u16 portchange = 0, portstatus = 0;
+ 	unsigned connection = 0xffff;
+ 
+ 	for (total_time = 0; ; total_time += HUB_DEBOUNCE_STEP) {
+@@ -3733,10 +3732,10 @@ static void hub_events(void)
+ 	struct usb_interface *intf;
+ 	struct usb_hub *hub;
+ 	struct device *hub_dev;
+-	u16 hubstatus;
+-	u16 hubchange;
+-	u16 portstatus;
+-	u16 portchange;
++	u16 hubstatus = 0;
++	u16 hubchange = 0;
++	u16 portstatus = 0;
++	u16 portchange = 0;
+ 	int i, ret;
+ #if defined(CONFIG_USB_PEHCI_HCD) || defined(CONFIG_USB_PEHCI_HCD_MODULE)
+ 	int j;
+diff --git a/drivers/usb/gadget/f_qdss.c b/drivers/usb/gadget/f_qdss.c
+index cece500..c90f0d8 100644
+--- a/drivers/usb/gadget/f_qdss.c
++++ b/drivers/usb/gadget/f_qdss.c
+@@ -596,7 +596,7 @@ static int qdss_bind_config(struct usb_configuration *c, const char *name)
+ 
+ 	spin_lock_irqsave(&d_lock, flags);
+ 	list_for_each_entry(ch, &usb_qdss_ch_list, list) {
+-		if (!strncmp(name, ch->name, sizeof(ch->name))) {
++		if (!strncmp(name, ch->name, sizeof(*ch->name))) {
+ 			found = 1;
+ 			break;
+ 		}
+@@ -752,7 +752,7 @@ struct usb_qdss_ch *usb_qdss_open(const char *name, void *priv,
+ 	spin_lock_irqsave(&d_lock, flags);
+ 	/* Check if we already have a channel with this name */
+ 	list_for_each_entry(ch, &usb_qdss_ch_list, list) {
+-		if (!strncmp(name, ch->name, sizeof(ch->name))) {
++		if (!strncmp(name, ch->name, sizeof(*ch->name))) {
+ 			found = 1;
+ 			break;
+ 		}
+diff --git a/drivers/usb/host/ehci-sched.c b/drivers/usb/host/ehci-sched.c
+index a60679c..9961c46 100644
+--- a/drivers/usb/host/ehci-sched.c
++++ b/drivers/usb/host/ehci-sched.c
+@@ -829,7 +829,7 @@ static int qh_schedule(struct ehci_hcd *ehci, struct ehci_qh *qh)
+ {
+ 	int		status;
+ 	unsigned	uframe;
+-	__hc32		c_mask;
++	__hc32		c_mask = 0;
+ 	unsigned	frame;		/* 0..(qh->period - 1), or NO_FRAME */
+ 	struct ehci_qh_hw	*hw = qh->hw;
+ 
+diff --git a/drivers/usb/storage/transport.c b/drivers/usb/storage/transport.c
+index c70109e..32a21c0 100644
+--- a/drivers/usb/storage/transport.c
++++ b/drivers/usb/storage/transport.c
+@@ -467,7 +467,7 @@ static int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
+ int usb_stor_bulk_srb(struct us_data* us, unsigned int pipe,
+ 		      struct scsi_cmnd* srb)
+ {
+-	unsigned int partial;
++	unsigned int partial = 0;
+ 	int result = usb_stor_bulk_transfer_sglist(us, pipe, scsi_sglist(srb),
+ 				      scsi_sg_count(srb), scsi_bufflen(srb),
+ 				      &partial);
+@@ -490,7 +490,7 @@ int usb_stor_bulk_transfer_sg(struct us_data* us, unsigned int pipe,
+ 		void *buf, unsigned int length_left, int use_sg, int *residual)
+ {
+ 	int result;
+-	unsigned int partial;
++	unsigned int partial = 0;
+ 
+ 	/* are we scatter-gathering? */
+ 	if (use_sg) {
+diff --git a/drivers/video/msm/mdss/mdss_mdp_util.c b/drivers/video/msm/mdss/mdss_mdp_util.c
+index b65d894..5d19fb8 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_util.c
++++ b/drivers/video/msm/mdss/mdss_mdp_util.c
+@@ -389,13 +389,15 @@ int mdss_mdp_data_check(struct mdss_mdp_data *data,
+ 	for (i = 0; i < ps->num_planes; i++) {
+ 		curr = &data->p[i];
+ 		if (i >= data->num_planes) {
+-			u32 psize = ps->plane_size[i-1];
+-			prev = &data->p[i-1];
+-			if (prev->len > psize) {
+-				curr->len = prev->len - psize;
+-				prev->len = psize;
++			if (i > 0) {
++				u32 psize = ps->plane_size[i-1];
++				prev = &data->p[i-1];
++				if (prev->len > psize) {
++					curr->len = prev->len - psize;
++					prev->len = psize;
++				}
++				curr->addr = prev->addr + psize;
+ 			}
+-			curr->addr = prev->addr + psize;
+ 		}
+ 		if (curr->len < ps->plane_size[i]) {
+ 			pr_err("insufficient mem=%u p=%d len=%u\n",
+diff --git a/fs/fs-writeback.c b/fs/fs-writeback.c
+index 42a853e..347b7a6 100644
+--- a/fs/fs-writeback.c
++++ b/fs/fs-writeback.c
+@@ -904,7 +904,10 @@ long wb_do_writeback(struct bdi_writeback *wb, int force_wait)
+ 		if (force_wait)
+ 			work->sync_mode = WB_SYNC_ALL;
+ 
+-		trace_writeback_exec(bdi, work);
++		/* This trace causes an ICE in gcc4.7
++		 * For more information look into this commits message.
++		 * trace_writeback_exec(bdi, work);
++		 */
+ 
+ 		wrote += wb_writeback(wb, work);
+ 
+@@ -947,7 +950,7 @@ int bdi_writeback_thread(void *data)
+ 	 */
+ 	set_user_nice(current, 0);
+ 
+-	trace_writeback_thread_start(bdi);
++//	trace_writeback_thread_start(bdi);
+ 
+ 	while (!kthread_freezable_should_stop(NULL)) {
+ 		/*
+@@ -958,7 +961,7 @@ int bdi_writeback_thread(void *data)
+ 
+ 		pages_written = wb_do_writeback(wb, 0);
+ 
+-		trace_writeback_pages_written(pages_written);
++//		trace_writeback_pages_written(pages_written);
+ 
+ 		if (pages_written)
+ 			wb->last_active = jiffies;
+@@ -985,7 +988,7 @@ int bdi_writeback_thread(void *data)
+ 	if (!list_empty(&bdi->work_list))
+ 		wb_do_writeback(wb, 1);
+ 
+-	trace_writeback_thread_stop(bdi);
++//	trace_writeback_thread_stop(bdi);
+ 	return 0;
+ }
+ 
+diff --git a/fs/fuse/control.c b/fs/fuse/control.c
+index 42593c5..a16b175 100644
+--- a/fs/fuse/control.c
++++ b/fs/fuse/control.c
+@@ -107,7 +107,7 @@ static ssize_t fuse_conn_max_background_read(struct file *file,
+ 					     loff_t *ppos)
+ {
+ 	struct fuse_conn *fc;
+-	unsigned val;
++	unsigned val = 0;
+ 
+ 	fc = fuse_ctl_file_conn_get(file);
+ 	if (!fc)
+@@ -123,7 +123,7 @@ static ssize_t fuse_conn_max_background_write(struct file *file,
+ 					      const char __user *buf,
+ 					      size_t count, loff_t *ppos)
+ {
+-	unsigned val;
++	unsigned val = 0;
+ 	ssize_t ret;
+ 
+ 	ret = fuse_conn_limit_write(file, buf, count, ppos, &val,
+@@ -144,7 +144,7 @@ static ssize_t fuse_conn_congestion_threshold_read(struct file *file,
+ 						   loff_t *ppos)
+ {
+ 	struct fuse_conn *fc;
+-	unsigned val;
++	unsigned val = 0;
+ 
+ 	fc = fuse_ctl_file_conn_get(file);
+ 	if (!fc)
+@@ -160,7 +160,7 @@ static ssize_t fuse_conn_congestion_threshold_write(struct file *file,
+ 						    const char __user *buf,
+ 						    size_t count, loff_t *ppos)
+ {
+-	unsigned val;
++	unsigned val = 0;
+ 	ssize_t ret;
+ 
+ 	ret = fuse_conn_limit_write(file, buf, count, ppos, &val,
+diff --git a/fs/jbd/journal.c b/fs/jbd/journal.c
+index 0971e92..80552ee 100644
+--- a/fs/jbd/journal.c
++++ b/fs/jbd/journal.c
+@@ -619,7 +619,7 @@ EXPORT_SYMBOL(journal_trans_will_send_data_barrier);
+ 
+ int journal_next_log_block(journal_t *journal, unsigned int *retp)
+ {
+-	unsigned int blocknr;
++	unsigned int blocknr = 0;
+ 
+ 	spin_lock(&journal->j_state_lock);
+ 	J_ASSERT(journal->j_free > 1);
+@@ -680,7 +680,7 @@ int journal_bmap(journal_t *journal, unsigned int blocknr,
+ struct journal_head *journal_get_descriptor_buffer(journal_t *journal)
+ {
+ 	struct buffer_head *bh;
+-	unsigned int blocknr;
++	unsigned int blocknr = 0;
+ 	int err;
+ 
+ 	err = journal_next_log_block(journal, &blocknr);
+@@ -824,7 +824,7 @@ journal_t * journal_init_inode (struct inode *inode)
+ 	journal_t *journal = journal_init_common();
+ 	int err;
+ 	int n;
+-	unsigned int blocknr;
++	unsigned int blocknr = 0;
+ 
+ 	if (!journal)
+ 		return NULL;
+@@ -936,7 +936,7 @@ static int journal_reset(journal_t *journal)
+  **/
+ int journal_create(journal_t *journal)
+ {
+-	unsigned int blocknr;
++	unsigned int blocknr = 0;
+ 	struct buffer_head *bh;
+ 	journal_superblock_t *sb;
+ 	int i, err;
+diff --git a/fs/jbd2/journal.c b/fs/jbd2/journal.c
+index 1afb701..2791a22 100644
+--- a/fs/jbd2/journal.c
++++ b/fs/jbd2/journal.c
+@@ -667,7 +667,7 @@ int jbd2_log_wait_commit(journal_t *journal, tid_t tid)
+ 
+ int jbd2_journal_next_log_block(journal_t *journal, unsigned long long *retp)
+ {
+-	unsigned long blocknr;
++	unsigned long blocknr = 0;
+ 
+ 	write_lock(&journal->j_state_lock);
+ 	J_ASSERT(journal->j_free > 1);
+@@ -724,7 +724,7 @@ int jbd2_journal_bmap(journal_t *journal, unsigned long blocknr,
+ struct journal_head *jbd2_journal_get_descriptor_buffer(journal_t *journal)
+ {
+ 	struct buffer_head *bh;
+-	unsigned long long blocknr;
++	unsigned long long blocknr = 0;
+ 	int err;
+ 
+ 	err = jbd2_journal_next_log_block(journal, &blocknr);
+@@ -1098,7 +1098,7 @@ journal_t * jbd2_journal_init_inode (struct inode *inode)
+ 	char *p;
+ 	int err;
+ 	int n;
+-	unsigned long long blocknr;
++	unsigned long long blocknr = 0;
+ 
+ 	if (!journal)
+ 		return NULL;
+diff --git a/fs/namei.c b/fs/namei.c
+index c427919..598ff36 100644
+--- a/fs/namei.c
++++ b/fs/namei.c
+@@ -2743,7 +2743,7 @@ out:
+ static long do_rmdir(int dfd, const char __user *pathname)
+ {
+ 	int error = 0;
+-	char * name;
++	char *name = NULL;
+ 	struct dentry *dentry;
+ 	struct nameidata nd;
+ 
+@@ -2839,7 +2839,7 @@ int vfs_unlink(struct inode *dir, struct dentry *dentry)
+ static long do_unlinkat(int dfd, const char __user *pathname)
+ {
+ 	int error;
+-	char *name;
++	char *name = NULL;
+ 	struct dentry *dentry;
+ 	struct nameidata nd;
+ 	struct inode *inode = NULL;
+@@ -2931,7 +2931,7 @@ SYSCALL_DEFINE3(symlinkat, const char __user *, oldname,
+ 		int, newdfd, const char __user *, newname)
+ {
+ 	int error;
+-	char *from;
++	char *from = NULL;
+ 	struct dentry *dentry;
+ 	struct path path;
+ 
+@@ -3239,8 +3239,8 @@ SYSCALL_DEFINE4(renameat, int, olddfd, const char __user *, oldname,
+ 	struct dentry *old_dentry, *new_dentry;
+ 	struct dentry *trap;
+ 	struct nameidata oldnd, newnd;
+-	char *from;
+-	char *to;
++	char *from = NULL;
++	char *to = NULL;
+ 	int error;
+ 
+ 	error = user_path_parent(olddfd, oldname, &oldnd, &from);
+diff --git a/fs/namespace.c b/fs/namespace.c
+index e608199..8df371c 100644
+--- a/fs/namespace.c
++++ b/fs/namespace.c
+@@ -2361,9 +2361,9 @@ SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
+ 		char __user *, type, unsigned long, flags, void __user *, data)
+ {
+ 	int ret;
+-	char *kernel_type;
+-	char *kernel_dir;
+-	char *kernel_dev;
++	char *kernel_type = NULL;
++	char *kernel_dir = NULL;
++	char *kernel_dev = NULL;
+ 	unsigned long data_page;
+ 
+ 	ret = copy_mount_string(type, &kernel_type);
+diff --git a/include/scsi/scsi.h b/include/scsi/scsi.h
+index cc37cd8..a1ab569 100644
+--- a/include/scsi/scsi.h
++++ b/include/scsi/scsi.h
+@@ -562,6 +562,6 @@ static inline __u32 scsi_to_u32(__u8 *ptr)
+ 	return (ptr[0]<<24) + (ptr[1]<<16) + (ptr[2]<<8) + ptr[3];
+ }
+ 
+-struct scsi_disk *scsi_disk_get_from_dev(struct device *dev);
++//struct scsi_disk *scsi_disk_get_from_dev(struct device *dev);
+ 
+ #endif /* _SCSI_SCSI_H */
+diff --git a/ipc/shm.c b/ipc/shm.c
+index 406c5b2..cb4c16c 100644
+--- a/ipc/shm.c
++++ b/ipc/shm.c
+@@ -1087,7 +1087,7 @@ out_put_dentry:
+ 
+ SYSCALL_DEFINE3(shmat, int, shmid, char __user *, shmaddr, int, shmflg)
+ {
+-	unsigned long ret;
++	unsigned long ret = 0;
+ 	long err;
+ 
+ 	err = do_shmat(shmid, shmaddr, shmflg, &ret);
+diff --git a/kernel/auditsc.c b/kernel/auditsc.c
+index af1de0f..e3fd8e5 100644
+--- a/kernel/auditsc.c
++++ b/kernel/auditsc.c
+@@ -913,7 +913,7 @@ static int audit_filter_inode_name(struct task_struct *tsk,
+ 	int h = audit_hash_ino((u32)n->ino);
+ 	struct list_head *list = &audit_inode_hash[h];
+ 	struct audit_entry *e;
+-	enum audit_state state;
++	enum audit_state state = 0;
+ 
+ 	word = AUDIT_WORD(ctx->major);
+ 	bit  = AUDIT_BIT(ctx->major);
+diff --git a/kernel/cgroup.c b/kernel/cgroup.c
+index 2f0d754..5303ec8 100644
+--- a/kernel/cgroup.c
++++ b/kernel/cgroup.c
+@@ -2880,6 +2880,7 @@ int cgroup_scan_tasks(struct cgroup_scanner *scan)
+ 	struct ptr_heap tmp_heap;
+ 	struct ptr_heap *heap;
+ 	struct timespec latest_time = { 0, 0 };
++        it.task = NULL;
+ 
+ 	if (scan->heap) {
+ 		/* The caller supplied our heap and pre-allocated its memory */
+@@ -3216,6 +3217,7 @@ int cgroupstats_build(struct cgroupstats *stats, struct dentry *dentry)
+ 	struct cgroup *cgrp;
+ 	struct cgroup_iter it;
+ 	struct task_struct *tsk;
++        it.task = NULL;
+ 
+ 	/*
+ 	 * Validate dentry by checking the superblock operations,
+diff --git a/kernel/sysctl.c b/kernel/sysctl.c
+index b390dad..6d0410d 100644
+--- a/kernel/sysctl.c
++++ b/kernel/sysctl.c
+@@ -1829,7 +1829,7 @@ static int __do_proc_dointvec(void *tbl_data, struct ctl_table *table,
+ 	int *i, vleft, first = 1, err = 0;
+ 	unsigned long page = 0;
+ 	size_t left;
+-	char *kbuf;
++	char *kbuf = 0;
+ 	
+ 	if (!tbl_data || !table->maxlen || !*lenp || (*ppos && !write)) {
+ 		*lenp = 0;
+@@ -2047,7 +2047,7 @@ static int __do_proc_doulongvec_minmax(void *data, struct ctl_table *table, int
+ 	int vleft, first = 1, err = 0;
+ 	unsigned long page = 0;
+ 	size_t left;
+-	char *kbuf;
++	char *kbuf = NULL;
+ 
+ 	if (!data || !table->maxlen || !*lenp || (*ppos && !write)) {
+ 		*lenp = 0;
+diff --git a/kernel/workqueue.c b/kernel/workqueue.c
+index 90fd57d..3e0ec30 100644
+--- a/kernel/workqueue.c
++++ b/kernel/workqueue.c
+@@ -3716,8 +3716,11 @@ void freeze_workqueues_begin(void)
+ 		gcwq->flags |= GCWQ_FREEZING;
+ 
+ 		list_for_each_entry(wq, &workqueues, list) {
+-			struct cpu_workqueue_struct *cwq = get_cwq(cpu, wq);
+-
++			struct cpu_workqueue_struct *cwq;
++			if (cpu < CONFIG_NR_CPUS)
++                                cwq = get_cwq(cpu, wq);
++                        else
++                                continue;
+ 			if (cwq && wq->flags & WQ_FREEZABLE)
+ 				cwq->max_active = 0;
+ 		}
+@@ -3757,7 +3760,11 @@ bool freeze_workqueues_busy(void)
+ 		 * to peek without lock.
+ 		 */
+ 		list_for_each_entry(wq, &workqueues, list) {
+-			struct cpu_workqueue_struct *cwq = get_cwq(cpu, wq);
++			struct cpu_workqueue_struct *cwq;
++			if (cpu < CONFIG_NR_CPUS)
++                                cwq = get_cwq(cpu, wq);
++                        else
++                                continue;
+ 
+ 			if (!cwq || !(wq->flags & WQ_FREEZABLE))
+ 				continue;
+diff --git a/net/bluetooth/hci_conn.c b/net/bluetooth/hci_conn.c
+index 7a9fcd4..cbb8d0e 100644
+--- a/net/bluetooth/hci_conn.c
++++ b/net/bluetooth/hci_conn.c
+@@ -403,7 +403,7 @@ void hci_le_ltk_reply(struct hci_conn *conn, u8 ltk[16])
+ 	memset(&cp, 0, sizeof(cp));
+ 
+ 	cp.handle = cpu_to_le16(conn->handle);
+-	memcpy(cp.ltk, ltk, sizeof(ltk));
++	memcpy(cp.ltk, ltk, sizeof(*ltk));
+ 
+ 	hci_send_cmd(hdev, HCI_OP_LE_LTK_REPLY, sizeof(cp), &cp);
+ }
+diff --git a/net/bluetooth/l2cap_core.c b/net/bluetooth/l2cap_core.c
+index fd9088a..14d731e 100644
+--- a/net/bluetooth/l2cap_core.c
++++ b/net/bluetooth/l2cap_core.c
+@@ -1271,7 +1271,7 @@ int l2cap_do_connect(struct sock *sk)
+ 	struct hci_conn *hcon;
+ 	struct hci_dev *hdev;
+ 	__u8 auth_type;
+-	int err;
++	int err = 0;
+ 
+ 	BT_DBG("%s -> %s psm 0x%2.2x", batostr(src), batostr(dst),
+ 							l2cap_pi(sk)->psm);
+@@ -1621,7 +1621,7 @@ static inline int l2cap_skbuff_fromiovec(struct sock *sk, struct msghdr *msg,
+ 	struct l2cap_conn *conn = l2cap_pi(sk)->conn;
+ 	struct sk_buff **frag;
+ 	struct sk_buff *final;
+-	int err, sent = 0;
++	int err = 0, sent = 0;
+ 
+ 	BT_DBG("sk %p, msg %p, len %d, count %d, skb %p", sk,
+ 		msg, (int)len, (int)count, skb);
+@@ -1723,7 +1723,7 @@ struct sk_buff *l2cap_create_connless_pdu(struct sock *sk, struct msghdr *msg, s
+ {
+ 	struct l2cap_conn *conn = l2cap_pi(sk)->conn;
+ 	struct sk_buff *skb;
+-	int err, count, hlen = L2CAP_HDR_SIZE + 2;
++	int err = 0, count = 0, hlen = L2CAP_HDR_SIZE + 2;
+ 	struct l2cap_hdr *lh;
+ 
+ 	BT_DBG("sk %p len %d", sk, (int)len);
+@@ -1752,7 +1752,7 @@ struct sk_buff *l2cap_create_basic_pdu(struct sock *sk, struct msghdr *msg, size
+ {
+ 	struct l2cap_conn *conn = l2cap_pi(sk)->conn;
+ 	struct sk_buff *skb;
+-	int err, count, hlen = L2CAP_HDR_SIZE;
++	int err = 0, count = 0, hlen = L2CAP_HDR_SIZE;
+ 	struct l2cap_hdr *lh;
+ 
+ 	BT_DBG("sk %p len %d", sk, (int)len);
+@@ -1781,7 +1781,7 @@ struct sk_buff *l2cap_create_iframe_pdu(struct sock *sk,
+ 					u16 sdulen, int reseg)
+ {
+ 	struct sk_buff *skb;
+-	int err, count, hlen;
++	int err = 0, count = 0, hlen = 0;
+ 	int reserve = 0;
+ 	struct l2cap_hdr *lh;
+ 	u8 fcs = l2cap_pi(sk)->fcs;
+diff --git a/net/bridge/br_multicast.c b/net/bridge/br_multicast.c
+index 27ca25e..8044aff 100644
+--- a/net/bridge/br_multicast.c
++++ b/net/bridge/br_multicast.c
+@@ -139,6 +139,12 @@ struct net_bridge_mdb_entry *br_mdb_get(struct net_bridge *br,
+ {
+ 	struct net_bridge_mdb_htable *mdb = rcu_dereference(br->mdb);
+ 	struct br_ip ip;
++	int i = 0;
++	ip.u.ip4 = 0;
++
++	for (i=0; i<16; i++)
++		ip.u.ip6.s6_addr[i] = 0;
++
+ 
+ 	if (br->multicast_disabled)
+ 		return NULL;
+diff --git a/net/ipv4/tcp_input.c b/net/ipv4/tcp_input.c
+index 257b617..8614e7c 100644
+--- a/net/ipv4/tcp_input.c
++++ b/net/ipv4/tcp_input.c
+@@ -4383,7 +4383,8 @@ static void tcp_sack_remove(struct tcp_sock *tp)
+ 
+ 			/* Zap this SACK, by moving forward any other SACKS. */
+ 			for (i=this_sack+1; i < num_sacks; i++)
+-				tp->selective_acks[i-1] = tp->selective_acks[i];
++				if (i < 4)
++					tp->selective_acks[i-1] = tp->selective_acks[i];
+ 			num_sacks--;
+ 			continue;
+ 		}
+diff --git a/net/netfilter/nf_conntrack_h323_main.c b/net/netfilter/nf_conntrack_h323_main.c
+index 722291f..2bf7a80 100644
+--- a/net/netfilter/nf_conntrack_h323_main.c
++++ b/net/netfilter/nf_conntrack_h323_main.c
+@@ -566,9 +566,9 @@ static int h245_help(struct sk_buff *skb, unsigned int protoff,
+ {
+ 	static MultimediaSystemControlMessage mscm;
+ 	unsigned char *data = NULL;
+-	int datalen;
+-	int dataoff;
+-	int ret;
++	int datalen = 0;
++	int dataoff = 0;
++	int ret = 0;
+ 
+ 	/* Until there's been traffic both ways, don't look in packets. */
+ 	if (ctinfo != IP_CT_ESTABLISHED && ctinfo != IP_CT_ESTABLISHED_REPLY)
+@@ -1118,9 +1118,9 @@ static int q931_help(struct sk_buff *skb, unsigned int protoff,
+ {
+ 	static Q931 q931;
+ 	unsigned char *data = NULL;
+-	int datalen;
+-	int dataoff;
+-	int ret;
++	int datalen = 0;
++	int dataoff = 0;
++	int ret = 0;
+ 
+ 	/* Until there's been traffic both ways, don't look in packets. */
+ 	if (ctinfo != IP_CT_ESTABLISHED && ctinfo != IP_CT_ESTABLISHED_REPLY)
+diff --git a/net/socket.c b/net/socket.c
+index 851edcd..8fd89bf 100644
+--- a/net/socket.c
++++ b/net/socket.c
+@@ -1322,7 +1322,7 @@ EXPORT_SYMBOL(sock_create_kern);
+ SYSCALL_DEFINE3(socket, int, family, int, type, int, protocol)
+ {
+ 	int retval;
+-	struct socket *sock;
++	struct socket *sock = NULL;
+ 	int flags;
+ 
+ 	/* Check the SOCK_* constants for consistency.  */
+@@ -1363,7 +1363,7 @@ out_release:
+ SYSCALL_DEFINE4(socketpair, int, family, int, type, int, protocol,
+ 		int __user *, usockvec)
+ {
+-	struct socket *sock1, *sock2;
++	struct socket *sock1 = NULL, *sock2 = NULL;
+ 	int fd1, fd2, err;
+ 	struct file *newfile1, *newfile2;
+ 	int flags;
+diff --git a/net/unix/af_unix.c b/net/unix/af_unix.c
+index 8d932a5..8f11f64 100644
+--- a/net/unix/af_unix.c
++++ b/net/unix/af_unix.c
+@@ -824,8 +824,8 @@ static int unix_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
+ 	char *sun_path = sunaddr->sun_path;
+ 	struct dentry *dentry = NULL;
+ 	struct path path;
+-	int err;
+-	unsigned hash;
++	int err = 0;
++	unsigned hash = 0;
+ 	struct unix_address *addr;
+ 	struct hlist_head *list;
+ 
+@@ -965,8 +965,8 @@ static int unix_dgram_connect(struct socket *sock, struct sockaddr *addr,
+ 	struct net *net = sock_net(sk);
+ 	struct sockaddr_un *sunaddr = (struct sockaddr_un *)addr;
+ 	struct sock *other;
+-	unsigned hash;
+-	int err;
++	unsigned hash = 0;
++	int err = 0;
+ 
+ 	if (addr->sa_family != AF_UNSPEC) {
+ 		err = unix_mkname(sunaddr, alen, &hash);
+@@ -1063,10 +1063,10 @@ static int unix_stream_connect(struct socket *sock, struct sockaddr *uaddr,
+ 	struct sock *newsk = NULL;
+ 	struct sock *other = NULL;
+ 	struct sk_buff *skb = NULL;
+-	unsigned hash;
+-	int st;
+-	int err;
+-	long timeo;
++	unsigned hash = 0;
++	int st = 0;
++	int err = 0;
++	long timeo = 0;
+ 
+ 	err = unix_mkname(sunaddr, addr_len, &hash);
+ 	if (err < 0)
+@@ -1437,12 +1437,12 @@ static int unix_dgram_sendmsg(struct kiocb *kiocb, struct socket *sock,
+ 	struct sockaddr_un *sunaddr = msg->msg_name;
+ 	struct sock *other = NULL;
+ 	int namelen = 0; /* fake GCC */
+-	int err;
+-	unsigned hash;
++	int err = 0;
++	unsigned hash = 0;
+ 	struct sk_buff *skb;
+-	long timeo;
++	long timeo = 0;
+ 	struct scm_cookie tmp_scm;
+-	int max_level;
++	int max_level = 0;
+ 
+ 	if (NULL == siocb->scm)
+ 		siocb->scm = &tmp_scm;
+diff --git a/sound/usb/mixer.c b/sound/usb/mixer.c
+index ab23869..d400ddd 100644
+--- a/sound/usb/mixer.c
++++ b/sound/usb/mixer.c
+@@ -958,7 +958,7 @@ static int mixer_ctl_feature_info(struct snd_kcontrol *kcontrol, struct snd_ctl_
+ static int mixer_ctl_feature_get(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+ {
+ 	struct usb_mixer_elem_info *cval = kcontrol->private_data;
+-	int c, cnt, val, err;
++	int c=0, cnt=0, val=0, err=0;
+ 
+ 	ucontrol->value.integer.value[0] = cval->min;
+ 	if (cval->cmask) {
+@@ -989,7 +989,7 @@ static int mixer_ctl_feature_get(struct snd_kcontrol *kcontrol, struct snd_ctl_e
+ static int mixer_ctl_feature_put(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+ {
+ 	struct usb_mixer_elem_info *cval = kcontrol->private_data;
+-	int c, cnt, val, oval, err;
++	int c=0, cnt=0, val=0, oval=0, err=0;
+ 	int changed = 0;
+ 
+ 	if (cval->cmask) {
+@@ -1065,7 +1065,7 @@ static void build_feature_ctl(struct mixer_build *state, void *raw_desc,
+ 	struct snd_kcontrol *kctl;
+ 	struct usb_mixer_elem_info *cval;
+ 	const struct usbmix_name_map *map;
+-	unsigned int range;
++	unsigned int range=0;
+ 
+ 	control++; /* change from zero-based to 1-based value */
+ 
+@@ -1202,10 +1202,10 @@ static void build_feature_ctl(struct mixer_build *state, void *raw_desc,
+  */
+ static int parse_audio_feature_unit(struct mixer_build *state, int unitid, void *_ftr)
+ {
+-	int channels, i, j;
++	int channels=0, i=0, j=0;
+ 	struct usb_audio_term iterm;
+-	unsigned int master_bits, first_ch_bits;
+-	int err, csize;
++	unsigned int master_bits=0, first_ch_bits=0;
++	int err=0, csize=0;
+ 	struct uac_feature_unit_descriptor *hdr = _ftr;
+ 	__u8 *bmaControls;
+ 
+@@ -1316,7 +1316,7 @@ static void build_mixer_unit_ctl(struct mixer_build *state,
+ {
+ 	struct usb_mixer_elem_info *cval;
+ 	unsigned int num_outs = uac_mixer_unit_bNrChannels(desc);
+-	unsigned int i, len;
++	unsigned int i=0, len=0;
+ 	struct snd_kcontrol *kctl;
+ 	const struct usbmix_name_map *map;
+ 
+@@ -1370,8 +1370,8 @@ static int parse_audio_mixer_unit(struct mixer_build *state, int unitid, void *r
+ {
+ 	struct uac_mixer_unit_descriptor *desc = raw_desc;
+ 	struct usb_audio_term iterm;
+-	int input_pins, num_ins, num_outs;
+-	int pin, ich, err;
++	int input_pins=0, num_ins=0, num_outs=0;
++	int pin=0, ich=0, err=0;
+ 
+ 	if (desc->bLength < 11 || ! (input_pins = desc->bNrInPins) || ! (num_outs = uac_mixer_unit_bNrChannels(desc))) {
+ 		snd_printk(KERN_ERR "invalid MIXER UNIT descriptor %d\n", unitid);
+@@ -1420,7 +1420,7 @@ static int parse_audio_mixer_unit(struct mixer_build *state, int unitid, void *r
+ static int mixer_ctl_procunit_get(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+ {
+ 	struct usb_mixer_elem_info *cval = kcontrol->private_data;
+-	int err, val;
++	int err=0, val=0;
+ 
+ 	err = get_cur_ctl_value(cval, cval->control << 8, &val);
+ 	if (err < 0 && cval->mixer->ignore_ctl_error) {
+@@ -1438,7 +1438,7 @@ static int mixer_ctl_procunit_get(struct snd_kcontrol *kcontrol, struct snd_ctl_
+ static int mixer_ctl_procunit_put(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+ {
+ 	struct usb_mixer_elem_info *cval = kcontrol->private_data;
+-	int val, oval, err;
++	int val=0, oval=0, err=0;
+ 
+ 	err = get_cur_ctl_value(cval, cval->control << 8, &oval);
+ 	if (err < 0) {
+@@ -1564,7 +1564,7 @@ static int build_audio_procunit(struct mixer_build *state, int unitid, void *raw
+ 	int num_ins = desc->bNrInPins;
+ 	struct usb_mixer_elem_info *cval;
+ 	struct snd_kcontrol *kctl;
+-	int i, err, nameid, type, len;
++	int i=0, err=0, nameid=0, type=0, len=0;
+ 	struct procunit_info *info;
+ 	struct procunit_value_info *valinfo;
+ 	const struct usbmix_name_map *map;
+@@ -1701,7 +1701,7 @@ static int mixer_ctl_selector_info(struct snd_kcontrol *kcontrol, struct snd_ctl
+ static int mixer_ctl_selector_get(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+ {
+ 	struct usb_mixer_elem_info *cval = kcontrol->private_data;
+-	int val, err;
++	int val=0, err=0;
+ 
+ 	err = get_cur_ctl_value(cval, cval->control << 8, &val);
+ 	if (err < 0) {
+@@ -1720,7 +1720,7 @@ static int mixer_ctl_selector_get(struct snd_kcontrol *kcontrol, struct snd_ctl_
+ static int mixer_ctl_selector_put(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+ {
+ 	struct usb_mixer_elem_info *cval = kcontrol->private_data;
+-	int val, oval, err;
++	int val=0, oval=0, err=0;
+ 
+ 	err = get_cur_ctl_value(cval, cval->control << 8, &oval);
+ 	if (err < 0) {
+@@ -1752,7 +1752,7 @@ static struct snd_kcontrol_new mixer_selectunit_ctl = {
+  */
+ static void usb_mixer_selector_elem_free(struct snd_kcontrol *kctl)
+ {
+-	int i, num_ins = 0;
++	int i=0, num_ins = 0;
+ 
+ 	if (kctl->private_data) {
+ 		struct usb_mixer_elem_info *cval = kctl->private_data;
+@@ -1775,8 +1775,8 @@ static void usb_mixer_selector_elem_free(struct snd_kcontrol *kctl)
+ static int parse_audio_selector_unit(struct mixer_build *state, int unitid, void *raw_desc)
+ {
+ 	struct uac_selector_unit_descriptor *desc = raw_desc;
+-	unsigned int i, nameid, len;
+-	int err;
++	unsigned int i=0, nameid=0, len=0;
++	int err=0;
+ 	struct usb_mixer_elem_info *cval;
+ 	struct snd_kcontrol *kctl;
+ 	const struct usbmix_name_map *map;
+@@ -1957,7 +1957,7 @@ static int snd_usb_mixer_dev_free(struct snd_device *device)
+ static int snd_usb_mixer_controls(struct usb_mixer_interface *mixer)
+ {
+ 	struct mixer_build state;
+-	int err;
++	int err=0;
+ 	const struct usbmix_ctl_map *map;
+ 	void *p;
+ 
+@@ -2189,7 +2189,7 @@ static int snd_usb_mixer_status_create(struct usb_mixer_interface *mixer)
+ 	struct usb_endpoint_descriptor *ep;
+ 	void *transfer_buffer;
+ 	int buffer_length;
+-	unsigned int epnum;
++	unsigned int epnum=0;
+ 
+ 	/* we need one interrupt input endpoint */
+ 	if (get_iface_desc(mixer->hostif)->bNumEndpoints < 1)
+-- 
+1.7.9.5
+

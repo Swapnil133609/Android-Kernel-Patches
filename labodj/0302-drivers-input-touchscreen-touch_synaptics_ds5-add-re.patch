@@ -1,0 +1,66 @@
+From feaf3b49a1e4ab8148451ba0c78f9457aeb627d6 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sun, 10 Nov 2013 00:47:19 +0100
+Subject: [PATCH 302/590] drivers/input/touchscreen/touch_synaptics_ds5: add
+ reset code on finger release
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/sweep2wake.c          |    8 ++++++++
+ drivers/input/touchscreen/touch_synaptics_ds5.c |    5 +++++
+ include/linux/input/sweep2wake.h                |    3 +++
+ 3 files changed, 16 insertions(+)
+
+diff --git a/drivers/input/touchscreen/sweep2wake.c b/drivers/input/touchscreen/sweep2wake.c
+index 6fd0db6..b81c0c9 100644
+--- a/drivers/input/touchscreen/sweep2wake.c
++++ b/drivers/input/touchscreen/sweep2wake.c
+@@ -100,6 +100,14 @@ void sweep2wake_pwrtrigger(void) {
+         return;
+ }
+ 
++/* reset on finger release */
++void sweep2wake_reset(void) {
++	exec_count = true;
++	barrier[0] = false;
++	barrier[1] = false;
++	scr_on_touch = false;
++}
++
+ /* Sweep2wake main function */
+ void detect_sweep2wake(int x, int y, bool st)
+ {
+diff --git a/drivers/input/touchscreen/touch_synaptics_ds5.c b/drivers/input/touchscreen/touch_synaptics_ds5.c
+index 4896939..279864e 100644
+--- a/drivers/input/touchscreen/touch_synaptics_ds5.c
++++ b/drivers/input/touchscreen/touch_synaptics_ds5.c
+@@ -343,6 +343,11 @@ static void touch_abs_input_report(struct synaptics_ts_data *ts, const ktime_t t
+ 		}
+ 		else {
+ 			ts->ts_data.curr_data[id].state = 0;
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++                        if (s2w_switch > 0) {
++				sweep2wake_reset();
++                        }
++#endif
+ 		}
+ 	}
+ 
+diff --git a/include/linux/input/sweep2wake.h b/include/linux/input/sweep2wake.h
+index 9bb5c60..81a28bd 100644
+--- a/include/linux/input/sweep2wake.h
++++ b/include/linux/input/sweep2wake.h
+@@ -33,6 +33,9 @@ extern bool scr_on_touch;
+ extern bool exec_count;
+ extern bool barrier[2];
+ 
++/* Sweep2wake reset function */
++extern void sweep2wake_reset(void);
++
+ /* Sweep2wake main function */
+ extern void detect_sweep2wake(int, int, bool);
+ 
+-- 
+1.7.9.5
+

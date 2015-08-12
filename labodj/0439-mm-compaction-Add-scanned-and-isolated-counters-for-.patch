@@ -1,0 +1,114 @@
+From 76b39efd9b38580b3db0155431f04cf2700b3384 Mon Sep 17 00:00:00 2001
+From: Mel Gorman <mgorman@suse.de>
+Date: Fri, 19 Oct 2012 12:00:10 +0100
+Subject: [PATCH 439/590] mm: compaction: Add scanned and isolated counters
+ for compaction
+
+Compaction already has tracepoints to count scanned and isolated pages
+but it requires that ftrace be enabled and if that information has to be
+written to disk then it can be disruptive. This patch adds vmstat counters
+for compaction called compact_migrate_scanned, compact_free_scanned and
+compact_isolated.
+
+With these counters, it is possible to define a basic cost model for
+compaction. This approximates of how much work compaction is doing and can
+be compared that with an oprofile showing TLB misses and see if the cost of
+compaction is being offset by THP for example. Minimally a compaction patch
+can be evaluated in terms of whether it increases or decreases cost. The
+basic cost model looks like this
+
+Fundamental unit u:	a word	sizeof(void *)
+
+Ca  = cost of struct page access = sizeof(struct page) / u
+
+Cmc = Cost migrate page copy = (Ca + PAGE_SIZE/u) * 2
+Cmf = Cost migrate failure   = Ca * 2
+Ci  = Cost page isolation    = (Ca + Wi)
+	where Wi is a constant that should reflect the approximate
+	cost of the locking operation.
+
+Csm = Cost migrate scanning = Ca
+Csf = Cost free    scanning = Ca
+
+Overall cost =	(Csm * compact_migrate_scanned) +
+	      	(Csf * compact_free_scanned)    +
+	      	(Ci  * compact_isolated)	+
+		(Cmc * pgmigrate_success)	+
+		(Cmf * pgmigrate_failed)
+
+Where the values are read from /proc/vmstat.
+
+This is very basic and ignores certain costs such as the allocation cost
+to do a migrate page copy but any improvement to the model would still
+use the same vmstat counters.
+
+Change-Id: I9db1a609fc86a95e3fd8d3774de994197ecb9adf
+Signed-off-by: Mel Gorman <mgorman@suse.de>
+Reviewed-by: Rik van Riel <riel@redhat.com>
+Git-commit: 397487db696cae0b026a474a5cd66f4e372995e6
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/vm_event_item.h |    2 ++
+ mm/compaction.c               |    8 ++++++++
+ mm/vmstat.c                   |    3 +++
+ 3 files changed, 13 insertions(+)
+
+diff --git a/include/linux/vm_event_item.h b/include/linux/vm_event_item.h
+index 6c908de..8bbb324 100644
+--- a/include/linux/vm_event_item.h
++++ b/include/linux/vm_event_item.h
+@@ -41,6 +41,8 @@ enum vm_event_item { PGPGIN, PGPGOUT, PSWPIN, PSWPOUT,
+ 		PGMIGRATE_SUCCESS, PGMIGRATE_FAIL,
+ #endif
+ #ifdef CONFIG_COMPACTION
++		COMPACTMIGRATE_SCANNED, COMPACTFREE_SCANNED,
++		COMPACTISOLATED,
+ 		COMPACTSTALL, COMPACTFAIL, COMPACTSUCCESS,
+ #endif
+ #ifdef CONFIG_HUGETLB_PAGE
+diff --git a/mm/compaction.c b/mm/compaction.c
+index 2568452..2b27847 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -356,6 +356,10 @@ static unsigned long isolate_freepages_block(struct compact_control *cc,
+ 	if (blockpfn == end_pfn)
+ 		update_pageblock_skip(cc, valid_page, total_isolated, false);
+ 
++	count_vm_events(COMPACTFREE_SCANNED, nr_scanned);
++	if (total_isolated)
++		count_vm_events(COMPACTISOLATED, total_isolated);
++
+ 	return total_isolated;
+ }
+ 
+@@ -643,6 +647,10 @@ next_pageblock:
+ 
+ 	trace_mm_compaction_isolate_migratepages(nr_scanned, nr_isolated);
+ 
++	count_vm_events(COMPACTMIGRATE_SCANNED, nr_scanned);
++	if (nr_isolated)
++		count_vm_events(COMPACTISOLATED, nr_isolated);
++
+ 	return low_pfn;
+ }
+ 
+diff --git a/mm/vmstat.c b/mm/vmstat.c
+index a158b24..959a558 100644
+--- a/mm/vmstat.c
++++ b/mm/vmstat.c
+@@ -766,6 +766,9 @@ const char * const vmstat_text[] = {
+ 	"pgmigrate_fail",
+ #endif
+ #ifdef CONFIG_COMPACTION
++	"compact_migrate_scanned",
++	"compact_free_scanned",
++	"compact_isolated",
+ 	"compact_stall",
+ 	"compact_fail",
+ 	"compact_success",
+-- 
+1.7.9.5
+

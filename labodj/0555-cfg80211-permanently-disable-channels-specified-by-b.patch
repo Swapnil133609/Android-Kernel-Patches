@@ -1,0 +1,69 @@
+From 5834c006ca331c36821908e960087fd290d63f6d Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Sun, 29 Dec 2013 14:54:52 +0100
+Subject: [PATCH 555/590] cfg80211: permanently disable channels specified by
+ base settings
+
+if a custom regulatory domain is passed and if a rule for a channel
+indicates it should be disabled that channel should always remain
+disabled as per its documentation and design.
+Likewise if WIPHY_FLAG_STRICT_REGULATORY flag is set and a
+regulatory_hint() is issued if a channel is disabled that channel should
+remain disabled.
+Without this change only drivers that set the _orig flags appropriately
+on their own would ensure disallowed channels remaind disabled. This
+helps drivers save code by relying on the APIS provided to entrust
+channels that should not be enabled be respected by only having to use
+wiphy_apply_custom_regulatory() or regulatory_hint() with the
+WIPHY_FLAG_STRICT_REGULATORY set.
+If wiphy_apply_custom_regulatory() is used together with
+WIPHY_FLAG_STRICT_REGULATORY and a regulatory_hint() issued later, the
+incoming regulatory domain can override previously set _orig parameters
+from the initial custom regulatory setting.
+
+Change-Id: Ia1af4b293bd299ac20e1934e5e03e633ecb9d6ee
+Signed-off-by: Luis R. Rodriguez <mcgrof@do-not-panic.com>
+Signed-off-by: Mihir Shete <smihir@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ net/wireless/reg.c |   17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/net/wireless/reg.c b/net/wireless/reg.c
+index 160b3b6..d100366 100755
+--- a/net/wireless/reg.c
++++ b/net/wireless/reg.c
+@@ -861,8 +861,18 @@ static void handle_channel(struct wiphy *wiphy,
+ 		    r == -ERANGE)
+ 			return;
+ 
+-		REG_DBG_PRINT("Disabling freq %d MHz\n", chan->center_freq);
+-		chan->flags |= IEEE80211_CHAN_DISABLED;
++		if (last_request->initiator == NL80211_REGDOM_SET_BY_DRIVER &&
++		    request_wiphy && request_wiphy == wiphy &&
++		    request_wiphy->flags & WIPHY_FLAG_STRICT_REGULATORY) {
++			REG_DBG_PRINT("Disabling freq %d MHz for good\n",
++			chan->center_freq);
++			chan->orig_flags |= IEEE80211_CHAN_DISABLED;
++			chan->flags = chan->orig_flags;
++		} else {
++			REG_DBG_PRINT("Disabling freq %d MHz\n",
++			chan->center_freq);
++			chan->flags |= IEEE80211_CHAN_DISABLED;
++		}
+ 		return;
+ 	}
+ 
+@@ -1243,7 +1253,8 @@ static void handle_channel_custom(struct wiphy *wiphy,
+ 			      "wide channel\n",
+ 			      chan->center_freq,
+ 			      KHZ_TO_MHZ(desired_bw_khz));
+-		chan->flags = IEEE80211_CHAN_DISABLED;
++		chan->orig_flags |= IEEE80211_CHAN_DISABLED;
++		chan->flags = chan->orig_flags;
+ 		return;
+ 	}
+ 
+-- 
+1.7.9.5
+

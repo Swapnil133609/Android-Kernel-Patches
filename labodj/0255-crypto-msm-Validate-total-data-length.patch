@@ -1,0 +1,48 @@
+From ee19e49056868eaa5afa8fcca0a5e36cc03be9f6 Mon Sep 17 00:00:00 2001
+From: Ajay Dudani <adudani@codeaurora.org>
+Date: Sat, 12 Oct 2013 16:17:48 -0700
+Subject: [PATCH 255/590] crypto: msm: Validate total data length
+
+Verify sum of all data segments equals the total data length.
+
+Change-Id: I0fb9d856281d52c58536e77512f8cae75544d1bc
+Signed-off-by: Mona Hossain <mhossain@codeaurora.org>
+Signed-off-by: Ajay Dudani <adudani@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/crypto/msm/qcedev.c |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/crypto/msm/qcedev.c b/drivers/crypto/msm/qcedev.c
+index ed7dc70..722e604 100644
+--- a/drivers/crypto/msm/qcedev.c
++++ b/drivers/crypto/msm/qcedev.c
+@@ -1722,6 +1722,9 @@ error:
+ static int qcedev_check_sha_params(struct qcedev_sha_op_req *req,
+ 						struct qcedev_control *podev)
+ {
++	uint32_t total = 0;
++	uint32_t i;
++
+ 	if ((req->alg == QCEDEV_ALG_AES_CMAC) &&
+ 				(!podev->ce_support.cmac)) {
+ 		pr_err("%s: CMAC not supported\n", __func__);
+@@ -1759,6 +1762,14 @@ static int qcedev_check_sha_params(struct qcedev_sha_op_req *req,
+ 		}
+ 	}
+ 
++	/* Check for sum of all src length is equal to data_len  */
++	for (i = 0, total = 0; i < req->entries; i++)
++		total += req->data[i].len;
++	if (total != req->data_len) {
++		pr_err("%s: Total src(%d) buf size != data_len (%d)\n",
++			__func__, total, req->data_len);
++		goto sha_error;
++	}
+ 	return 0;
+ sha_error:
+ 	return -EINVAL;
+-- 
+1.7.9.5
+

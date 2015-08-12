@@ -1,0 +1,31 @@
+From a104bb032b809c1bb4c000867e8a70a972978bae Mon Sep 17 00:00:00 2001
+From: Markus Trippelsdorf <markus@trippelsdorf.de>
+Date: Wed, 31 Jul 2013 13:53:33 -0700
+Subject: [PATCH 193/590] .gitignore: ignore *.lz4 files
+
+Now that lz4 kernel compression is available, add *.lz4 to .gitignore.
+
+Signed-off-by: Markus Trippelsdorf <markus@trippelsdorf.de>
+Acked-by: Kyungsik Lee <kyungsik.lee@lge.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ .gitignore |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/.gitignore b/.gitignore
+index 8d0ff18..5347b8f 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -29,6 +29,7 @@ modules.builtin
+ *.bz2
+ *.lzma
+ *.xz
++*.lz4
+ *.lzo
+ *.patch
+ *.gcno
+-- 
+1.7.9.5
+

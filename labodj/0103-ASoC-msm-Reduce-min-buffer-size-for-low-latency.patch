@@ -1,0 +1,35 @@
+From 27c65740e7bfc0eac9684c508cfea797eb71b1ef Mon Sep 17 00:00:00 2001
+From: Mekala Natarajan <mekalan@codeaurora.org>
+Date: Tue, 19 Mar 2013 17:54:45 -0700
+Subject: [PATCH 103/590] ASoC: msm: Reduce min buffer size for low latency
+
+The current low latency driver has 512 bytes as
+the min buffer size threshold. With this reducing
+the playback time to lower values is not possible.
+Setting it to 128 bytes gives us more room
+to try out lower buffer sizes from the user space
+
+Signed-off-by: Alexy Joseph <alexyj@codeaurora.org>
+Signed-off-by: Mekala Natarajan <mekalan@codeaurora.org>
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ sound/soc/msm/msm-lowlatency-pcm-q6.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sound/soc/msm/msm-lowlatency-pcm-q6.c b/sound/soc/msm/msm-lowlatency-pcm-q6.c
+index 1630d66..81ae27d 100644
+--- a/sound/soc/msm/msm-lowlatency-pcm-q6.c
++++ b/sound/soc/msm/msm-lowlatency-pcm-q6.c
+@@ -46,7 +46,7 @@ struct snd_msm_volume {
+ 
+ #define PLAYBACK_NUM_PERIODS		2
+ #define PLAYBACK_MAX_PERIOD_SIZE	4096
+-#define PLAYBACK_MIN_PERIOD_SIZE	512
++#define PLAYBACK_MIN_PERIOD_SIZE	128
+ #define CAPTURE_NUM_PERIODS		2
+ #define CAPTURE_MIN_PERIOD_SIZE		128
+ #define CAPTURE_MAX_PERIOD_SIZE		1024
+-- 
+1.7.9.5
+

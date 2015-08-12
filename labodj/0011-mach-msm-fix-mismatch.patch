@@ -1,0 +1,33 @@
+From 5c786f6dc8e191cc99a9cf91f91951f3389c235b Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Sat, 2 Nov 2013 04:21:32 +0000
+Subject: [PATCH 011/590] mach: msm: fix mismatch.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/mpm-of.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-msm/mpm-of.c b/arch/arm/mach-msm/mpm-of.c
+index 5139b9a..2188d5a 100644
+--- a/arch/arm/mach-msm/mpm-of.c
++++ b/arch/arm/mach-msm/mpm-of.c
+@@ -620,12 +620,12 @@ static int __devinit msm_mpm_dev_probe(struct platform_device *pdev)
+ 
+ }
+ 
+-static inline int __init mpm_irq_domain_linear_size(struct irq_domain *d)
++static inline int mpm_irq_domain_linear_size(struct irq_domain *d)
+ {
+ 	return d->revmap_data.linear.size;
+ }
+ 
+-static inline int __init mpm_irq_domain_legacy_size(struct irq_domain *d)
++static inline int mpm_irq_domain_legacy_size(struct irq_domain *d)
+ {
+ 	return d->revmap_data.legacy.size;
+ }
+-- 
+1.7.9.5
+

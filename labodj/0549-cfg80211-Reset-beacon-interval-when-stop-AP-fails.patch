@@ -1,0 +1,33 @@
+From 65ce83e76c724abeafad0058fd9478dcbfa73260 Mon Sep 17 00:00:00 2001
+From: Sameer Thalappil <sameert@codeaurora.org>
+Date: Fri, 14 Jun 2013 17:12:12 -0700
+Subject: [PATCH 549/590] cfg80211: Reset beacon interval when stop AP fails
+
+When SSR happens at WLAN driver, the cfg80211 stop AP can fail at driver.
+Make sure that the beacon interval is reset, even when this API fails.
+
+Change-Id: I459f55ce5f4bc44c4d0e20170bd50a83c2d609b4
+Signed-off-by: Sameer Thalappil <sameert@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ net/wireless/nl80211.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/net/wireless/nl80211.c b/net/wireless/nl80211.c
+index aebb002..594d316 100644
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -2408,8 +2408,8 @@ static int nl80211_stop_ap(struct sk_buff *skb, struct genl_info *info)
+ 		return -ENOENT;
+ 
+ 	err = rdev->ops->stop_ap(&rdev->wiphy, dev);
+-	if (!err)
+-		wdev->beacon_interval = 0;
++	wdev->beacon_interval = 0;
++
+ 	return err;
+ }
+ 
+-- 
+1.7.9.5
+

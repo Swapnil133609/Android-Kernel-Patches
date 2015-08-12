@@ -1,0 +1,28 @@
+From 7d5be471780fa9ecd624b3827b95dcb4cf196761 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Tue, 10 Dec 2013 14:32:58 +0100
+Subject: [PATCH 337/590] Defconfig: update for s2w, dt2w
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/labo_defconfig |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/configs/labo_defconfig b/arch/arm/configs/labo_defconfig
+index e2f5679..42e96d9 100644
+--- a/arch/arm/configs/labo_defconfig
++++ b/arch/arm/configs/labo_defconfig
+@@ -1633,6 +1633,9 @@ CONFIG_INPUT_TOUCHSCREEN=y
+ # CONFIG_TOUCHSCREEN_GEN_VKEYS is not set
+ CONFIG_TOUCHSCREEN_LGE_SYNAPTICS=y
+ CONFIG_TOUCHSCREEN_CHARGER_NOTIFY=y
++CONFIG_TOUCHSCREEN_SWEEP2WAKE=y
++CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE=y
++CONFIG_TOUCHSCREEN_PREVENT_SLEEP=y
+ CONFIG_INPUT_MISC=y
+ # CONFIG_INPUT_AD714X is not set
+ # CONFIG_INPUT_BMA150 is not set
+-- 
+1.7.9.5
+

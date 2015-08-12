@@ -1,0 +1,86 @@
+From 03664dba19ed232d8fcdc5fdf432bee6c4447c47 Mon Sep 17 00:00:00 2001
+From: Laura Abbott <lauraa@codeaurora.org>
+Date: Thu, 27 Jun 2013 18:58:34 -0700
+Subject: [PATCH 522/590] gpu: ion: Add ioctls for prefetching/draining pools
+
+Multiple heaps in Ion are begining to pool large amounts of memory.
+This gives a boost on average but clients may still take a hit
+if the pool needs to be filled up again. Add an ioctl to give a
+'hint' to add memory to the pool. Equivalently, add an ioctl to
+drain some of the memory out of the pool to ennsure the memory
+isn't hanging around for too long.
+
+Change-Id: I2974322caa1520fd199d9cf2658f2fafceffb65c
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/ion/msm/msm_ion.c |   25 +++++++++++++++++++++++++
+ include/linux/msm_ion.h       |   11 +++++++++++
+ 2 files changed, 36 insertions(+)
+
+diff --git a/drivers/gpu/ion/msm/msm_ion.c b/drivers/gpu/ion/msm/msm_ion.c
+index c7fb742..87717d5 100644
+--- a/drivers/gpu/ion/msm/msm_ion.c
++++ b/drivers/gpu/ion/msm/msm_ion.c
+@@ -929,6 +929,31 @@ static long msm_ion_custom_ioctl(struct ion_client *client,
+ 		break;
+ 
+ 	}
++	case ION_IOC_PREFETCH:
++	{
++		struct ion_prefetch_data data;
++
++		if (copy_from_user(&data, (void __user *)arg,
++					sizeof(struct ion_prefetch_data)))
++			return -EFAULT;
++
++		ion_walk_heaps(client, data.heap_id, (void *)data.len,
++						ion_secure_cma_prefetch);
++		break;
++	}
++	case ION_IOC_DRAIN:
++	{
++		struct ion_prefetch_data data;
++
++		if (copy_from_user(&data, (void __user *)arg,
++					sizeof(struct ion_prefetch_data)))
++			return -EFAULT;
++
++		ion_walk_heaps(client, data.heap_id, (void *)data.len,
++						ion_secure_cma_drain_pool);
++		break;
++	}
++
+ 	default:
+ 		return -ENOTTY;
+ 	}
+diff --git a/include/linux/msm_ion.h b/include/linux/msm_ion.h
+index e9194d3..d5ac3b5 100644
+--- a/include/linux/msm_ion.h
++++ b/include/linux/msm_ion.h
+@@ -495,6 +495,11 @@ struct ion_flush_data {
+ 	unsigned int length;
+ };
+ 
++struct ion_prefetch_data {
++       int heap_id;
++       unsigned long len;
++};
++
+ #define ION_IOC_MSM_MAGIC 'M'
+ 
+ /**
+@@ -519,4 +524,10 @@ struct ion_flush_data {
+ #define ION_IOC_CLEAN_INV_CACHES	_IOWR(ION_IOC_MSM_MAGIC, 2, \
+ 						struct ion_flush_data)
+ 
++#define ION_IOC_PREFETCH               _IOWR(ION_IOC_MSM_MAGIC, 3, \
++                                               struct ion_prefetch_data)
++
++#define ION_IOC_DRAIN                  _IOWR(ION_IOC_MSM_MAGIC, 4, \
++                                               struct ion_prefetch_data)
++
+ #endif
+-- 
+1.7.9.5
+

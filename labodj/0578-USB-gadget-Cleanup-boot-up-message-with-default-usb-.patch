@@ -1,0 +1,49 @@
+From 153913e1706b9f94a3c0dd5455cde986a95e25a9 Mon Sep 17 00:00:00 2001
+From: Mayank Rana <mrana@codeaurora.org>
+Date: Wed, 12 Jun 2013 12:29:54 +0530
+Subject: [PATCH 578/590] USB: gadget: Cleanup boot-up message with default
+ usb composition
+
+The print message with rmnet bind and adb_bind is enabled by default.
+It appears for each default composition switch. Watchdog timeout is
+seen if there is stability issue on device bootup with serial console
+enable. Hence move message loglevel from pr_info to pr_debug to
+resolve this issue.
+
+Signed-off-by: Mayank Rana <mrana@codeaurora.org>
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/usb/gadget/f_adb.c   |    2 +-
+ drivers/usb/gadget/f_rmnet.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/usb/gadget/f_adb.c b/drivers/usb/gadget/f_adb.c
+index ff2287e..55f5b80 100644
+--- a/drivers/usb/gadget/f_adb.c
++++ b/drivers/usb/gadget/f_adb.c
+@@ -662,7 +662,7 @@ static int adb_bind_config(struct usb_configuration *c)
+ {
+ 	struct adb_dev *dev = _adb_dev;
+ 
+-	printk(KERN_INFO "adb_bind_config\n");
++	pr_debug("adb_bind_config\n");
+ 
+ 	dev->cdev = c->cdev;
+ 	dev->function.name = "adb";
+diff --git a/drivers/usb/gadget/f_rmnet.c b/drivers/usb/gadget/f_rmnet.c
+index 26b739d..6bfa203 100644
+--- a/drivers/usb/gadget/f_rmnet.c
++++ b/drivers/usb/gadget/f_rmnet.c
+@@ -1121,7 +1121,7 @@ static int frmnet_bind(struct usb_configuration *c, struct usb_function *f)
+ 			goto fail;
+ 	}
+ 
+-	pr_info("%s: RmNet(%d) %s Speed, IN:%s OUT:%s\n",
++	pr_debug("%s: RmNet(%d) %s Speed, IN:%s OUT:%s\n",
+ 			__func__, dev->port_num,
+ 			gadget_is_dualspeed(cdev->gadget) ? "dual" : "full",
+ 			dev->port.in->name, dev->port.out->name);
+-- 
+1.7.9.5
+

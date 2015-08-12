@@ -1,0 +1,124 @@
+From 6330e188f973002e70170ee4c0c581cff75dada9 Mon Sep 17 00:00:00 2001
+From: Thomas Gleixner <tglx@linutronix.de>
+Date: Tue, 26 Feb 2013 18:44:33 +0100
+Subject: [PATCH 353/590] stop_machine: Mark per cpu stopper enabled early
+
+commit 14e568e78 (stop_machine: Use smpboot threads) introduced the
+following regression:
+
+Before this commit the stopper enabled bit was set in the online
+notifier.
+
+CPU0				CPU1
+cpu_up
+				cpu online
+hotplug_notifier(ONLINE)
+  stopper(CPU1)->enabled = true;
+...
+stop_machine()
+
+The conversion to smpboot threads moved the enablement to the wakeup
+path of the parked thread. The majority of users seem to have the
+following working order:
+
+CPU0				CPU1
+cpu_up
+				cpu online
+unpark_threads()
+  wakeup(stopper[CPU1])
+....
+				stopper thread runs
+				  stopper(CPU1)->enabled = true;
+stop_machine()
+
+But Konrad and Sander have observed:
+
+CPU0				CPU1
+cpu_up
+				cpu online
+unpark_threads()
+  wakeup(stopper[CPU1])
+....
+stop_machine()
+				stopper thread runs
+				  stopper(CPU1)->enabled = true;
+
+Now the stop machinery kicks CPU0 into the stop loop, where it gets
+stuck forever because the queue code saw stopper(CPU1)->enabled ==
+false, so CPU0 waits for CPU1 to enter stomp_machine, but the CPU1
+stopper work got discarded due to enabled == false.
+
+Add a pre_unpark function to the smpboot thread descriptor and call it
+before waking the thread.
+
+This fixes the problem at hand, but the stop_machine code should be
+more robust. The stopper->enabled flag smells fishy at best.
+
+Thanks to Konrad for going through a loop of debug patches and
+providing the information to decode this issue.
+
+Reported-and-tested-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Reported-and-tested-by: Sander Eikelenboom <linux@eikelenboom.it>
+Cc: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
+Cc: Rusty Russell <rusty@rustcorp.com.au>
+Link: http://lkml.kernel.org/r/alpine.LFD.2.02.1302261843240.22263@ionos
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/smpboot.h |    4 ++++
+ kernel/smpboot.c        |    2 ++
+ kernel/stop_machine.c   |    2 +-
+ 3 files changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/include/linux/smpboot.h b/include/linux/smpboot.h
+index c65dee0..13e9296 100644
+--- a/include/linux/smpboot.h
++++ b/include/linux/smpboot.h
+@@ -24,6 +24,9 @@ struct smpboot_thread_data;
+  *			parked (cpu offline)
+  * @unpark:		Optional unpark function, called when the thread is
+  *			unparked (cpu online)
++ * @pre_unpark:		Optional unpark function, called before the thread is
++ *			unparked (cpu online). This is not guaranteed to be
++ *			called on the target cpu of the thread. Careful!
+  * @selfparking:	Thread is not parked by the park function.
+  * @thread_comm:	The base name of the thread
+  */
+@@ -37,6 +40,7 @@ struct smp_hotplug_thread {
+ 	void				(*cleanup)(unsigned int cpu, bool online);
+ 	void				(*park)(unsigned int cpu);
+ 	void				(*unpark)(unsigned int cpu);
++	void				(*pre_unpark)(unsigned int cpu);
+ 	bool				selfparking;
+ 	const char			*thread_comm;
+ };
+diff --git a/kernel/smpboot.c b/kernel/smpboot.c
+index d4abac2..8eaed9a 100644
+--- a/kernel/smpboot.c
++++ b/kernel/smpboot.c
+@@ -209,6 +209,8 @@ static void smpboot_unpark_thread(struct smp_hotplug_thread *ht, unsigned int cp
+ {
+ 	struct task_struct *tsk = *per_cpu_ptr(ht->store, cpu);
+ 
++	if (ht->pre_unpark)
++		ht->pre_unpark(cpu);
+ 	kthread_unpark(tsk);
+ }
+ 
+diff --git a/kernel/stop_machine.c b/kernel/stop_machine.c
+index 95d178c..c09f295 100644
+--- a/kernel/stop_machine.c
++++ b/kernel/stop_machine.c
+@@ -336,7 +336,7 @@ static struct smp_hotplug_thread cpu_stop_threads = {
+ 	.create			= cpu_stop_create,
+ 	.setup			= cpu_stop_unpark,
+ 	.park			= cpu_stop_park,
+-	.unpark			= cpu_stop_unpark,
++	.pre_unpark		= cpu_stop_unpark,
+ 	.selfparking		= true,
+ };
+ 
+-- 
+1.7.9.5
+

@@ -1,0 +1,66 @@
+From bec4a3621ae5be40155846894a3f31564b4d1c85 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Sat, 4 Jan 2014 16:08:22 +0100
+Subject: [PATCH 584/590] Defconfig: update
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/labo_defconfig |   13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/configs/labo_defconfig b/arch/arm/configs/labo_defconfig
+index d24312f..5d8dd00 100644
+--- a/arch/arm/configs/labo_defconfig
++++ b/arch/arm/configs/labo_defconfig
+@@ -1150,7 +1150,7 @@ CONFIG_NET_CLS_ACT=y
+ # CONFIG_NET_CLS_IND is not set
+ CONFIG_NET_SCH_FIFO=y
+ # CONFIG_DCB is not set
+-# CONFIG_DNS_RESOLVER is not set
++CONFIG_DNS_RESOLVER=y
+ # CONFIG_BATMAN_ADV is not set
+ # CONFIG_OPENVSWITCH is not set
+ CONFIG_RPS=y
+@@ -1387,7 +1387,7 @@ CONFIG_SCSI_MULTI_LUN=y
+ CONFIG_SCSI_CONSTANTS=y
+ CONFIG_SCSI_LOGGING=y
+ CONFIG_SCSI_SCAN_ASYNC=y
+-CONFIG_SCSI_WAIT_SCAN=m
++# CONFIG_SCSI_WAIT_SCAN is not set
+ 
+ #
+ # SCSI Transports
+@@ -1642,6 +1642,7 @@ CONFIG_TOUCHSCREEN_CHARGER_NOTIFY=y
+ CONFIG_TOUCHSCREEN_SWEEP2WAKE=y
+ CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE=y
+ CONFIG_TOUCHSCREEN_PREVENT_SLEEP=y
++CONFIG_PWRKEY_SUSPEND=y
+ CONFIG_INPUT_MISC=y
+ # CONFIG_INPUT_AD714X is not set
+ # CONFIG_INPUT_BMA150 is not set
+@@ -3417,8 +3418,8 @@ CONFIG_CRYPTO_MD5=y
+ # CONFIG_CRYPTO_RMD160 is not set
+ # CONFIG_CRYPTO_RMD256 is not set
+ # CONFIG_CRYPTO_RMD320 is not set
+-# CONFIG_CRYPTO_SHA1 is not set
+-CONFIG_CRYPTO_SHA1_ARM=y
++CONFIG_CRYPTO_SHA1=y
++# CONFIG_CRYPTO_SHA1_ARM is not set
+ CONFIG_CRYPTO_SHA256=y
+ # CONFIG_CRYPTO_SHA512 is not set
+ # CONFIG_CRYPTO_TGR192 is not set
+@@ -3427,8 +3428,8 @@ CONFIG_CRYPTO_SHA256=y
+ #
+ # Ciphers
+ #
+-# CONFIG_CRYPTO_AES is not set
+-CONFIG_CRYPTO_AES_ARM=y
++CONFIG_CRYPTO_AES=y
++# CONFIG_CRYPTO_AES_ARM is not set
+ # CONFIG_CRYPTO_ANUBIS is not set
+ CONFIG_CRYPTO_ARC4=y
+ # CONFIG_CRYPTO_BLOWFISH is not set
+-- 
+1.7.9.5
+

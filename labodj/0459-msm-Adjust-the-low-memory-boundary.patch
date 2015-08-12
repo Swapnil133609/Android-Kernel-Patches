@@ -1,0 +1,44 @@
+From d9d5a719dd13809b118bc49acd669bca442cff85 Mon Sep 17 00:00:00 2001
+From: Neeti Desai <neetid@codeaurora.org>
+Date: Thu, 18 Jul 2013 15:29:20 -0700
+Subject: [PATCH 459/590] msm: Adjust the low memory boundary
+
+The unused virtual address space in low memory is given to
+vmalloc for use. This reduces the low memory space and
+increases vmalloc space. Adjust the vmalloc_min in order
+to increase the low memory.
+
+Change-Id: I0dbef5b6e5ec3d19f5f93f06ed03a4cf1215dc4d
+Signed-off-by: Neeti Desai <neetid@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mm/mmu.c |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 58beb57..b12b95c 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1002,6 +1002,18 @@ void __init sanity_check_meminfo(void)
+ {
+ 	int i, j, highmem = 0;
+ 
++#ifdef CONFIG_ENABLE_VMALLOC_SAVING
++	unsigned long hole_start;
++	for (i = 0; i < (meminfo.nr_banks - 1); i++) {
++		hole_start = meminfo.bank[i].start + meminfo.bank[i].size;
++		if (hole_start != meminfo.bank[i+1].start) {
++			if (hole_start <= MAX_HOLE_ADDRESS) {
++				vmalloc_min = (void *) (vmalloc_min +
++				(meminfo.bank[i+1].start - hole_start));
++			}
++		}
++	}
++#endif
+ #ifdef CONFIG_DONT_MAP_HOLE_AFTER_MEMBANK0
+ 	find_memory_hole();
+ #endif
+-- 
+1.7.9.5
+

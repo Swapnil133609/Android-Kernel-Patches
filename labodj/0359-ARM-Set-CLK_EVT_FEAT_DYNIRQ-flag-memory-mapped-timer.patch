@@ -1,0 +1,36 @@
+From d115462d4c18404af931313438e3e2dd623df25c Mon Sep 17 00:00:00 2001
+From: Karthik Parsha <kparsha@codeaurora.org>
+Date: Wed, 20 Nov 2013 13:27:17 -0800
+Subject: [PATCH 359/590] ARM: Set CLK_EVT_FEAT_DYNIRQ flag memory mapped
+ timers
+
+Memory mapped timers are used as broadcast timers to wake up a core
+across reset. CLK_EVT_FEAT_DYNIRQ ensures only the intended cores are
+woken up instead of the default core that they are routed to, thereby
+saving power.
+
+Change-Id: I535faa0d1fd328fefe4422a6f362b17c94ab5b8e
+Signed-off-by: Karthik Parsha <kparsha@codeaurora.org>
+Signed-off-by: Mahesh Sivasubramanian <msivasub@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/kernel/arch_timer.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+index ac4c7a3..7cafd0a 100644
+--- a/arch/arm/kernel/arch_timer.c
++++ b/arch/arm/kernel/arch_timer.c
+@@ -480,7 +480,7 @@ static int __init arch_timer_mem_register(void)
+ 	if (!clk)
+ 		return -ENOMEM;
+ 
+-	clk->features = CLOCK_EVT_FEAT_ONESHOT;
++	clk->features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_DYNIRQ;
+ 	clk->name = "arch_mem_timer";
+ 	clk->rating = 400;
+ 	clk->set_mode = arch_timer_set_mode_mem;
+-- 
+1.7.9.5
+

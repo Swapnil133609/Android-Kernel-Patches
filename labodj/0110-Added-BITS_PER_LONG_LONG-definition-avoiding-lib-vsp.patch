@@ -1,0 +1,30 @@
+From 3fbeb99110f1dc61e5f1d4e7f919af465859f3d4 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Fri, 7 Jun 2013 16:37:50 +0200
+Subject: [PATCH 110/590] Added BITS_PER_LONG_LONG definition avoiding
+ lib/vsprintf.c errors.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/asm-generic/bitsperlong.h |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/include/asm-generic/bitsperlong.h b/include/asm-generic/bitsperlong.h
+index 4ae54e0..f421654 100644
+--- a/include/asm-generic/bitsperlong.h
++++ b/include/asm-generic/bitsperlong.h
+@@ -12,6 +12,10 @@
+ #define __BITS_PER_LONG 32
+ #endif
+ 
++#ifndef BITS_PER_LONG_LONG
++#define BITS_PER_LONG_LONG 64
++#endif
++
+ #ifdef __KERNEL__
+ 
+ #ifdef CONFIG_64BIT
+-- 
+1.7.9.5
+

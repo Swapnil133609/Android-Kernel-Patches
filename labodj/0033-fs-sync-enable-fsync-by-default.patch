@@ -1,0 +1,28 @@
+From 09e9fce0e493107584f132c47b29f2cd2ffdec89 Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Sun, 25 Nov 2012 22:19:24 -0800
+Subject: [PATCH 033/590] fs: sync: enable fsync by default.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ fs/sync.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/fs/sync.c b/fs/sync.c
+index f9c190e..082cd99 100644
+--- a/fs/sync.c
++++ b/fs/sync.c
+@@ -18,7 +18,7 @@
+ #include <linux/backing-dev.h>
+ #include "internal.h"
+ 
+-bool fsync_enabled = false;
++bool fsync_enabled = true;
+ module_param(fsync_enabled, bool, 0755);
+ 
+ #define VALID_FLAGS (SYNC_FILE_RANGE_WAIT_BEFORE|SYNC_FILE_RANGE_WRITE| \
+-- 
+1.7.9.5
+

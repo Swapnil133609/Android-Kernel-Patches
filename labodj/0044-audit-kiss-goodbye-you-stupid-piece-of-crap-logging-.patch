@@ -1,0 +1,28 @@
+From 75e721620546c6ea5ff1fb7993f0f29b659a52e2 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Wed, 25 Sep 2013 03:03:01 +0100
+Subject: [PATCH 044/590] audit: kiss goodbye you stupid piece of crap logging
+ messages.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/audit.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/audit.c b/kernel/audit.c
+index 1c7f2c6..940f178 100644
+--- a/kernel/audit.c
++++ b/kernel/audit.c
+@@ -69,7 +69,7 @@
+ #define AUDIT_DISABLED		-1
+ #define AUDIT_UNINITIALIZED	0
+ #define AUDIT_INITIALIZED	1
+-static int	audit_initialized;
++static int	audit_initialized = AUDIT_DISABLED;
+ 
+ #define AUDIT_OFF	0
+ #define AUDIT_ON	1
+-- 
+1.7.9.5
+

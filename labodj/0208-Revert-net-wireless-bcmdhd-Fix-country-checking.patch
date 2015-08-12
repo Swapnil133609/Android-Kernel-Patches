@@ -1,0 +1,28 @@
+From 8a215c04c2588591a01ba7908a79d1a88ebd1fae Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Fri, 6 Dec 2013 17:30:30 +0000
+Subject: [PATCH 208/590] Revert "net: wireless: bcmdhd: Fix country checking"
+
+This reverts commit 7de625fa8c15106c1b1bd6147db42121186010d8.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/net/wireless/bcmdhd/wldev_common.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/wireless/bcmdhd/wldev_common.c b/drivers/net/wireless/bcmdhd/wldev_common.c
+index c900493..361235b 100644
+--- a/drivers/net/wireless/bcmdhd/wldev_common.c
++++ b/drivers/net/wireless/bcmdhd/wldev_common.c
+@@ -354,7 +354,7 @@ int wldev_set_country(
+ 	}
+ 
+ 	if ((error < 0) ||
+-	    (strncmp(country_code, cspec.country_abbrev, WLC_CNTRY_BUF_SZ) != 0)) {
++	    (strncmp(country_code, cspec.ccode, WLC_CNTRY_BUF_SZ) != 0)) {
+ 
+ 		if (user_enforced) {
+ 			bzero(&scbval, sizeof(scb_val_t));
+-- 
+1.7.9.5
+

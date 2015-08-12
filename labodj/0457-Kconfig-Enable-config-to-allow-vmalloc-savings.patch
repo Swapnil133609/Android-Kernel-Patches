@@ -1,0 +1,80 @@
+From d4118558dd19c4f2dc3cad3335141ffc9c2b336b Mon Sep 17 00:00:00 2001
+From: Neeti Desai <neetid@codeaurora.org>
+Date: Fri, 25 Oct 2013 11:47:12 -0700
+Subject: [PATCH 457/590] Kconfig: Enable config to allow vmalloc savings
+
+Select the config to reclaim the vmalloc space in lowmem
+and disable the map around the hole config, where selected,
+as both the configs cannot be enabled together
+
+CRs-Fixed: 568470
+Change-Id: I9dd3e0123e4fe3e33554cdbdf5a82e344c230f47
+Signed-off-by: Neeti Desai <neetid@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/Kconfig |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index 4326f8d..fd3347a 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -280,11 +280,11 @@ config ARCH_MSM8974
+ 	select MEMORY_HOLE_CARVEOUT
+ 	select MSM_RPM_STATS_LOG
+ 	select QMI_ENCDEC
+-	select DONT_MAP_HOLE_AFTER_MEMBANK0
+ 	select MSM_ULTRASOUND_B
+ 	select MSM_LPM_TEST
+ 	select MSM_RPM_LOG
+ 	select ARCH_WANT_KMAP_ATOMIC_FLUSH
++	select ENABLE_VMALLOC_SAVINGS
+ 
+ config ARCH_APQ8084
+ 	bool "APQ8084"
+@@ -305,8 +305,8 @@ config ARCH_APQ8084
+ 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+ 	select ARCH_WANT_KMAP_ATOMIC_FLUSH
+ 	select MEMORY_HOLE_CARVEOUT
+-	select DONT_MAP_HOLE_AFTER_MEMBANK0
+ 	select QMI_ENCDEC
++	select ENABLE_VMALLOC_SAVINGS
+ 
+ config ARCH_MPQ8092
+ 	bool "MPQ8092"
+@@ -454,7 +454,6 @@ config ARCH_MSM8610
+ 	select MSM_L2_SPM
+ 	select MSM_PM8X60 if PM
+ 	select MEMORY_HOLE_CARVEOUT
+-	select DONT_MAP_HOLE_AFTER_MEMBANK0
+ 	select MSM_BUS_SCALING
+ 	select CPU_FREQ_MSM
+ 	select CPU_FREQ
+@@ -471,6 +470,7 @@ config ARCH_MSM8610
+ 	select MSM_CPR_REGULATOR
+ 	select MSM_RPM_LOG
+ 	select MSM_RPM_STATS_LOG
++	select ENABLE_VMALLOC_SAVINGS
+ 
+ config ARCH_MSM8226
+ 	bool "MSM8226"
+@@ -496,7 +496,6 @@ config ARCH_MSM8226
+ 	select MSM_L2_SPM
+ 	select MSM_PM8X60 if PM
+ 	select MEMORY_HOLE_CARVEOUT
+-	select DONT_MAP_HOLE_AFTER_MEMBANK0
+ 	select MSM_BUS_SCALING
+ 	select CPU_FREQ_MSM
+ 	select CPU_FREQ
+@@ -513,6 +512,7 @@ config ARCH_MSM8226
+ 	select MSM_RPM_LOG
+ 	select MSM_RPM_STATS_LOG
+ 	select ARCH_WANT_KMAP_ATOMIC_FLUSH
++	select ENABLE_VMALLOC_SAVINGS
+ 
+ config ARCH_MSMSAMARIUM
+ 	bool "MSMSAMARIUM"
+-- 
+1.7.9.5
+

@@ -1,0 +1,48 @@
+From b5f0d028db33b8c6aff51a10f8a05e961b011bf7 Mon Sep 17 00:00:00 2001
+From: Sujit Reddy Thumma <sthumma@codeaurora.org>
+Date: Tue, 13 Aug 2013 09:31:32 +0530
+Subject: [PATCH 404/590] PM / QoS: Fix deadlock during PM QoS vote to default
+ value
+
+pm_qos_work_fn() calls pm_qos_update_request() which does
+cancel_delayed_work_sync() on the same pm_qos_work_fn()
+causing deadlock. Fix this by updating the target with
+default timeout value directly instead of calling
+pm_qos_update_request().
+
+CRs-Fixed: 526216
+Change-Id: I7de2fb1c89f87b0ebf7427116b8920aec50d5b2b
+Signed-off-by: Sujit Reddy Thumma <sthumma@codeaurora.org>
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/power/qos.c |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/kernel/power/qos.c b/kernel/power/qos.c
+index 6a031e6..bb2dad8 100644
+--- a/kernel/power/qos.c
++++ b/kernel/power/qos.c
+@@ -237,11 +237,18 @@ EXPORT_SYMBOL_GPL(pm_qos_request_active);
+  */
+ static void pm_qos_work_fn(struct work_struct *work)
+ {
++	s32 new_value = PM_QOS_DEFAULT_VALUE;
+ 	struct pm_qos_request *req = container_of(to_delayed_work(work),
+ 						  struct pm_qos_request,
+ 						  work);
+ 
+-	pm_qos_update_request(req, PM_QOS_DEFAULT_VALUE);
++	if (!req || !pm_qos_request_active(req))
++		return;
++
++	if (new_value != req->node.prio)
++		pm_qos_update_target(
++			pm_qos_array[req->pm_qos_class]->constraints,
++			&req->node, PM_QOS_UPDATE_REQ, new_value);
+ }
+ 
+ /**
+-- 
+1.7.9.5
+

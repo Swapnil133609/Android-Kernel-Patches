@@ -1,0 +1,90 @@
+From 836c3d43ffee451b1361457fa91aeef37b4c3947 Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Wed, 4 Dec 2013 12:52:03 +0100
+Subject: [PATCH 170/590] Compressed: optimize for Cortex A15
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/boot/compressed/Makefile |   25 ++++++++++++++-----------
+ 1 file changed, 14 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 6474de0..34451a1 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -22,15 +22,18 @@ OBJS		+= sdhi-sh7372.o
+ endif
+ 
+ AFLAGS_head.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
+-
+-AFLAGS_head.o += -Wa,-march=armv7-a$(plus_sec)
+-AFLAGS_misc.o +=-Wa,-march=armv7-a$(plus_sec)
+-AFLAGS_decompress.o += -Wa,-march=armv7-a$(plus_sec)
+-
++AFLAGS_head.o += -Wa,-mcpu=cortex-a15
+ HEAD	= head.o
+-OBJS	+= misc.o decompress.o
++OBJS	+= misc.o
+ FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
+ 
++AFLAGS_misc.o += -Wa,-mcpu=cortex-a15
++
++MISC = misc.o
++
++AFLAGS_decompress.o += -Wa,-mcpu=cortex-a15
++DECOMPRESS = decompress.o  
++
+ # string library code (-Os is enforced to keep it much smaller)
+ OBJS		+= string.o
+ CFLAGS_string.o	:= -Os
+@@ -119,7 +122,7 @@ endif
+ targets       := vmlinux vmlinux.lds \
+ 		 piggy.$(suffix_y) piggy.$(suffix_y).o \
+ 		 lib1funcs.o lib1funcs.S ashldi3.o ashldi3.S \
+-		 font.o font.c head.o misc.o $(OBJS)
++		 font.o font.c head.o misc.o decompress.o $(OBJS)
+ 
+ # Make sure files are removed during clean
+ extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern \
+@@ -154,16 +157,16 @@ LDFLAGS_vmlinux += -X
+ LDFLAGS_vmlinux += -T
+ 
+ # For __aeabi_uidivmod
+-AFLAGS_lib1funcs.o +=-Wa,-march=armv7-a$(plus_sec)
++AFLAGS_lib1funcs.o += -Wa,-mcpu=cortex-a15
+ lib1funcs = $(obj)/lib1funcs.o
+ 
+ $(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
+ 	$(call cmd,shipped)
+ 
+ # For __aeabi_llsl
++AFLAGS_ashldi3.o += -Wa,-mcpu=cortex-a15
+ ashldi3 = $(obj)/ashldi3.o
+ 
+-AFLAGS_ashldi3.o +=-Wa,-march=armv7-a$(plus_sec)
+ $(obj)/ashldi3.S: $(srctree)/arch/$(SRCARCH)/lib/ashldi3.S
+ 	$(call cmd,shipped)
+ 
+@@ -187,16 +190,16 @@ if [ $(words $(ZRELADDR)) -gt 1 -a "$(CONFIG_AUTO_ZRELADDR)" = "" ]; then \
+ 	false; \
+ fi
+ 
+-$(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
++$(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/$(MISC) $(obj)/$(DECOMPRESS) $(obj)/piggy.$(suffix_y).o \
+ 		$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) $(ashldi3) FORCE
+ 	@$(check_for_multiple_zreladdr)
+ 	$(call if_changed,ld)
+ 	@$(check_for_bad_syms)
+ 
++AFLAGS_piggy.$(suffix_y).o += -Wa,-mcpu=cortex-a15
+ $(obj)/piggy.$(suffix_y): $(obj)/../Image FORCE
+ 	$(call if_changed,$(suffix_y))
+ 
+-AFLAGS_piggy.$(suffix_y).o += -Wa,-march=armv7-a$(plus_sec)
+ $(obj)/piggy.$(suffix_y).o:  $(obj)/piggy.$(suffix_y) FORCE
+ 
+ CFLAGS_font.o := -Dstatic=
+-- 
+1.7.9.5
+

@@ -1,0 +1,63 @@
+From b516a517aeafaa8b364f0d47715c4ca45f91a8c3 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Sun, 17 Nov 2013 06:57:40 +0000
+Subject: [PATCH 091/590] load_stats: small optimization to save 2 calls and
+ inline both functions.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/kernel/load_stats.c |   16 ++++++----------
+ 1 file changed, 6 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/kernel/load_stats.c b/arch/arm/kernel/load_stats.c
+index b681f96..16caffe 100644
+--- a/arch/arm/kernel/load_stats.c
++++ b/arch/arm/kernel/load_stats.c
+@@ -95,7 +95,7 @@ static inline cputime64_t get_cpu_iowait_time(unsigned int cpu,
+ 	return iowait_time;
+ }
+ 
+-static int update_average_load(unsigned int cpu)
++static inline int update_average_load(unsigned int cpu)
+ {
+ 	struct cpufreq_policy cpu_policy;
+ 	struct cpu_load_data *pcpu = &per_cpu(cpuload, cpu);
+@@ -128,21 +128,18 @@ static int update_average_load(unsigned int cpu)
+ 	/* Calculate the scaled load across CPU */
+ 	load_at_max_freq = (cur_load * cpu_policy.cur) / pcpu->policy_max;
+ 
+-	/* This is the first sample in this window*/
+-	pcpu->avg_load_maxfreq = pcpu->prev_avg_load_maxfreq + load_at_max_freq;
+-	pcpu->avg_load_maxfreq /= 2;
+ 	pcpu->window_size = wall_time;
+-
+-	return 0;
++	pcpu->avg_load_maxfreq = (pcpu->prev_avg_load_maxfreq + load_at_max_freq) / 2;
++	
++	return pcpu->avg_load_maxfreq;
+ }
+ 
+-unsigned int report_load_at_max_freq(int cpu)
++unsigned inline int report_load_at_max_freq(int cpu)
+ {
+ 	struct cpu_load_data *pcpu;
+ 	unsigned int total_load = 0;
+ 	pcpu = &per_cpu(cpuload, cpu);
+-	update_average_load(cpu);
+-	total_load = pcpu->avg_load_maxfreq;
++	total_load = update_average_load(cpu);
+ 	pcpu->prev_avg_load_maxfreq = pcpu->avg_load_maxfreq;
+ 	pcpu->avg_load_maxfreq = 0;
+ 
+@@ -156,7 +153,6 @@ static int __init msm_rq_stats_init(void)
+ 
+ 	for_each_possible_cpu(i) {
+ 		struct cpu_load_data *pcpu = &per_cpu(cpuload, i);
+-		mutex_init(&pcpu->cpu_load_mutex);
+ 		cpufreq_get_policy(&cpu_policy, i);
+ 		pcpu->policy_max = cpu_policy.max;
+ 		if (cpu_online(i))
+-- 
+1.7.9.5
+

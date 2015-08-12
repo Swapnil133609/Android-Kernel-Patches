@@ -1,0 +1,166 @@
+From 2f0ff0052c83001d95b66d34cb067b50a0b199e7 Mon Sep 17 00:00:00 2001
+From: Daniel Lezcano <daniel.lezcano@linaro.org>
+Date: Tue, 15 Jan 2013 14:18:04 +0100
+Subject: [PATCH 068/590] cpuidle: remove the power_specified field in the
+ driver
+
+We realized that the power usage field is never filled and when it
+is filled for tegra, the power_specified flag is not set causing all
+of these values to be reset when the driver is initialized with
+set_power_state().
+
+However, the power_specified flag can be simply removed under the
+assumption that the states are always backward sorted, which is the
+case with the current code.
+
+This change allows the menu governor select function and the
+cpuidle_play_dead() to be simplified.  Moreover, the
+set_power_states() function can removed as it does not make sense
+any more.
+
+Drop the power_specified flag from struct cpuidle_driver and make
+the related changes as described above.
+
+As a consequence, this also fixes the bug where on the dynamic
+C-states system, the power fields are not initialized.
+
+[rjw: Changelog]
+References: https://bugzilla.kernel.org/show_bug.cgi?id=42870
+References: https://bugzilla.kernel.org/show_bug.cgi?id=43349
+References: https://lkml.org/lkml/2012/10/16/518
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+
+Conflicts:
+
+	drivers/cpuidle/cpuidle.c
+	drivers/cpuidle/driver.c
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpuidle/cpuidle.c        |   15 +++------------
+ drivers/cpuidle/driver.c         |   24 ------------------------
+ drivers/cpuidle/governors/menu.c |    8 ++------
+ include/linux/cpuidle.h          |    2 +-
+ 4 files changed, 6 insertions(+), 43 deletions(-)
+
+diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
+index 648d4ae..145008c 100644
+--- a/drivers/cpuidle/cpuidle.c
++++ b/drivers/cpuidle/cpuidle.c
+@@ -81,23 +81,14 @@ int cpuidle_play_dead(void)
+ 	struct cpuidle_device *dev = __this_cpu_read(cpuidle_devices);
+ 	struct cpuidle_driver *drv = cpuidle_get_driver();
+ 	int i, dead_state = -1;
+-	int power_usage = INT_MAX;
+ 
+ 	if (!drv)
+ 		return -ENODEV;
+ 
+ 	/* Find lowest-power state that supports long-term idle */
+-	for (i = CPUIDLE_DRIVER_STATE_START; i < drv->state_count; i++) {
+-		struct cpuidle_state *s = &drv->states[i];
+-
+-		if (s->power_usage < power_usage && s->enter_dead) {
+-			power_usage = s->power_usage;
+-			dead_state = i;
+-		}
+-	}
+-
+-	if (dead_state != -1)
+-		return drv->states[dead_state].enter_dead(dev, dead_state);
++	for (i = drv->state_count - 1; i >= CPUIDLE_DRIVER_STATE_START; i--)
++		if (drv->states[i].enter_dead)
++			return drv->states[i].enter_dead(dev, i);
+ 
+ 	return -ENODEV;
+ }
+diff --git a/drivers/cpuidle/driver.c b/drivers/cpuidle/driver.c
+index 40cd3f3..2265fcf 100644
+--- a/drivers/cpuidle/driver.c
++++ b/drivers/cpuidle/driver.c
+@@ -17,29 +17,6 @@
+ static struct cpuidle_driver *cpuidle_curr_driver;
+ DEFINE_SPINLOCK(cpuidle_driver_lock);
+ 
+-static void __cpuidle_register_driver(struct cpuidle_driver *drv)
+-{
+-	int i;
+-	/*
+-	 * cpuidle driver should set the drv->power_specified bit
+-	 * before registering if the driver provides
+-	 * power_usage numbers.
+-	 *
+-	 * If power_specified is not set,
+-	 * we fill in power_usage with decreasing values as the
+-	 * cpuidle code has an implicit assumption that state Cn
+-	 * uses less power than C(n-1).
+-	 *
+-	 * With CONFIG_ARCH_HAS_CPU_RELAX, C0 is already assigned
+-	 * an power value of -1.  So we use -2, -3, etc, for other
+-	 * c-states.
+-	 */
+-	if (!drv->power_specified) {
+-		for (i = CPUIDLE_DRIVER_STATE_START; i < drv->state_count; i++)
+-			drv->states[i].power_usage = -1 - i;
+-	}
+-}
+-
+ 
+ /**
+  * cpuidle_register_driver - registers a driver
+@@ -58,7 +35,6 @@ int cpuidle_register_driver(struct cpuidle_driver *drv)
+ 		spin_unlock(&cpuidle_driver_lock);
+ 		return -EBUSY;
+ 	}
+-	__cpuidle_register_driver(drv);
+ 	cpuidle_curr_driver = drv;
+ 	spin_unlock(&cpuidle_driver_lock);
+ 
+diff --git a/drivers/cpuidle/governors/menu.c b/drivers/cpuidle/governors/menu.c
+index 9d6e279..44c5212 100644
+--- a/drivers/cpuidle/governors/menu.c
++++ b/drivers/cpuidle/governors/menu.c
+@@ -300,7 +300,6 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
+ {
+ 	struct menu_device *data = &__get_cpu_var(menu_devices);
+ 	int latency_req = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
+-	int power_usage = INT_MAX;
+ 	int i;
+ 	int multiplier;
+ 	struct timespec t;
+@@ -370,11 +369,8 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
+ 		if (s->exit_latency * multiplier > data->predicted_us)
+ 			continue;
+ 
+-		if (s->power_usage < power_usage) {
+-			power_usage = s->power_usage;
+-			data->last_state_idx = i;
+-			data->exit_us = s->exit_latency;
+-		}
++		data->last_state_idx = i;
++		data->exit_us = s->exit_latency;
+ 	}
+ 
+ 	/* not deepest C-state chosen for low predicted residency */
+diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
+index 23a79c6..d983ff9 100644
+--- a/include/linux/cpuidle.h
++++ b/include/linux/cpuidle.h
+@@ -131,9 +131,9 @@ struct cpuidle_driver {
+ 	const char		*name;
+ 	struct module 		*owner;
+ 
+-	unsigned int		power_specified:1;
+ 	/* set to 1 to use the core cpuidle time keeping (for all states). */
+ 	unsigned int		en_core_tk_irqen:1;
++	/* states array must be ordered in decreasing power consumption */
+ 	struct cpuidle_state	states[CPUIDLE_STATE_MAX];
+ 	int			state_count;
+ 	int			safe_state_index;
+-- 
+1.7.9.5
+

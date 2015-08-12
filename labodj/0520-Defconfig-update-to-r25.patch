@@ -1,0 +1,28 @@
+From 4a23b9b81617b9064247783d22329613f880c1be Mon Sep 17 00:00:00 2001
+From: LaboDJ <jacopolabardi@gmail.com>
+Date: Thu, 26 Dec 2013 12:51:52 +0100
+Subject: [PATCH 520/590] Defconfig: update to r25
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/labo_defconfig |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/configs/labo_defconfig b/arch/arm/configs/labo_defconfig
+index 4ce9c79..2c0b15a 100644
+--- a/arch/arm/configs/labo_defconfig
++++ b/arch/arm/configs/labo_defconfig
+@@ -3139,6 +3139,9 @@ CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1"
+ CONFIG_NTFS_FS=y
+ # CONFIG_NTFS_DEBUG is not set
+ CONFIG_NTFS_RW=y
++CONFIG_EXFAT_FS=y
++CONFIG_EXFAT_DEFAULT_CODEPAGE=437
++CONFIG_EXFAT_DEFAULT_IOCHARSET="utf8"
+ 
+ #
+ # Pseudo filesystems
+-- 
+1.7.9.5
+

@@ -1,0 +1,36 @@
+From ebee15ced502af330a62f0057bef86b509664034 Mon Sep 17 00:00:00 2001
+From: Pranav Vashi <neobuddy89@gmail.com>
+Date: Tue, 3 Dec 2013 14:31:36 -0800
+Subject: [PATCH 166/590] sched: LOAD_FREQ (4*HZ+61) avoids loadavg Moire
+
+These values are applicable for 100 HZ device.
+Check http://ripke.com/loadavg/moire for more details.
+
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/sched.h |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index fa31ab0..6be1333 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -122,10 +122,10 @@ extern void get_avenrun(unsigned long *loads, unsigned long offset, int shift);
+ 
+ #define FSHIFT		11		/* nr of bits of precision */
+ #define FIXED_1		(1<<FSHIFT)	/* 1.0 as fixed-point */
+-#define LOAD_FREQ	(5*HZ+1)	/* 5 sec intervals */
+-#define EXP_1		1884		/* 1/exp(5sec/1min) as fixed-point */
+-#define EXP_5		2014		/* 1/exp(5sec/5min) */
+-#define EXP_15		2037		/* 1/exp(5sec/15min) */
++#define LOAD_FREQ	(4*HZ+61)	/* 4.61 sec intervals */
++#define EXP_1		1896		/* 1/exp(4.61sec/1min) as fixed-point */
++#define EXP_5		2017		/* 1/exp(4.61sec/5min) */
++#define EXP_15		2038		/* 1/exp(4.61sec/15min) */
+ 
+ #define CALC_LOAD(load,exp,n) \
+ 	load *= exp; \
+-- 
+1.7.9.5
+
