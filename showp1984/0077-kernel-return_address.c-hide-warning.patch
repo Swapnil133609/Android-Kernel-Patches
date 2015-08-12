@@ -1,0 +1,27 @@
+From 1e61578a143d00befb473fe95c738fb435b0f86c Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sun, 10 Mar 2013 07:33:21 +0100
+Subject: [PATCH 077/338] kernel/return_address.c: hide warning
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/kernel/return_address.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
+index 8085417..58278eb 100644
+--- a/arch/arm/kernel/return_address.c
++++ b/arch/arm/kernel/return_address.c
+@@ -58,7 +58,7 @@ void *return_address(unsigned int level)
+ 
+ #else /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) */
+ 
+-#if defined(CONFIG_ARM_UNWIND)
++#if 0
+ #warning "TODO: return_address should use unwind tables"
+ #endif
+ 
+-- 
+1.7.9.5
+

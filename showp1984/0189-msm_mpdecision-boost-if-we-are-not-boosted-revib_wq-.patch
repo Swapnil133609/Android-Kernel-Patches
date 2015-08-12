@@ -1,0 +1,44 @@
+From db912f3c8d9ccf7584d80bdb672461062d04b69c Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sun, 12 May 2013 00:56:00 +0200
+Subject: [PATCH 189/338] msm_mpdecision: boost: if we are not boosted,
+ revib_wq does not need to run at all
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |   17 +++++++++++------
+ 1 file changed, 11 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 521939b..d19e7da 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -416,13 +416,18 @@ static void unboost_cpu(int cpu) {
+ static void msm_mpdec_revib_work_thread(struct work_struct *work) {
+     int cpu = smp_processor_id();
+ 
+-    if (ktime_to_ms(ktime_get()) > per_cpu(msm_mpdec_cpudata, cpu).boost_until) {
+-        unboost_cpu(cpu);
++    if (per_cpu(msm_mpdec_cpudata, cpu).is_boosted) {
++        per_cpu(msm_mpdec_cpudata, cpu).revib_wq_running = true;
++        if (ktime_to_ms(ktime_get()) > per_cpu(msm_mpdec_cpudata, cpu).boost_until) {
++            unboost_cpu(cpu);
++        } else {
++            queue_delayed_work_on(cpu,
++                                  msm_mpdec_revib_workq,
++                                  &per_cpu(msm_mpdec_revib_work, cpu),
++                                  msecs_to_jiffies((per_cpu(msm_mpdec_cpudata, cpu).boost_until - ktime_to_ms(ktime_get()))));
++        }
+     } else {
+-        queue_delayed_work_on(cpu,
+-                              msm_mpdec_revib_workq,
+-                              &per_cpu(msm_mpdec_revib_work, cpu),
+-                              msecs_to_jiffies((per_cpu(msm_mpdec_cpudata, cpu).boost_until - ktime_to_ms(ktime_get()))));
++        per_cpu(msm_mpdec_cpudata, cpu).revib_wq_running = false;
+     }
+     return;
+ }
+-- 
+1.7.9.5
+

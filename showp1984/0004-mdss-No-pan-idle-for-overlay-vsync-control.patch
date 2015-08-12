@@ -1,0 +1,30 @@
+From 2d7b53a81335b57a16a75ec0990d7fb598f4ddc9 Mon Sep 17 00:00:00 2001
+From: Naseer Ahmed <naseer@codeaurora.org>
+Date: Tue, 22 Oct 2013 11:58:36 -0400
+Subject: [PATCH 004/338] mdss: No pan idle for overlay vsync control
+
+The other vsync control ioctl isn't used, make sure both ioctls
+do not call the "pan_idle" function
+
+Signed-off-by: Naseer Ahmed <naseer@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_fb.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_fb.c b/drivers/video/msm/mdss/mdss_fb.c
+index bb3b628..f5e4010 100644
+--- a/drivers/video/msm/mdss/mdss_fb.c
++++ b/drivers/video/msm/mdss/mdss_fb.c
+@@ -1970,7 +1970,7 @@ static int mdss_fb_ioctl(struct fb_info *info, unsigned int cmd,
+ 		return -EINVAL;
+ 	mfd = (struct msm_fb_data_type *)info->par;
+ 	mdss_fb_power_setting_idle(mfd);
+-	if (cmd != MSMFB_VSYNC_CTRL)
++	if (cmd != MSMFB_VSYNC_CTRL && cmd != MSMFB_OVERLAY_VSYNC_CTRL)
+ 		mdss_fb_pan_idle(mfd);
+ 
+ 	switch (cmd) {
+-- 
+1.7.9.5
+

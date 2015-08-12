@@ -1,0 +1,27 @@
+From 7088545bb9709f874b2187169c33a42414d9123e Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 18 Nov 2013 09:00:33 +0100
+Subject: [PATCH 301/338] defconfig: add '-Bricked' to localversion
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index df88d59..5f6eb50 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -41,7 +41,7 @@ CONFIG_IRQ_WORK=y
+ CONFIG_EXPERIMENTAL=y
+ CONFIG_INIT_ENV_ARG_LIMIT=32
+ CONFIG_CROSS_COMPILE=""
+-CONFIG_LOCALVERSION=""
++CONFIG_LOCALVERSION="-Bricked"
+ CONFIG_LOCALVERSION_AUTO=y
+ CONFIG_HAVE_KERNEL_GZIP=y
+ CONFIG_HAVE_KERNEL_LZMA=y
+-- 
+1.7.9.5
+

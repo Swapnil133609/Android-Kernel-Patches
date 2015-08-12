@@ -1,0 +1,45 @@
+From bf6adc6538ad8f125f57c09a23131008385eaf45 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 6 Nov 2013 01:42:50 +0100
+Subject: [PATCH 197/338] defconfig: build tun&bcmdhd&cifs as modules
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index 53f3afc..262ca17 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -1415,7 +1415,7 @@ CONFIG_MII=y
+ # CONFIG_NETCONSOLE is not set
+ # CONFIG_NETPOLL is not set
+ # CONFIG_NET_POLL_CONTROLLER is not set
+-CONFIG_TUN=y
++CONFIG_TUN=m
+ # CONFIG_VETH is not set
+ 
+ #
+@@ -1507,7 +1507,7 @@ CONFIG_WLAN=y
+ # CONFIG_ATH6K_LEGACY_EXT is not set
+ # CONFIG_WCNSS_CORE is not set
+ # CONFIG_ATH_COMMON is not set
+-CONFIG_BCMDHD=y
++CONFIG_BCMDHD=m
+ CONFIG_BCM4339=y
+ CONFIG_BCMDHD_FW_PATH="/vendor/firmware/fw_bcmdhd.bin"
+ CONFIG_BCMDHD_NVRAM_PATH="/etc/wifi/bcmdhd.cal"
+@@ -3145,7 +3145,7 @@ CONFIG_NETWORK_FILESYSTEMS=y
+ # CONFIG_NFS_FS is not set
+ # CONFIG_NFSD is not set
+ # CONFIG_CEPH_FS is not set
+-CONFIG_CIFS=y
++CONFIG_CIFS=m
+ # CONFIG_CIFS_STATS is not set
+ # CONFIG_CIFS_WEAK_PW_HASH is not set
+ # CONFIG_CIFS_UPCALL is not set
+-- 
+1.7.9.5
+

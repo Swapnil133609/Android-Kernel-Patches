@@ -1,0 +1,47 @@
+From 3218eb247ed6b6fa7cfb518d943b499353e8ee44 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 11 Nov 2013 00:31:51 +0100
+Subject: [PATCH 234/338] msm_mpdecision: move startdelay to init to save
+ cycles on each work call
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 8bdf3dc..214ed40 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -203,8 +203,6 @@ static int mp_decision(void) {
+ 		return MSM_MPDEC_DISABLED;
+ 
+ 	current_time = ktime_to_ms(ktime_get());
+-	if (current_time <= msm_mpdec_tuners_ins.startdelay)
+-		return MSM_MPDEC_IDLE;
+ 
+ 	if (first_call) {
+ 		first_call = false;
+@@ -255,9 +253,6 @@ static int mp_decision(void) {
+ static void msm_mpdec_work_thread(struct work_struct *work) {
+ 	unsigned int cpu = nr_cpu_ids;
+ 
+-	if (ktime_to_ms(ktime_get()) <= msm_mpdec_tuners_ins.startdelay)
+-		goto out;
+-
+ 	/* Check if we are paused */
+ 	if (mpdec_paused_until >= ktime_to_ms(ktime_get()))
+ 		goto out;
+@@ -1167,7 +1162,7 @@ static int __init msm_mpdec_init(void) {
+ 
+ 	if (state != MSM_MPDEC_DISABLED)
+ 		queue_delayed_work(msm_mpdec_workq, &msm_mpdec_work,
+-					msecs_to_jiffies(msm_mpdec_tuners_ins.delay));
++					msecs_to_jiffies(msm_mpdec_tuners_ins.startdelay));
+ 
+ 	msm_mpdec_kobject = kobject_create_and_add("msm_mpdecision", kernel_kobj);
+ 	if (msm_mpdec_kobject) {
+-- 
+1.7.9.5
+

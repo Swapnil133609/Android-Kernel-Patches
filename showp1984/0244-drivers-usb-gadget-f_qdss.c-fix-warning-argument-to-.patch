@@ -1,0 +1,38 @@
+From 101ab5d60c538a967550d14f50d8fd0e0a9fb1fc Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 11 Nov 2013 01:22:19 +0100
+Subject: [PATCH 244/338] drivers/usb/gadget/f_qdss.c: fix: warning: argument
+ to 'sizeof' in 'strncmp' call is the same
+ expression as the second source
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/usb/gadget/f_qdss.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/usb/gadget/f_qdss.c b/drivers/usb/gadget/f_qdss.c
+index cece500..c90f0d8 100644
+--- a/drivers/usb/gadget/f_qdss.c
++++ b/drivers/usb/gadget/f_qdss.c
+@@ -596,7 +596,7 @@ static int qdss_bind_config(struct usb_configuration *c, const char *name)
+ 
+ 	spin_lock_irqsave(&d_lock, flags);
+ 	list_for_each_entry(ch, &usb_qdss_ch_list, list) {
+-		if (!strncmp(name, ch->name, sizeof(ch->name))) {
++		if (!strncmp(name, ch->name, sizeof(*ch->name))) {
+ 			found = 1;
+ 			break;
+ 		}
+@@ -752,7 +752,7 @@ struct usb_qdss_ch *usb_qdss_open(const char *name, void *priv,
+ 	spin_lock_irqsave(&d_lock, flags);
+ 	/* Check if we already have a channel with this name */
+ 	list_for_each_entry(ch, &usb_qdss_ch_list, list) {
+-		if (!strncmp(name, ch->name, sizeof(ch->name))) {
++		if (!strncmp(name, ch->name, sizeof(*ch->name))) {
+ 			found = 1;
+ 			break;
+ 		}
+-- 
+1.7.9.5
+

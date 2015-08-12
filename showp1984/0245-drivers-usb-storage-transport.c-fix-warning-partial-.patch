@@ -1,0 +1,38 @@
+From 8ed05cc913808cbabc49611187045f64248f06b0 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 11 Nov 2013 01:23:38 +0100
+Subject: [PATCH 245/338] drivers/usb/storage/transport.c: fix: warning:
+ 'partial' may be used uninitialized in this
+ function
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/usb/storage/transport.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/usb/storage/transport.c b/drivers/usb/storage/transport.c
+index c70109e..32a21c0 100644
+--- a/drivers/usb/storage/transport.c
++++ b/drivers/usb/storage/transport.c
+@@ -467,7 +467,7 @@ static int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
+ int usb_stor_bulk_srb(struct us_data* us, unsigned int pipe,
+ 		      struct scsi_cmnd* srb)
+ {
+-	unsigned int partial;
++	unsigned int partial = 0;
+ 	int result = usb_stor_bulk_transfer_sglist(us, pipe, scsi_sglist(srb),
+ 				      scsi_sg_count(srb), scsi_bufflen(srb),
+ 				      &partial);
+@@ -490,7 +490,7 @@ int usb_stor_bulk_transfer_sg(struct us_data* us, unsigned int pipe,
+ 		void *buf, unsigned int length_left, int use_sg, int *residual)
+ {
+ 	int result;
+-	unsigned int partial;
++	unsigned int partial = 0;
+ 
+ 	/* are we scatter-gathering? */
+ 	if (use_sg) {
+-- 
+1.7.9.5
+

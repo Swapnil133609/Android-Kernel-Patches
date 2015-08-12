@@ -1,0 +1,31 @@
+From a681d422f8f4ec1d316779e3a0b454987d6246f1 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 8 May 2013 22:46:56 +0200
+Subject: [PATCH 184/338] msm_mpdecision: increasing the check delay to 130ms
+ This change brings us down from 10 to 8 checks each
+ second. The input boost reacts without delay which
+ is why we don't need to check for hotplugs so often
+ anymore.
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 9a96c76..b92506d 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -43,7 +43,7 @@
+ 
+ #define MPDEC_TAG                       "[MPDEC]: "
+ #define MSM_MPDEC_STARTDELAY            20000
+-#define MSM_MPDEC_DELAY                 100
++#define MSM_MPDEC_DELAY                 130
+ #define MSM_MPDEC_PAUSE                 10000
+ #define MSM_MPDEC_IDLE_FREQ             486000
+ #ifdef CONFIG_MSM_MPDEC_INPUTBOOST_CPUMIN
+-- 
+1.7.9.5
+

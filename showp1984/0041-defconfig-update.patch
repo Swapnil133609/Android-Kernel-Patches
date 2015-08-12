@@ -1,0 +1,103 @@
+From ceaf2e86869095d2480248d424d78f4b6c40a3c8 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 5 Nov 2013 17:10:28 +0100
+Subject: [PATCH 041/338] defconfig: update
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |   16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index 5844d7f..4f1a1d9 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -160,6 +160,7 @@ CONFIG_PROFILING=y
+ CONFIG_TRACEPOINTS=y
+ # CONFIG_OPROFILE is not set
+ CONFIG_HAVE_OPROFILE=y
++# CONFIG_KPROBES is not set
+ # CONFIG_JUMP_LABEL is not set
+ CONFIG_HAVE_KPROBES=y
+ CONFIG_HAVE_KRETPROBES=y
+@@ -179,7 +180,11 @@ CONFIG_HAVE_ARCH_JUMP_LABEL=y
+ CONFIG_HAVE_GENERIC_DMA_COHERENT=y
+ CONFIG_RT_MUTEXES=y
+ CONFIG_BASE_SMALL=0
+-# CONFIG_MODULES is not set
++CONFIG_MODULES=y
++# CONFIG_MODULE_FORCE_LOAD is not set
++# CONFIG_MODULE_UNLOAD is not set
++CONFIG_MODVERSIONS=y
++# CONFIG_MODULE_SRCVERSION_ALL is not set
+ CONFIG_STOP_MACHINE=y
+ CONFIG_BLOCK=y
+ CONFIG_LBDAF=y
+@@ -1125,6 +1130,7 @@ CONFIG_XPS=y
+ # CONFIG_NETPRIO_CGROUP is not set
+ CONFIG_BQL=y
+ CONFIG_HAVE_BPF_JIT=y
++# CONFIG_BPF_JIT is not set
+ 
+ #
+ # Network testing
+@@ -1351,6 +1357,7 @@ CONFIG_SCSI_MULTI_LUN=y
+ CONFIG_SCSI_CONSTANTS=y
+ CONFIG_SCSI_LOGGING=y
+ CONFIG_SCSI_SCAN_ASYNC=y
++CONFIG_SCSI_WAIT_SCAN=m
+ 
+ #
+ # SCSI Transports
+@@ -1740,6 +1747,7 @@ CONFIG_I2C_QUP=y
+ #
+ # Other I2C/SMBus bus drivers
+ #
++# CONFIG_I2C_STUB is not set
+ # CONFIG_I2C_DEBUG_CORE is not set
+ # CONFIG_I2C_DEBUG_ALGO is not set
+ # CONFIG_I2C_DEBUG_BUS is not set
+@@ -2136,6 +2144,7 @@ CONFIG_MSMB_JPEG=y
+ CONFIG_MSM_VIDC_V4L2=y
+ # CONFIG_MSM_WFD is not set
+ CONFIG_MSM_VCAP=y
++# CONFIG_MEDIA_ATTACH is not set
+ CONFIG_MEDIA_TUNER=y
+ CONFIG_MEDIA_TUNER_CUSTOMISE=y
+ 
+@@ -2965,12 +2974,15 @@ CONFIG_STAGING=y
+ # CONFIG_PRISM2_USB is not set
+ # CONFIG_ECHO is not set
+ # CONFIG_ASUS_OLED is not set
++# CONFIG_RTLLIB is not set
+ # CONFIG_R8712U is not set
+ # CONFIG_RTS5139 is not set
+ # CONFIG_TRANZPORT is not set
+ # CONFIG_LINE6_USB is not set
++# CONFIG_VT6656 is not set
+ # CONFIG_IIO is not set
+ # CONFIG_FB_SM7XX is not set
++# CONFIG_USB_ENESTORAGE is not set
+ # CONFIG_BCM_WIMAX is not set
+ # CONFIG_FT1000 is not set
+ 
+@@ -3284,6 +3296,7 @@ CONFIG_OLD_MCOUNT=y
+ # CONFIG_DEBUG_USER is not set
+ # CONFIG_DEBUG_LL is not set
+ CONFIG_PID_IN_CONTEXTIDR=y
++# CONFIG_DEBUG_SET_MODULE_RONX is not set
+ 
+ #
+ # Security options
+@@ -3338,6 +3351,7 @@ CONFIG_CRYPTO_NULL=y
+ CONFIG_CRYPTO_WORKQUEUE=y
+ # CONFIG_CRYPTO_CRYPTD is not set
+ CONFIG_CRYPTO_AUTHENC=y
++# CONFIG_CRYPTO_TEST is not set
+ 
+ #
+ # Authenticated Encryption with Associated Data
+-- 
+1.7.9.5
+

@@ -1,0 +1,36 @@
+From 19d211a0af341c4c576fb83980971845e8503286 Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Fri, 22 Jun 2012 06:06:24 +0200
+Subject: [PATCH 093/338] mach-msm: mpdecision: don't start immediately
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 5103fe0..9502f32 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -33,6 +33,7 @@
+ #include <linux/delay.h>
+ 
+ #define MPDEC_TAG "[MPDEC]: "
++#define MSM_MPDEC_STARTDELAY 40000
+ #define MSM_MPDEC_DELAY 500
+ #define MSM_MPDEC_CPU_UPDELAY 200
+ #define MSM_MPDEC_CPU_DOWNDELAY 200
+@@ -75,6 +76,9 @@ static int mp_decision(void)
+ 	cputime64_t this_time = 0;
+ 
+ 	current_time = ktime_to_ms(ktime_get());
++	if (current_time <= MSM_MPDEC_STARTDELAY)
++		return MSM_MPDEC_IDLE;
++
+ 	if (first_call) {
+ 		first_call = false;
+ 	} else {
+-- 
+1.7.9.5
+

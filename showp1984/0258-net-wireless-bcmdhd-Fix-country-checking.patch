@@ -1,0 +1,31 @@
+From 4c830560031103005d7b5986fff15b2747735898 Mon Sep 17 00:00:00 2001
+From: Dmitry Shmidt <dimitrysh@google.com>
+Date: Mon, 21 Oct 2013 19:01:31 -0700
+Subject: [PATCH 258/338] net: wireless: bcmdhd: Fix country checking
+
+Bug: 11319610
+
+Change-Id: I5c52ed594614d8039f167de3c98bd9f802b521df
+Signed-off-by: Dmitry Shmidt <dimitrysh@google.com>
+(cherry picked from commit f233ca04fa09cf510e60c5ced95595355a961d25)
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/net/wireless/bcmdhd/wldev_common.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/wireless/bcmdhd/wldev_common.c b/drivers/net/wireless/bcmdhd/wldev_common.c
+index 361235b..c900493 100644
+--- a/drivers/net/wireless/bcmdhd/wldev_common.c
++++ b/drivers/net/wireless/bcmdhd/wldev_common.c
+@@ -354,7 +354,7 @@ int wldev_set_country(
+ 	}
+ 
+ 	if ((error < 0) ||
+-	    (strncmp(country_code, cspec.ccode, WLC_CNTRY_BUF_SZ) != 0)) {
++	    (strncmp(country_code, cspec.country_abbrev, WLC_CNTRY_BUF_SZ) != 0)) {
+ 
+ 		if (user_enforced) {
+ 			bzero(&scbval, sizeof(scb_val_t));
+-- 
+1.7.9.5
+

@@ -1,0 +1,141 @@
+From 6528532a2aec4db145077fc627671719014a494b Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Thu, 14 Nov 2013 16:04:23 +0100
+Subject: [PATCH 269/338] acpu: fix under/over-volting and under clock voltage
+ on lower pvs ids
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/boot/dts/msm8974-regulator.dtsi |    8 ++++----
+ arch/arm/mach-msm/acpuclock-8974.c       |   30 +++++++++++++++---------------
+ arch/arm/mach-msm/acpuclock-krait.c      |    4 ++--
+ 3 files changed, 21 insertions(+), 21 deletions(-)
+
+diff --git a/arch/arm/boot/dts/msm8974-regulator.dtsi b/arch/arm/boot/dts/msm8974-regulator.dtsi
+index 9de41f4..6a38980 100644
+--- a/arch/arm/boot/dts/msm8974-regulator.dtsi
++++ b/arch/arm/boot/dts/msm8974-regulator.dtsi
+@@ -477,7 +477,7 @@
+ 				<0xf908a800 0x1000>; /* APCS_ALIAS0_KPSS_MDD */
+ 			reg-names = "acs", "mdd";
+ 			regulator-min-microvolt = <500000>;
+-			regulator-max-microvolt = <1100000>;
++			regulator-max-microvolt = <1200000>;
+ 			qcom,headroom-voltage = <150000>;
+ 			qcom,retention-voltage = <675000>;
+ 			qcom,ldo-default-voltage = <750000>;
+@@ -493,7 +493,7 @@
+ 				<0xf909a800 0x1000>; /* APCS_ALIAS1_KPSS_MDD */
+ 			reg-names = "acs", "mdd";
+ 			regulator-min-microvolt = <500000>;
+-			regulator-max-microvolt = <1100000>;
++			regulator-max-microvolt = <1200000>;
+ 			qcom,headroom-voltage = <150000>;
+ 			qcom,retention-voltage = <675000>;
+ 			qcom,ldo-default-voltage = <750000>;
+@@ -509,7 +509,7 @@
+ 				<0xf90aa800 0x1000>; /* APCS_ALIAS2_KPSS_MDD */
+ 			reg-names = "acs", "mdd";
+ 			regulator-min-microvolt = <500000>;
+-			regulator-max-microvolt = <1100000>;
++			regulator-max-microvolt = <1200000>;
+ 			qcom,headroom-voltage = <150000>;
+ 			qcom,retention-voltage = <675000>;
+ 			qcom,ldo-default-voltage = <750000>;
+@@ -525,7 +525,7 @@
+ 				<0xf90ba800 0x1000>; /* APCS_ALIAS3_KPSS_MDD */
+ 			reg-names = "acs", "mdd";
+ 			regulator-min-microvolt = <500000>;
+-			regulator-max-microvolt = <1100000>;
++			regulator-max-microvolt = <1200000>;
+ 			qcom,headroom-voltage = <150000>;
+ 			qcom,retention-voltage = <675000>;
+ 			qcom,ldo-default-voltage = <750000>;
+diff --git a/arch/arm/mach-msm/acpuclock-8974.c b/arch/arm/mach-msm/acpuclock-8974.c
+index d6d9a9a..c816817 100644
+--- a/arch/arm/mach-msm/acpuclock-8974.c
++++ b/arch/arm/mach-msm/acpuclock-8974.c
+@@ -782,9 +782,9 @@ static struct acpu_level acpu_freq_tbl_2p3g_pvs1[] __initdata = {
+ 
+ static struct acpu_level acpu_freq_tbl_2p3g_pvs2[] __initdata = {
+ #ifdef CONFIG_CPU_UNDERCLOCK
+-	{ 1, {   96000, HFPLL, 2,  10 },  L2(0),  800000,   1 },
+-	{ 1, {  192000, HFPLL, 2,  20 },  L2(0),  800000,   1 },
+-	{ 1, {  249600, HFPLL, 2,  26 },  L2(0),  800000,   1 },
++	{ 1, {   96000, HFPLL, 2,  10 },  L2(0),  775000,   1 },
++	{ 1, {  192000, HFPLL, 2,  20 },  L2(0),  775000,   1 },
++	{ 1, {  249600, HFPLL, 2,  26 },  L2(0),  775000,   1 },
+ #endif
+ 	{ 1, {  300000, PLL_0, 0,   0 },  L2(0),  775000,  72 },
+ 	{ 0, {  345600, HFPLL, 2,  36 },  L2(1),  775000,  83 },
+@@ -823,9 +823,9 @@ static struct acpu_level acpu_freq_tbl_2p3g_pvs2[] __initdata = {
+ 
+ static struct acpu_level acpu_freq_tbl_2p3g_pvs3[] __initdata = {
+ #ifdef CONFIG_CPU_UNDERCLOCK
+-	{ 1, {   96000, HFPLL, 2,  10 },  L2(0),  800000,   1 },
+-	{ 1, {  192000, HFPLL, 2,  20 },  L2(0),  800000,   1 },
+-	{ 1, {  249600, HFPLL, 2,  26 },  L2(0),  800000,   1 },
++	{ 1, {   96000, HFPLL, 2,  10 },  L2(0),  775000,   1 },
++	{ 1, {  192000, HFPLL, 2,  20 },  L2(0),  775000,   1 },
++	{ 1, {  249600, HFPLL, 2,  26 },  L2(0),  775000,   1 },
+ #endif
+ 	{ 1, {  300000, PLL_0, 0,   0 },  L2(0),  775000,  72 },
+ 	{ 0, {  345600, HFPLL, 2,  36 },  L2(1),  775000,  83 },
+@@ -864,9 +864,9 @@ static struct acpu_level acpu_freq_tbl_2p3g_pvs3[] __initdata = {
+ 
+ static struct acpu_level acpu_freq_tbl_2p3g_pvs4[] __initdata = {
+ #ifdef CONFIG_CPU_UNDERCLOCK
+-	{ 1, {   96000, HFPLL, 2,  10 },  L2(0),  800000,   1 },
+-	{ 1, {  192000, HFPLL, 2,  20 },  L2(0),  800000,   1 },
+-	{ 1, {  249600, HFPLL, 2,  26 },  L2(0),  800000,   1 },
++	{ 1, {   96000, HFPLL, 2,  10 },  L2(0),  775000,   1 },
++	{ 1, {  192000, HFPLL, 2,  20 },  L2(0),  775000,   1 },
++	{ 1, {  249600, HFPLL, 2,  26 },  L2(0),  775000,   1 },
+ #endif
+ 	{ 1, {  300000, PLL_0, 0,   0 },  L2(0),  775000,  72 },
+ 	{ 0, {  345600, HFPLL, 2,  36 },  L2(1),  775000,  83 },
+@@ -905,9 +905,9 @@ static struct acpu_level acpu_freq_tbl_2p3g_pvs4[] __initdata = {
+ 
+ static struct acpu_level acpu_freq_tbl_2p3g_pvs5[] __initdata = {
+ #ifdef CONFIG_CPU_UNDERCLOCK
+-	{ 1, {   96000, HFPLL, 2,  10 },  L2(0),  800000,   1 },
+-	{ 1, {  192000, HFPLL, 2,  20 },  L2(0),  800000,   1 },
+-	{ 1, {  249600, HFPLL, 2,  26 },  L2(0),  800000,   1 },
++	{ 1, {   96000, HFPLL, 2,  10 },  L2(0),  750000,   1 },
++	{ 1, {  192000, HFPLL, 2,  20 },  L2(0),  750000,   1 },
++	{ 1, {  249600, HFPLL, 2,  26 },  L2(0),  750000,   1 },
+ #endif
+ 	{ 1, {  300000, PLL_0, 0,   0 },  L2(0),  750000,  72 },
+ 	{ 0, {  345600, HFPLL, 2,  36 },  L2(1),  750000,  83 },
+@@ -946,9 +946,9 @@ static struct acpu_level acpu_freq_tbl_2p3g_pvs5[] __initdata = {
+ 
+ static struct acpu_level acpu_freq_tbl_2p3g_pvs6[] __initdata = {
+ #ifdef CONFIG_CPU_UNDERCLOCK
+-	{ 1, {   96000, HFPLL, 2,  10 },  L2(0),  800000,   1 },
+-	{ 1, {  192000, HFPLL, 2,  20 },  L2(0),  800000,   1 },
+-	{ 1, {  249600, HFPLL, 2,  26 },  L2(0),  800000,   1 },
++	{ 1, {   96000, HFPLL, 2,  10 },  L2(0),  750000,   1 },
++	{ 1, {  192000, HFPLL, 2,  20 },  L2(0),  750000,   1 },
++	{ 1, {  249600, HFPLL, 2,  26 },  L2(0),  750000,   1 },
+ #endif
+ 	{ 1, {  300000, PLL_0, 0,   0 },  L2(0),  750000,  72 },
+ 	{ 0, {  345600, HFPLL, 2,  36 },  L2(1),  750000,  83 },
+diff --git a/arch/arm/mach-msm/acpuclock-krait.c b/arch/arm/mach-msm/acpuclock-krait.c
+index 6d693cd..9c3bb5d 100644
+--- a/arch/arm/mach-msm/acpuclock-krait.c
++++ b/arch/arm/mach-msm/acpuclock-krait.c
+@@ -947,8 +947,8 @@ static void __init bus_init(const struct l2_level *l2_level)
+ 
+ #ifdef CONFIG_CPU_VOLTAGE_TABLE
+ 
+-#define HFPLL_MIN_VDD		 800000
+-#define HFPLL_MAX_VDD		1350000
++#define HFPLL_MIN_VDD		 500000
++#define HFPLL_MAX_VDD		1200000
+ 
+ ssize_t acpuclk_get_vdd_levels_str(char *buf) {
+ 
+-- 
+1.7.9.5
+

@@ -1,0 +1,49 @@
+From 976166104aea187dc8993e8cb478107d41585b89 Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Thu, 21 Jun 2012 12:51:35 +0200
+Subject: [PATCH 088/338] mach-msm: mpdecision: small cleanup
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |   10 ----------
+ 1 file changed, 10 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 5d02b97..c80c699 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -34,9 +34,7 @@
+ 
+ #define MPDEC_TAG "[MPDEC]: "
+ 
+-#ifdef CONFIG_SMP
+ static struct workqueue_struct *msm_mpdec_wq;
+-#endif
+ 
+ struct msm_mpdec_suspend_t {
+ 	struct mutex suspend_mutex;
+@@ -84,20 +82,12 @@ static struct early_suspend msm_mpdec_early_suspend_handler = {
+ static int __init msm_mpdec(void)
+ {
+ 	int cpu, err = 0;
+-#if 0
+-	err = sysfs_create_file(&cpu_sysdev_class.kset.kobj,
+-			&attr_mfreq.attr);
+-	if (err)
+-		pr_err("Failed to create sysfs mfreq\n");
+-#endif
+ 	for_each_possible_cpu(cpu) {
+ 		mutex_init(&(per_cpu(msm_mpdec_suspend, cpu).suspend_mutex));
+ 		per_cpu(msm_mpdec_suspend, cpu).device_suspended = false;
+ 	}
+ 
+-#ifdef CONFIG_SMP
+ 	msm_mpdec_wq = create_workqueue("msm-mpdec");
+-#endif
+ 
+ 	register_early_suspend(&msm_mpdec_early_suspend_handler);
+ 
+-- 
+1.7.9.5
+

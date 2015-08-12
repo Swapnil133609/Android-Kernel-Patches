@@ -1,0 +1,33 @@
+From 66ad946d19b31c54540723a273c98fcfc5f986ea Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sun, 12 May 2013 00:50:32 +0200
+Subject: [PATCH 188/338] msm_mpdecision: fix changing boost freq sets min =
+ boost freq
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 1742cc4..521939b 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -951,7 +951,13 @@ static ssize_t store_boost_freqs(struct kobject *a, struct attribute *b,
+         }
+     }
+     sscanf(chz, "%lu", &hz);
++
++    /* if this cpu is currently boosted, unboost */
++    unboost_cpu(cpu);
++
++    /* update boost freq */
+     per_cpu(msm_mpdec_cpudata, cpu).boost_freq = hz;
++
+     return count;
+ }
+ define_one_global_rw(boost_freqs);
+-- 
+1.7.9.5
+

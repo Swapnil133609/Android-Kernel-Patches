@@ -1,0 +1,29 @@
+From c50426b20af111d9f7ac021b8448e33c7b2e6103 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 04:17:19 +0100
+Subject: [PATCH 062/338] drivers/media/common/tuners/xc5000: fix 'warning:
+ 'adc_envelope' may be used uninitialized in this
+ function'
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/media/common/tuners/xc5000.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/media/common/tuners/xc5000.c b/drivers/media/common/tuners/xc5000.c
+index 5745dc5..e6c8ece 100644
+--- a/drivers/media/common/tuners/xc5000.c
++++ b/drivers/media/common/tuners/xc5000.c
+@@ -641,7 +641,7 @@ out:
+ 
+ static void xc_debug_dump(struct xc5000_priv *priv)
+ {
+-	u16 adc_envelope;
++	u16 adc_envelope = 0;
+ 	u32 freq_error_hz = 0;
+ 	u16 lock_status = 0;
+ 	u32 hsync_freq_hz = 0;
+-- 
+1.7.9.5
+

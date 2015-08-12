@@ -1,0 +1,46 @@
+From c3625e7abe9426ab6c0d7dd2119c30544806d94e Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 04:08:09 +0100
+Subject: [PATCH 057/338] fs/jbd2/journal: fix: 'warning: 'blocknr' may be
+ used uninitialized in this function'
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ fs/jbd2/journal.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/fs/jbd2/journal.c b/fs/jbd2/journal.c
+index 1afb701..2791a22 100644
+--- a/fs/jbd2/journal.c
++++ b/fs/jbd2/journal.c
+@@ -667,7 +667,7 @@ int jbd2_log_wait_commit(journal_t *journal, tid_t tid)
+ 
+ int jbd2_journal_next_log_block(journal_t *journal, unsigned long long *retp)
+ {
+-	unsigned long blocknr;
++	unsigned long blocknr = 0;
+ 
+ 	write_lock(&journal->j_state_lock);
+ 	J_ASSERT(journal->j_free > 1);
+@@ -724,7 +724,7 @@ int jbd2_journal_bmap(journal_t *journal, unsigned long blocknr,
+ struct journal_head *jbd2_journal_get_descriptor_buffer(journal_t *journal)
+ {
+ 	struct buffer_head *bh;
+-	unsigned long long blocknr;
++	unsigned long long blocknr = 0;
+ 	int err;
+ 
+ 	err = jbd2_journal_next_log_block(journal, &blocknr);
+@@ -1098,7 +1098,7 @@ journal_t * jbd2_journal_init_inode (struct inode *inode)
+ 	char *p;
+ 	int err;
+ 	int n;
+-	unsigned long long blocknr;
++	unsigned long long blocknr = 0;
+ 
+ 	if (!journal)
+ 		return NULL;
+-- 
+1.7.9.5
+

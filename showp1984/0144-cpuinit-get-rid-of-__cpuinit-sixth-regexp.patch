@@ -1,0 +1,110 @@
+From ad92e58eacda7d6106d2ef9e867b2f50be1a3926 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 5 Nov 2013 19:45:01 +0100
+Subject: [PATCH 144/338] cpuinit: get rid of __cpuinit, sixth regexp This
+ commit is the result of:
+
+find -name "*.c" | xargs sed -i "s/^__cpuinit //g"
+
+Signed-off-by: Arjan van de Ven <arjan@linux.intel.com>
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/mips/kernel/cpu-probe.c          |    4 ++--
+ arch/mips/kernel/smp.c                |    2 +-
+ arch/mips/kernel/watch.c              |    2 +-
+ arch/x86/kernel/apic/apic.c           |    2 +-
+ arch/x86/kernel/cpu/intel_cacheinfo.c |    2 +-
+ arch/x86/kernel/tsc.c                 |    2 +-
+ 6 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/arch/mips/kernel/cpu-probe.c b/arch/mips/kernel/cpu-probe.c
+index 914df7a..08564dd 100644
+--- a/arch/mips/kernel/cpu-probe.c
++++ b/arch/mips/kernel/cpu-probe.c
+@@ -1093,7 +1093,7 @@ EXPORT_SYMBOL(__ua_limit);
+ const char *__cpu_name[NR_CPUS];
+ const char *__elf_platform;
+ 
+-__cpuinit void cpu_probe(void)
++void cpu_probe(void)
+ {
+ 	struct cpuinfo_mips *c = &current_cpu_data;
+ 	unsigned int cpu = smp_processor_id();
+@@ -1177,7 +1177,7 @@ __cpuinit void cpu_probe(void)
+ #endif
+ }
+ 
+-__cpuinit void cpu_report(void)
++void cpu_report(void)
+ {
+ 	struct cpuinfo_mips *c = &current_cpu_data;
+ 
+diff --git a/arch/mips/kernel/smp.c b/arch/mips/kernel/smp.c
+index cd5f86d..6e2e5bf 100644
+--- a/arch/mips/kernel/smp.c
++++ b/arch/mips/kernel/smp.c
+@@ -84,7 +84,7 @@ static inline void set_cpu_sibling_map(int cpu)
+ 
+ struct plat_smp_ops *mp_ops;
+ 
+-__cpuinit void register_smp_ops(struct plat_smp_ops *ops)
++void register_smp_ops(struct plat_smp_ops *ops)
+ {
+ 	if (mp_ops)
+ 		printk(KERN_WARNING "Overriding previously set SMP ops\n");
+diff --git a/arch/mips/kernel/watch.c b/arch/mips/kernel/watch.c
+index c154069..63ddb10 100644
+--- a/arch/mips/kernel/watch.c
++++ b/arch/mips/kernel/watch.c
+@@ -100,7 +100,7 @@ void mips_clear_watch_registers(void)
+ 	}
+ }
+ 
+-__cpuinit void mips_probe_watch_registers(struct cpuinfo_mips *c)
++void mips_probe_watch_registers(struct cpuinfo_mips *c)
+ {
+ 	unsigned int t;
+ 
+diff --git a/arch/x86/kernel/apic/apic.c b/arch/x86/kernel/apic/apic.c
+index 774c0b2..d28b9f0 100644
+--- a/arch/x86/kernel/apic/apic.c
++++ b/arch/x86/kernel/apic/apic.c
+@@ -2372,7 +2372,7 @@ static void dmi_check_multi(void)
+  * multi-chassis.
+  * Use DMI to check them
+  */
+-__cpuinit int apic_is_clustered_box(void)
++int apic_is_clustered_box(void)
+ {
+ 	dmi_check_multi();
+ 	if (multi)
+diff --git a/arch/x86/kernel/cpu/intel_cacheinfo.c b/arch/x86/kernel/cpu/intel_cacheinfo.c
+index ab131f2..a70ccce 100644
+--- a/arch/x86/kernel/cpu/intel_cacheinfo.c
++++ b/arch/x86/kernel/cpu/intel_cacheinfo.c
+@@ -529,7 +529,7 @@ static struct _cache_attr subcaches =
+ #endif /* CONFIG_AMD_NB */
+ 
+ static int
+-__cpuinit cpuid4_cache_lookup_regs(int index,
++cpuid4_cache_lookup_regs(int index,
+ 				   struct _cpuid4_info_regs *this_leaf)
+ {
+ 	union _cpuid4_leaf_eax	eax;
+diff --git a/arch/x86/kernel/tsc.c b/arch/x86/kernel/tsc.c
+index ac5fff3..d3dc60f 100644
+--- a/arch/x86/kernel/tsc.c
++++ b/arch/x86/kernel/tsc.c
+@@ -818,7 +818,7 @@ static void __init check_system_tsc_reliable(void)
+  * Make an educated guess if the TSC is trustworthy and synchronized
+  * over all CPUs.
+  */
+-__cpuinit int unsynchronized_tsc(void)
++int unsynchronized_tsc(void)
+ {
+ 	if (!cpu_has_tsc || tsc_unstable)
+ 		return 1;
+-- 
+1.7.9.5
+

@@ -1,0 +1,44 @@
+From f89eff457734ea336033c0b0b57930023adad67b Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 08:21:53 +0100
+Subject: [PATCH 134/338] msm_mpdecision: add get_rate()
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index cd90c01..b88b0a4 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -33,6 +33,7 @@
+ #include <asm-generic/cputime.h>
+ #include <linux/hrtimer.h>
+ #include <linux/delay.h>
++#include "acpuclock.h"
+ 
+ #define DEBUG 1
+ 
+@@ -83,11 +84,16 @@ static unsigned int NwNs_Threshold[8] = {19, 30, 19, 11, 19, 11, 0, 11};
+ static unsigned int TwTs_Threshold[8] = {140, 0, 140, 190, 140, 190, 0, 190};
+ 
+ extern unsigned int get_rq_info(void);
+-extern unsigned long acpuclk_8x60_get_rate(int);
++extern unsigned long acpuclk_get_rate(int);
+ 
+ unsigned int state = MSM_MPDEC_IDLE;
+ bool was_paused = false;
+ 
++static unsigned long get_rate(int cpu)
++{
++        return acpuclk_get_rate(cpu);
++}
++
+ static int get_slowest_cpu(void)
+ {
+         int i, cpu = 0;
+-- 
+1.7.9.5
+

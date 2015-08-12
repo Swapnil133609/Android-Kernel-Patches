@@ -1,0 +1,48 @@
+From d31f5a554f2012bda451b52db457a7d81e0aba54 Mon Sep 17 00:00:00 2001
+From: Devin Kim <dojip.kim@lge.com>
+Date: Wed, 30 Oct 2013 12:40:50 -0700
+Subject: [PATCH 024/338] arm/dt: hammerhead: Enhance the feedback feeling
+
+Add the braking/driving force feature to enhance the feedback feeling.
+The braking avoid the residual vibration. The driving force enhance
+the feedback feeling
+
+Change-Id: Ibf739296d2ec0e0a88736a6bdb0859637f7e34a2
+Signed-off-by: Devin Kim <dojip.kim@lge.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ .../msm8974-hammerhead-misc.dtsi                   |    3 +++
+ .../msm8974-hammerhead-rev-f.dtsi                  |    3 +++
+ 2 files changed, 6 insertions(+)
+
+diff --git a/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-misc.dtsi b/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-misc.dtsi
+index 4678a8a..3c67862 100644
+--- a/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-misc.dtsi
++++ b/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-misc.dtsi
+@@ -17,6 +17,9 @@
+ 		motor-pwm-gpio = <&msmgpio 27 0x00>;
+ 		motor-amp = <63>;
+ 		n-value = <127>;
++		vibe-braking-gain = <100>;
++		vibe-braking-ms = <15>;
++		vibe-driving-ms = <20>;
+ 	};
+ 
+ 	earjack-debugger {
+diff --git a/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-rev-f.dtsi b/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-rev-f.dtsi
+index c736cdb..fccb345 100644
+--- a/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-rev-f.dtsi
++++ b/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead-rev-f.dtsi
+@@ -62,6 +62,9 @@
+ 
+ 	vibrator {
+ 		motor-amp = <50>;
++		vibe-braking-gain = <0>;
++		vibe-braking-ms = <0>;
++		vibe-driving-ms = <0>;
+ 	};
+ };
+ 
+-- 
+1.7.9.5
+

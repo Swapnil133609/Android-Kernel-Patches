@@ -1,0 +1,31 @@
+From 4bb9c2331c43d365f73f88b3f2b07cf84123c4de Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Thu, 20 Dec 2012 01:08:18 +0100
+Subject: [PATCH 153/338] mach-msm/cpufreq: set safe frequencies from config
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+
+Conflicts:
+	arch/arm/mach-msm/cpufreq.c
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/cpufreq.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/mach-msm/cpufreq.c b/arch/arm/mach-msm/cpufreq.c
+index 278c753..8c9b53e 100644
+--- a/arch/arm/mach-msm/cpufreq.c
++++ b/arch/arm/mach-msm/cpufreq.c
+@@ -297,6 +297,9 @@ static int msm_cpufreq_init(struct cpufreq_policy *policy)
+ 
+ 	policy->cpuinfo.transition_latency =
+ 		acpuclk_get_switch_time() * NSEC_PER_USEC;
++	/* set safe default min and max speeds */
++	policy->max = CONFIG_MSM_CPU_FREQ_MAX;
++	policy->min = CONFIG_MSM_CPU_FREQ_MIN;
+ 
+ 	cpu_work = &per_cpu(cpufreq_work, policy->cpu);
+ 	INIT_WORK(&cpu_work->work, set_cpu_work);
+-- 
+1.7.9.5
+

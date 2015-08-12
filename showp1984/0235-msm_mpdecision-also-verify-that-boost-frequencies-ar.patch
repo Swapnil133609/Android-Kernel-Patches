@@ -1,0 +1,30 @@
+From 177b1156c601324c580fa47c57ac695ad502ea3f Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 11 Nov 2013 00:41:38 +0100
+Subject: [PATCH 235/338] msm_mpdecision: also verify that boost frequencies
+ are > minfreq
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 214ed40..d641c47 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -409,6 +409,10 @@ static void mpdec_input_callback(struct work_struct *unused) {
+ 				return;
+ 			}
+ 			per_cpu(msm_mpdec_cpudata, cpu).norm_min_freq = cpu_policy->min;
++
++			/* check if boost freq is > minfreq */
++			cpufreq_verify_within_limits(cpu_policy, cpu_policy->min, per_cpu(msm_mpdec_cpudata, cpu).boost_freq);
++
+ 			update_cpu_min_freq(cpu_policy, cpu, per_cpu(msm_mpdec_cpudata, cpu).boost_freq);
+ #if DEBUG
+ 			pr_info(MPDEC_TAG"boosted cpu%i to %lu", cpu, per_cpu(msm_mpdec_cpudata, cpu).boost_freq);
+-- 
+1.7.9.5
+

@@ -1,0 +1,28 @@
+From 2258ca2e6298968387931971462191738c5f1510 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 20 Nov 2013 00:57:52 +0100
+Subject: [PATCH 312/338] sweep2wake: update header information
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/input/sweep2wake.h |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/include/linux/input/sweep2wake.h b/include/linux/input/sweep2wake.h
+index a98bcc0..7c3947c 100644
+--- a/include/linux/input/sweep2wake.h
++++ b/include/linux/input/sweep2wake.h
+@@ -1,7 +1,7 @@
+ /*
+- * include/linux/sweep2wake.h
++ * include/linux/input/sweep2wake.h
+  *
+- * Copyright (c) 2012, Dennis Rassmann <showp1984@gmail.com>
++ * Copyright (c) 2013, Dennis Rassmann <showp1984@gmail.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+-- 
+1.7.9.5
+

@@ -1,0 +1,55 @@
+From fdddd6f0597755ac99ba740a63a0f91590d2fe81 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 04:06:15 +0100
+Subject: [PATCH 056/338] fs/jbd/journal: fix: 'warning: 'blocknr' may be used
+ uninitialized in this function'
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ fs/jbd/journal.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/fs/jbd/journal.c b/fs/jbd/journal.c
+index 0971e92..80552ee 100644
+--- a/fs/jbd/journal.c
++++ b/fs/jbd/journal.c
+@@ -619,7 +619,7 @@ EXPORT_SYMBOL(journal_trans_will_send_data_barrier);
+ 
+ int journal_next_log_block(journal_t *journal, unsigned int *retp)
+ {
+-	unsigned int blocknr;
++	unsigned int blocknr = 0;
+ 
+ 	spin_lock(&journal->j_state_lock);
+ 	J_ASSERT(journal->j_free > 1);
+@@ -680,7 +680,7 @@ int journal_bmap(journal_t *journal, unsigned int blocknr,
+ struct journal_head *journal_get_descriptor_buffer(journal_t *journal)
+ {
+ 	struct buffer_head *bh;
+-	unsigned int blocknr;
++	unsigned int blocknr = 0;
+ 	int err;
+ 
+ 	err = journal_next_log_block(journal, &blocknr);
+@@ -824,7 +824,7 @@ journal_t * journal_init_inode (struct inode *inode)
+ 	journal_t *journal = journal_init_common();
+ 	int err;
+ 	int n;
+-	unsigned int blocknr;
++	unsigned int blocknr = 0;
+ 
+ 	if (!journal)
+ 		return NULL;
+@@ -936,7 +936,7 @@ static int journal_reset(journal_t *journal)
+  **/
+ int journal_create(journal_t *journal)
+ {
+-	unsigned int blocknr;
++	unsigned int blocknr = 0;
+ 	struct buffer_head *bh;
+ 	journal_superblock_t *sb;
+ 	int i, err;
+-- 
+1.7.9.5
+

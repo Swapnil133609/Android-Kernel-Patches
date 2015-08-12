@@ -1,0 +1,29 @@
+From 254ee101fa832d7a0ea34a47595f1eeaae3fe789 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 5 Nov 2013 18:38:12 +0100
+Subject: [PATCH 070/338] fix: arch/arm/mach-msm/clock-generic.c:277:6:
+ warning: 'div' may be used uninitialized in this
+ function
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/clock-generic.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/clock-generic.c b/arch/arm/mach-msm/clock-generic.c
+index 4d74533..be45739 100644
+--- a/arch/arm/mach-msm/clock-generic.c
++++ b/arch/arm/mach-msm/clock-generic.c
+@@ -256,7 +256,7 @@ static long div_round_rate(struct clk *c, unsigned long rate)
+ static int div_set_rate(struct clk *c, unsigned long rate)
+ {
+ 	struct div_clk *d = to_div_clk(c);
+-	int div, rc = 0;
++	int div = 0, rc = 0;
+ 	long rrate, old_prate;
+ 
+ 	rrate = __div_round_rate(c, rate, &div);
+-- 
+1.7.9.5
+

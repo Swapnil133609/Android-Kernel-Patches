@@ -1,0 +1,45 @@
+From 25ab3b01df09a895189459c692569fd75b2f0144 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 08:07:41 +0100
+Subject: [PATCH 130/338] msm_mpdecision: use unique lock names
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index a4f15a3..a6255a4 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -59,7 +59,7 @@ static DEFINE_PER_CPU(struct msm_mpdec_cpudata_t, msm_mpdec_cpudata);
+ 
+ static struct delayed_work msm_mpdec_work;
+ static struct workqueue_struct *msm_mpdec_workq;
+-static DEFINE_MUTEX(msm_cpu_lock);
++static DEFINE_MUTEX(mpdec_msm_cpu_lock);
+ 
+ static struct msm_mpdec_tuners {
+ 	unsigned int startdelay;
+@@ -208,7 +208,7 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 	if (suspended == true)
+ 		goto out;
+ 
+-	if (!mutex_trylock(&msm_cpu_lock))
++	if (!mutex_trylock(&mpdec_msm_cpu_lock))
+ 		goto out;
+ 
+ 	/* if sth messed with the cpus, update the check vars so we can proceed */
+@@ -265,7 +265,7 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 		pr_err(MPDEC_TAG"%s: invalid mpdec hotplug state %d\n",
+ 		       __func__, state);
+ 	}
+-	mutex_unlock(&msm_cpu_lock);
++	mutex_unlock(&mpdec_msm_cpu_lock);
+ 
+ out:
+ 	if (state != MSM_MPDEC_DISABLED)
+-- 
+1.7.9.5
+

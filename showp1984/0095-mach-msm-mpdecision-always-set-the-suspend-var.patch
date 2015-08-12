@@ -1,0 +1,38 @@
+From bd71f75243ecaa6c7b448b327862029e86cb9b2a Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Fri, 22 Jun 2012 06:34:30 +0200
+Subject: [PATCH 095/338] mach-msm: mpdecision: always set the suspend var
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 1944ab6..101b912 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -200,8 +200,8 @@ static void msm_mpdec_early_suspend(struct early_suspend *h)
+ 			pr_info(MPDEC_TAG"Screen -> off. Suspended CPU%d | Mask=[%d%d]\n",
+ 					cpu, cpu_online(0), cpu_online(1));
+ 			per_cpu(msm_mpdec_suspend, cpu).online = false;
+-			per_cpu(msm_mpdec_suspend, cpu).device_suspended = true;
+ 		}
++		per_cpu(msm_mpdec_suspend, cpu).device_suspended = true;
+ 		mutex_unlock(&per_cpu(msm_mpdec_suspend, cpu).suspend_mutex);
+ 	}
+ }
+@@ -219,8 +219,8 @@ static void msm_mpdec_late_resume(struct early_suspend *h)
+ 			pr_info(MPDEC_TAG"Screen -> on. Hot plugged CPU%d | Mask=[%d%d]\n",
+ 					cpu, cpu_online(0), cpu_online(1));
+ 			per_cpu(msm_mpdec_suspend, cpu).online = true;
+-			per_cpu(msm_mpdec_suspend, cpu).device_suspended = false;
+ 		}
++		per_cpu(msm_mpdec_suspend, cpu).device_suspended = false;
+ 		mutex_unlock(&per_cpu(msm_mpdec_suspend, cpu).suspend_mutex);
+ 	}
+ }
+-- 
+1.7.9.5
+

@@ -1,0 +1,30 @@
+From f728201ffe154abaef1f2a2ef26e4ed979f9e954 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 07:19:27 +0100
+Subject: [PATCH 081/338] vfp: compile with neon
+
+Conflicts:
+
+	arch/arm/vfp/Makefile
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/vfp/Makefile |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/vfp/Makefile b/arch/arm/vfp/Makefile
+index a81404c..bec25ae 100644
+--- a/arch/arm/vfp/Makefile
++++ b/arch/arm/vfp/Makefile
+@@ -7,7 +7,7 @@
+ # ccflags-y := -DDEBUG
+ # asflags-y := -DDEBUG
+ 
+-KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=softvfp+vfp -mfloat-abi=soft)
++KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=neon -mfloat-abi=soft)
+ LDFLAGS		+=--no-warn-mismatch
+ 
+ obj-y			+= vfp.o
+-- 
+1.7.9.5
+

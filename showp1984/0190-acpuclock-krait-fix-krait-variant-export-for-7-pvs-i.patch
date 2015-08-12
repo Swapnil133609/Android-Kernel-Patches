@@ -1,0 +1,37 @@
+From 5e1cacf2ea7a0bfc14908838807ffb238bb28a12 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Thu, 19 Sep 2013 00:53:27 +0200
+Subject: [PATCH 190/338] acpuclock-krait: fix krait variant export for 7 pvs
+ ids
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/acpuclock-krait.c |   11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-msm/acpuclock-krait.c b/arch/arm/mach-msm/acpuclock-krait.c
+index a5da1e0..6d693cd 100644
+--- a/arch/arm/mach-msm/acpuclock-krait.c
++++ b/arch/arm/mach-msm/acpuclock-krait.c
+@@ -1275,10 +1275,13 @@ static void __init hw_init(void)
+ static int krait_variant_debugfs_show(struct seq_file *s, void *data)
+ {
+ 	seq_printf(s, "Your krait chip variant is: \n");
+-	seq_printf(s, "[%s] SLOW \n", ((krait_chip_variant == PVS_SLOW) ? "X" : " "));
+-	seq_printf(s, "[%s] NOMINAL \n", ((krait_chip_variant == PVS_NOMINAL) ? "X" : " "));
+-	seq_printf(s, "[%s] FAST \n", ((krait_chip_variant == PVS_FAST) ? "X" : " "));
+-	seq_printf(s, "[%s] FASTER \n", ((krait_chip_variant == PVS_FASTER) ? "X" : " "));
++	seq_printf(s, "[%s] SNAIL \n", ((krait_chip_variant == 0) ? "X" : " "));
++	seq_printf(s, "[%s] SLOWER \n", ((krait_chip_variant == 1) ? "X" : " "));
++	seq_printf(s, "[%s] SLOW \n", ((krait_chip_variant == 2) ? "X" : " "));
++	seq_printf(s, "[%s] NOMINAL \n", ((krait_chip_variant == 3) ? "X" : " "));
++	seq_printf(s, "[%s] FAST \n", ((krait_chip_variant == 4) ? "X" : " "));
++	seq_printf(s, "[%s] FASTER \n", ((krait_chip_variant == 5) ? "X" : " "));
++	seq_printf(s, "[%s] OVER 3000! \n", ((krait_chip_variant == 6) ? "X" : " "));
+ 
+ 	return 0;
+ }
+-- 
+1.7.9.5
+

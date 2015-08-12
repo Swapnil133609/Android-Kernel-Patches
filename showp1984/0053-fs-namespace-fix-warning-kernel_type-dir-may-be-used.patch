@@ -1,0 +1,30 @@
+From 12a6a9b0b896acd9afedc0cc852ed566faed7c35 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 03:52:18 +0100
+Subject: [PATCH 053/338] fs/namespace: fix: 'warning: 'kernel_type/dir' may
+ be used uninitialized in this function'
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ fs/namespace.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/fs/namespace.c b/fs/namespace.c
+index d5ff15b..8df371c 100644
+--- a/fs/namespace.c
++++ b/fs/namespace.c
+@@ -2361,8 +2361,8 @@ SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
+ 		char __user *, type, unsigned long, flags, void __user *, data)
+ {
+ 	int ret;
+-	char *kernel_type;
+-	char *kernel_dir;
++	char *kernel_type = NULL;
++	char *kernel_dir = NULL;
+ 	char *kernel_dev = NULL;
+ 	unsigned long data_page;
+ 
+-- 
+1.7.9.5
+

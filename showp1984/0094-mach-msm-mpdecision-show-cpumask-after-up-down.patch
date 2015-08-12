@@ -1,0 +1,42 @@
+From ca6eb3e2b2a4f0bad9a10dfe5f51cad46bba60bf Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Fri, 22 Jun 2012 06:33:28 +0200
+Subject: [PATCH 094/338] mach-msm: mpdecision: show cpumask after up/down
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 9502f32..1944ab6 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -196,9 +196,9 @@ static void msm_mpdec_early_suspend(struct early_suspend *h)
+ 	for_each_possible_cpu(cpu) {
+ 		mutex_lock(&per_cpu(msm_mpdec_suspend, cpu).suspend_mutex);
+ 		if (((cpu >= (CONFIG_NR_CPUS - 1)) && (num_online_cpus() > 1)) && (scroff_single_core)) {
+-			pr_info(MPDEC_TAG"Screen -> off. Suspending CPU%d | Mask=[%d%d]\n",
+-					cpu, cpu_online(0), cpu_online(1));
+ 			cpu_down(cpu);
++			pr_info(MPDEC_TAG"Screen -> off. Suspended CPU%d | Mask=[%d%d]\n",
++					cpu, cpu_online(0), cpu_online(1));
+ 			per_cpu(msm_mpdec_suspend, cpu).online = false;
+ 			per_cpu(msm_mpdec_suspend, cpu).device_suspended = true;
+ 		}
+@@ -215,9 +215,9 @@ static void msm_mpdec_late_resume(struct early_suspend *h)
+ 			/* Always enable cpus when screen comes online.
+ 			 * This boosts the wakeup process.
+ 			 */
+-			pr_info(MPDEC_TAG"Screen -> on. Hot plugging CPU%d | Mask=[%d%d]\n",
+-					cpu, cpu_online(0), cpu_online(1));
+ 			cpu_up(cpu);
++			pr_info(MPDEC_TAG"Screen -> on. Hot plugged CPU%d | Mask=[%d%d]\n",
++					cpu, cpu_online(0), cpu_online(1));
+ 			per_cpu(msm_mpdec_suspend, cpu).online = true;
+ 			per_cpu(msm_mpdec_suspend, cpu).device_suspended = false;
+ 		}
+-- 
+1.7.9.5
+

@@ -1,0 +1,98 @@
+From 69f4886d6ecf94253654029d70863396c15268a2 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 08:29:54 +0100
+Subject: [PATCH 137/338] msm_mpdecision: fix merge errors
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |   28 +++++++++-------------------
+ 1 file changed, 9 insertions(+), 19 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index b88b0a4..260a342 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -281,7 +281,7 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 
+ out:
+ 	if (state != MSM_MPDEC_DISABLED)
+-		queue_delayed_work(msm_mpdec_suspended_workq, &msm_mpdec_work,
++		queue_delayed_work(msm_mpdec_workq, &msm_mpdec_work,
+ 				msecs_to_jiffies(msm_mpdec_tuners_ins.delay));
+ 	return;
+ }
+@@ -317,7 +317,7 @@ static void msm_mpdec_late_resume(struct early_suspend *h)
+                            msecs_to_jiffies(msm_mpdec_tuners_ins.delay));
+ 
+         pr_info(MPDEC_TAG"Screen -> on. Activated mpdecision. | Mask=[%d%d%d%d]\n",
+-		cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3))
++		cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
+ }
+ 
+ static struct early_suspend msm_mpdec_early_suspend_handler = {
+@@ -487,23 +487,13 @@ static ssize_t store_pause(struct kobject *a, struct attribute *b,
+ static ssize_t store_idle_freq(struct kobject *a, struct attribute *b,
+ 				   const char *buf, size_t count)
+ {
+-	long unsigned int input, check;
++	long unsigned int input;
+ 	int ret;
+ 	ret = sscanf(buf, "%lu", &input);
+ 	if (ret != 1)
+ 		return -EINVAL;
+ 
+-	check = acpu_check_khz_value(input);
+-
+-	if (check == 1) {
+-		msm_mpdec_tuners_ins.idle_freq = input;
+-	}
+-	if (check == 0) {
+-		msm_mpdec_tuners_ins.idle_freq = MSM_MPDEC_IDLE_FREQ;
+-	}
+-	if (check > 1) {
+-		msm_mpdec_tuners_ins.idle_freq = check;
+-	}
++	msm_mpdec_tuners_ins.idle_freq = input;
+ 
+ 	return count;
+ }
+@@ -589,8 +579,8 @@ static ssize_t store_enabled(struct kobject *a, struct attribute *b,
+ 
+                 for (cpu = 1; cpu < CONFIG_NR_CPUS; cpu++) {
+                         if (!cpu_online(cpu)) {
+-                                per_cpu(msm_thermal_info_mpdec_cpudata, cpu).on_time = ktime_to_ms(ktime_get());
+-                                per_cpu(msm_thermal_info_mpdec_cpudata, cpu).online = true;
++                                per_cpu(msm_mpdec_cpudata, cpu).on_time = ktime_to_ms(ktime_get());
++                                per_cpu(msm_mpdec_cpudata, cpu).online = true;
+                                 cpu_up(cpu);
+                                 pr_info(MPDEC_TAG"nap time... Hot plugged CPU[%d] | Mask=[%d%d%d%d]\n",
+                                         cpu, cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
+@@ -600,7 +590,7 @@ static ssize_t store_enabled(struct kobject *a, struct attribute *b,
+ 	case '1':
+ 		state = MSM_MPDEC_IDLE;
+ 		was_paused = true;
+-		queue_delayed_work(msm_mpdec_suspended_workq, &msm_mpdec_work,
++		queue_delayed_work(msm_mpdec_workq, &msm_mpdec_work,
+                                    msecs_to_jiffies(msm_mpdec_tuners_ins.delay));
+ 		pr_info(MPDEC_TAG"firing up mpdecision...\n");
+ 		break;
+@@ -672,7 +662,7 @@ static int __init msm_mpdec_init(void)
+                 return -ENOMEM;
+ 	INIT_DELAYED_WORK(&msm_mpdec_work, msm_mpdec_work_thread);
+ 	if (state != MSM_MPDEC_DISABLED)
+-		queue_delayed_work(msm_mpdec_suspended_workq, &msm_mpdec_work,
++		queue_delayed_work(msm_mpdec_workq, &msm_mpdec_work,
+                                    msecs_to_jiffies(msm_mpdec_tuners_ins.delay));
+ 
+ 	register_early_suspend(&msm_mpdec_early_suspend_handler);
+@@ -696,5 +686,5 @@ late_initcall(msm_mpdec_init);
+ void msm_mpdec_exit(void)
+ {
+         destroy_workqueue(msm_mpdec_workq);
+-        destroy_workqueue(msm_mpdec_suspended_workq);
++        destroy_workqueue(msm_mpdec_workq);
+ }
+-- 
+1.7.9.5
+

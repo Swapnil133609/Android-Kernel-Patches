@@ -1,0 +1,133 @@
+From 7eae9119943fe80f93d5d7f973fdf07b42ec47b4 Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Thu, 28 Jun 2012 05:13:58 +0200
+Subject: [PATCH 110/338] mach-msm: mpdecision: don't turn off cpu1 if freq >
+ idle
+
+This fixes cpu1 being turned off though it is still working
+with a high frequency. The idle_freq can be modified through sysfs.
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/acpuclock-8x60.c |    2 +-
+ arch/arm/mach-msm/msm_mpdecision.c |   37 ++++++++++++++++++++++++++++++++----
+ 2 files changed, 34 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-msm/acpuclock-8x60.c b/arch/arm/mach-msm/acpuclock-8x60.c
+index de63feb..c6d148e 100644
+--- a/arch/arm/mach-msm/acpuclock-8x60.c
++++ b/arch/arm/mach-msm/acpuclock-8x60.c
+@@ -447,7 +447,7 @@ static struct clkctl_acpu_speed *acpu_freq_tbl;
+ static struct clkctl_l2_speed *l2_freq_tbl = l2_freq_tbl_v2;
+ static unsigned int l2_freq_tbl_size = ARRAY_SIZE(l2_freq_tbl_v2);
+ 
+-static unsigned long acpuclk_8x60_get_rate(int cpu)
++unsigned long acpuclk_8x60_get_rate(int cpu)
+ {
+ 	return drv_state.current_speed[cpu]->acpuclk_khz;
+ }
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 73e21c7..519a34b 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -32,10 +32,11 @@
+ #include <linux/hrtimer.h>
+ #include <linux/delay.h>
+ 
+-#define MPDEC_TAG "[MPDEC]: "
+-#define MSM_MPDEC_STARTDELAY 70000
+-#define MSM_MPDEC_DELAY 500
+-#define MSM_MPDEC_PAUSE 10000
++#define MPDEC_TAG                       "[MPDEC]: "
++#define MSM_MPDEC_STARTDELAY            70000
++#define MSM_MPDEC_DELAY                 500
++#define MSM_MPDEC_PAUSE                 10000
++#define MSM_MPDEC_IDLE_FREQ             486000
+ 
+ enum {
+ 	MSM_MPDEC_DISABLED = 0,
+@@ -60,17 +61,21 @@ static struct msm_mpdec_tuners {
+ 	unsigned int delay;
+ 	unsigned int pause;
+ 	bool scroff_single_core;
++	unsigned long int idle_freq;
+ } msm_mpdec_tuners_ins = {
+ 	.startdelay = MSM_MPDEC_STARTDELAY,
+ 	.delay = MSM_MPDEC_DELAY,
+ 	.pause = MSM_MPDEC_PAUSE,
+ 	.scroff_single_core = true,
++	.idle_freq = MSM_MPDEC_IDLE_FREQ,
+ };
+ 
+ static unsigned int NwNs_Threshold[4] = {35, 0, 0, 5};
+ static unsigned int TwTs_Threshold[4] = {250, 0, 0, 250};
+ 
+ extern unsigned int get_rq_info(void);
++extern unsigned long acpuclk_8x60_get_rate(int);
++
+ unsigned int state = MSM_MPDEC_IDLE;
+ bool was_paused = false;
+ 
+@@ -160,6 +165,9 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 	case MSM_MPDEC_DOWN:
+ 		cpu = (CONFIG_NR_CPUS - 1);
+ 		if (cpu < nr_cpu_ids) {
++			if (cpu_online(cpu))
++				if (acpuclk_8x60_get_rate(cpu) > msm_mpdec_tuners_ins.idle_freq)
++					break;
+ 			if ((per_cpu(msm_mpdec_cpudata, cpu).online == true) && (cpu_online(cpu))) {
+ 				cpu_down(cpu);
+ 				per_cpu(msm_mpdec_cpudata, cpu).online = false;
+@@ -261,6 +269,12 @@ show_one(delay, delay);
+ show_one(pause, pause);
+ show_one(scroff_single_core, scroff_single_core);
+ 
++static ssize_t show_idle_freq (struct kobject *kobj, struct attribute *attr,
++                                   char *buf)
++{
++	return sprintf(buf, "%lu\n", msm_mpdec_tuners_ins.idle_freq);
++}
++
+ static ssize_t show_enabled(struct kobject *a, struct attribute *b,
+ 				   char *buf)
+ {
+@@ -346,6 +360,19 @@ static ssize_t store_pause(struct kobject *a, struct attribute *b,
+ 	return count;
+ }
+ 
++static ssize_t store_idle_freq(struct kobject *a, struct attribute *b,
++				   const char *buf, size_t count)
++{
++	long unsigned int input;
++	int ret;
++	ret = sscanf(buf, "%lu", &input);
++	if (ret != 1)
++		return -EINVAL;
++	msm_mpdec_tuners_ins.idle_freq = acpu_check_khz_value(input);
++
++	return count;
++}
++
+ static ssize_t store_scroff_single_core(struct kobject *a, struct attribute *b,
+ 				   const char *buf, size_t count)
+ {
+@@ -478,6 +505,7 @@ define_one_global_rw(startdelay);
+ define_one_global_rw(delay);
+ define_one_global_rw(pause);
+ define_one_global_rw(scroff_single_core);
++define_one_global_rw(idle_freq);
+ define_one_global_rw(enabled);
+ define_one_global_rw(nwns_threshold_up);
+ define_one_global_rw(nwns_threshold_down);
+@@ -489,6 +517,7 @@ static struct attribute *msm_mpdec_attributes[] = {
+ 	&delay.attr,
+ 	&pause.attr,
+ 	&scroff_single_core.attr,
++	&idle_freq.attr,
+ 	&enabled.attr,
+ 	&nwns_threshold_up.attr,
+ 	&nwns_threshold_down.attr,
+-- 
+1.7.9.5
+

@@ -1,0 +1,40 @@
+From 85700b1cbc8cc10d279c2bbae751d9d10be6e5c3 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 20 Nov 2013 00:07:53 +0100
+Subject: [PATCH 308/338] s2w: rename version file so we don't conflict with
+ dt2w, driver versions, etc
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/sweep2wake.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/input/touchscreen/sweep2wake.c b/drivers/input/touchscreen/sweep2wake.c
+index fd50da5..6f7e8f2 100644
+--- a/drivers/input/touchscreen/sweep2wake.c
++++ b/drivers/input/touchscreen/sweep2wake.c
+@@ -370,7 +370,7 @@ static ssize_t s2w_version_dump(struct device *dev,
+ 	return count;
+ }
+ 
+-static DEVICE_ATTR(version, (S_IWUSR|S_IRUGO),
++static DEVICE_ATTR(sweep2wake_version, (S_IWUSR|S_IRUGO),
+ 	s2w_version_show, s2w_version_dump);
+ 
+ /*
+@@ -431,9 +431,9 @@ static int __init sweep2wake_init(void)
+ 	if (rc) {
+ 		pr_warn("%s: sysfs_create_file failed for sweep2wake\n", __func__);
+ 	}
+-	rc = sysfs_create_file(android_touch_kobj, &dev_attr_version.attr);
++	rc = sysfs_create_file(android_touch_kobj, &dev_attr_sweep2wake_version.attr);
+ 	if (rc) {
+-		pr_warn("%s: sysfs_create_file failed for version\n", __func__);
++		pr_warn("%s: sysfs_create_file failed for sweep2wake_version\n", __func__);
+ 	}
+ 
+ err_input_dev:
+-- 
+1.7.9.5
+

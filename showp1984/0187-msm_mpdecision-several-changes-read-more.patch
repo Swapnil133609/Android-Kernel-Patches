@@ -1,0 +1,291 @@
+From c539859cee1fba2b72bbeb985b31e2c8e873abc6 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Thu, 9 May 2013 22:31:48 +0200
+Subject: [PATCH 187/338] msm_mpdecision: several changes [read more] reworked
+ cpu_up/down handling which removed redundant code
+ reworked max/min_cpus settings reworked
+ suspend/resume handling to obide by these new
+ changes also reworked locking for per cpu settings
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |  148 +++++++++++++++++++-----------------
+ 1 file changed, 78 insertions(+), 70 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index bc9f0da..1742cc4 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -33,6 +33,7 @@
+ #include <asm-generic/cputime.h>
+ #include <linux/hrtimer.h>
+ #include <linux/delay.h>
++#include <linux/export.h>
+ #ifdef CONFIG_MSM_MPDEC_INPUTBOOST_CPUMIN
+ #include <linux/input.h>
+ #include <linux/slab.h>
+@@ -62,7 +63,7 @@ enum {
+ };
+ 
+ struct msm_mpdec_cpudata_t {
+-    struct mutex suspend_mutex;
++    struct mutex hotplug_mutex;
+     int online;
+     int device_suspended;
+     cputime64_t on_time;
+@@ -183,6 +184,36 @@ static unsigned long get_slowest_cpu_rate(void) {
+     return slow_rate;
+ }
+ 
++static void mpdec_cpu_up(int cpu) {
++    if (!cpu_online(cpu)) {
++        mutex_lock(&per_cpu(msm_mpdec_cpudata, cpu).hotplug_mutex);
++        cpu_up(cpu);
++        per_cpu(msm_mpdec_cpudata, cpu).on_time = ktime_to_ms(ktime_get());
++        per_cpu(msm_mpdec_cpudata, cpu).online = true;
++        per_cpu(msm_mpdec_cpudata, cpu).times_cpu_hotplugged += 1;
++        pr_info(MPDEC_TAG"CPU[%d] off->on | Mask=[%d%d%d%d]\n",
++                cpu, cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
++        mutex_unlock(&per_cpu(msm_mpdec_cpudata, cpu).hotplug_mutex);
++    }
++}
++EXPORT_SYMBOL_GPL(mpdec_cpu_up);
++
++static void mpdec_cpu_down(int cpu) {
++    cputime64_t on_time = 0;
++    if (cpu_online(cpu)) {
++        mutex_lock(&per_cpu(msm_mpdec_cpudata, cpu).hotplug_mutex);
++        cpu_down(cpu);
++        on_time = (ktime_to_ms(ktime_get()) - per_cpu(msm_mpdec_cpudata, cpu).on_time);
++        per_cpu(msm_mpdec_cpudata, cpu).online = false;
++        per_cpu(msm_mpdec_cpudata, cpu).on_time_total += on_time;
++        per_cpu(msm_mpdec_cpudata, cpu).times_cpu_unplugged += 1;
++        pr_info(MPDEC_TAG"CPU[%d] on->off | Mask=[%d%d%d%d] | time online: %llu\n",
++                cpu, cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3), on_time);
++        mutex_unlock(&per_cpu(msm_mpdec_cpudata, cpu).hotplug_mutex);
++    }
++}
++EXPORT_SYMBOL_GPL(mpdec_cpu_down);
++
+ static int mp_decision(void) {
+     static bool first_call = true;
+     int new_state = MSM_MPDEC_IDLE;
+@@ -249,7 +280,6 @@ static int mp_decision(void) {
+ 
+ static void msm_mpdec_work_thread(struct work_struct *work) {
+     unsigned int cpu = nr_cpu_ids;
+-    cputime64_t on_time = 0;
+     bool suspended = false;
+ 
+     if (ktime_to_ms(ktime_get()) <= msm_mpdec_tuners_ins.startdelay)
+@@ -294,13 +324,7 @@ static void msm_mpdec_work_thread(struct work_struct *work) {
+ #ifdef CONFIG_MSM_MPDEC_INPUTBOOST_CPUMIN
+                 unboost_cpu(cpu);
+ #endif
+-                cpu_down(cpu);
+-                per_cpu(msm_mpdec_cpudata, cpu).online = false;
+-                on_time = ktime_to_ms(ktime_get()) - per_cpu(msm_mpdec_cpudata, cpu).on_time;
+-                per_cpu(msm_mpdec_cpudata, cpu).on_time_total += on_time;
+-                per_cpu(msm_mpdec_cpudata, cpu).times_cpu_unplugged += 1;
+-                pr_info(MPDEC_TAG"CPU[%d] on->off | Mask=[%d%d%d%d] | time online: %llu\n",
+-                        cpu, cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3), on_time);
++                mpdec_cpu_down(cpu);
+             } else if (per_cpu(msm_mpdec_cpudata, cpu).online != cpu_online(cpu)) {
+                 pr_info(MPDEC_TAG"CPU[%d] was controlled outside of mpdecision! | pausing [%d]ms\n",
+                         cpu, msm_mpdec_tuners_ins.pause);
+@@ -313,12 +337,7 @@ static void msm_mpdec_work_thread(struct work_struct *work) {
+         cpu = cpumask_next_zero(0, cpu_online_mask);
+         if (cpu < nr_cpu_ids) {
+             if ((per_cpu(msm_mpdec_cpudata, cpu).online == false) && (!cpu_online(cpu))) {
+-                cpu_up(cpu);
+-                per_cpu(msm_mpdec_cpudata, cpu).online = true;
+-                per_cpu(msm_mpdec_cpudata, cpu).on_time = ktime_to_ms(ktime_get());
+-                per_cpu(msm_mpdec_cpudata, cpu).times_cpu_hotplugged += 1;
+-                pr_info(MPDEC_TAG"CPU[%d] off->on | Mask=[%d%d%d%d]\n",
+-                        cpu, cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
++                mpdec_cpu_up(cpu);
+ #ifdef CONFIG_MSM_MPDEC_INPUTBOOST_CPUMIN
+                 unboost_cpu(cpu);
+ #endif
+@@ -525,29 +544,27 @@ static struct input_handler mpdec_input_handler = {
+ 
+ static void msm_mpdec_early_suspend(struct early_suspend *h) {
+     int cpu = nr_cpu_ids;
+-    cputime64_t on_time = 0;
+ #ifdef CONFIG_MSM_MPDEC_INPUTBOOST_CPUMIN
+     is_screen_on = false;
+ #endif
++
++    if (!msm_mpdec_tuners_ins.scroff_single_core) {
++        pr_info(MPDEC_TAG"Screen -> off\n");
++        return;
++    }
++
++    /* main work thread can sleep now */
++    cancel_delayed_work_sync(&msm_mpdec_work);
++
+     for_each_possible_cpu(cpu) {
+ #ifdef CONFIG_MSM_MPDEC_INPUTBOOST_CPUMIN
+         unboost_cpu(cpu);
+ #endif
+-        mutex_lock(&per_cpu(msm_mpdec_cpudata, cpu).suspend_mutex);
+         if ((cpu >= 1) && (cpu_online(cpu))) {
+-            cpu_down(cpu);
+-            pr_info(MPDEC_TAG"Screen -> off. Suspended CPU[%d] | Mask=[%d%d%d%d]\n",
+-                    cpu, cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
+-            per_cpu(msm_mpdec_cpudata, cpu).online = false;
+-            on_time = ktime_to_ms(ktime_get()) - per_cpu(msm_mpdec_cpudata, cpu).on_time;
+-            per_cpu(msm_mpdec_cpudata, cpu).on_time_total += on_time;
+-            per_cpu(msm_mpdec_cpudata, cpu).times_cpu_unplugged += 1;
++            mpdec_cpu_down(cpu);
+         }
+         per_cpu(msm_mpdec_cpudata, cpu).device_suspended = true;
+-        mutex_unlock(&per_cpu(msm_mpdec_cpudata, cpu).suspend_mutex);
+     }
+-    /* main work thread can sleep now */
+-    cancel_delayed_work_sync(&msm_mpdec_work);
+ 
+     pr_info(MPDEC_TAG"Screen -> off. Deactivated mpdecision.\n");
+ }
+@@ -557,28 +574,31 @@ static void msm_mpdec_late_resume(struct early_suspend *h) {
+ #ifdef CONFIG_MSM_MPDEC_INPUTBOOST_CPUMIN
+     is_screen_on = true;
+ #endif
++
+     for_each_possible_cpu(cpu)
+         per_cpu(msm_mpdec_cpudata, cpu).device_suspended = false;
+ 
+-    mutex_lock(&per_cpu(msm_mpdec_cpudata, 1).suspend_mutex);
+-    if (!cpu_online(1)) {
+-        /* Always enable cpu1 when screen comes online.
+-         * This boosts the wakeup process. */
+-        cpu_up(1);
+-        per_cpu(msm_mpdec_cpudata, 1).on_time = ktime_to_ms(ktime_get());
+-        per_cpu(msm_mpdec_cpudata, 1).online = true;
+-        per_cpu(msm_mpdec_cpudata, 1).times_cpu_hotplugged += 1;
+-        pr_info(MPDEC_TAG"Screen -> on. Hot plugged CPU1 | Mask=[%d%d%d%d]\n",
+-                cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
+-    }
+-    mutex_unlock(&per_cpu(msm_mpdec_cpudata, 1).suspend_mutex);
++    if (msm_mpdec_tuners_ins.scroff_single_core) {
++        /* wake up main work thread */
++        was_paused = true;
++        queue_delayed_work(msm_mpdec_workq, &msm_mpdec_work, 0);
+ 
+-    /* wake up main work thread */
+-    was_paused = true;
+-    queue_delayed_work(msm_mpdec_workq, &msm_mpdec_work, 0);
++        /* restore min/max cpus limits */
++        for (cpu=1; cpu<CONFIG_NR_CPUS; cpu++) {
++            if (cpu < msm_mpdec_tuners_ins.min_cpus) {
++                if (!cpu_online(cpu))
++                    mpdec_cpu_up(cpu);
++            } else if (cpu > msm_mpdec_tuners_ins.max_cpus) {
++                if (cpu_online(cpu))
++                    mpdec_cpu_down(cpu);
++            }
++        }
+ 
+-    pr_info(MPDEC_TAG"Screen -> on. Activated mpdecision. | Mask=[%d%d%d%d]\n",
+-            cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
++        pr_info(MPDEC_TAG"Screen -> on. Activated mpdecision. | Mask=[%d%d%d%d]\n",
++                cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
++    } else {
++        pr_info(MPDEC_TAG"Screen -> on\n");
++    }
+ }
+ 
+ static struct early_suspend msm_mpdec_early_suspend_handler = {
+@@ -772,14 +792,12 @@ static ssize_t store_scroff_single_core(struct kobject *a, struct attribute *b,
+     if (ret != 1)
+         return -EINVAL;
+     switch (buf[0]) {
+-    case '0':
+-        msm_mpdec_tuners_ins.scroff_single_core = input;
+-        break;
+-    case '1':
+-        msm_mpdec_tuners_ins.scroff_single_core = input;
+-        break;
+-    default:
+-        ret = -EINVAL;
++        case '0':
++        case '1':
++            msm_mpdec_tuners_ins.scroff_single_core = input;
++            break;
++        default:
++            ret = -EINVAL;
+     }
+     return count;
+ }
+@@ -790,7 +808,7 @@ static ssize_t store_max_cpus(struct kobject *a, struct attribute *b,
+     unsigned int input;
+     int ret, cpu;
+     ret = sscanf(buf, "%u", &input);
+-    if ((ret != 1) || input > CONFIG_NR_CPUS)
++    if ((ret != 1) || input > CONFIG_NR_CPUS || input < msm_mpdec_tuners_ins.min_cpus)
+                 return -EINVAL;
+ 
+     msm_mpdec_tuners_ins.max_cpus = input;
+@@ -800,8 +818,7 @@ static ssize_t store_max_cpus(struct kobject *a, struct attribute *b,
+                 break;
+             if (!cpu_online(cpu))
+                 continue;
+-            cpu_down(cpu);
+-            pr_info(MPDEC_TAG"Unplugging CPU[%i]...\n", cpu);
++            mpdec_cpu_down(cpu);
+         }
+         pr_info(MPDEC_TAG"max_cpus set to %u. Affected CPUs were unplugged!\n", input);
+     }
+@@ -815,7 +832,7 @@ static ssize_t store_min_cpus(struct kobject *a, struct attribute *b,
+     unsigned int input;
+     int ret, cpu;
+     ret = sscanf(buf, "%u", &input);
+-    if ((ret != 1) || input < 1)
++    if ((ret != 1) || input < 1 || input > msm_mpdec_tuners_ins.max_cpus)
+         return -EINVAL;
+ 
+     msm_mpdec_tuners_ins.min_cpus = input;
+@@ -825,8 +842,7 @@ static ssize_t store_min_cpus(struct kobject *a, struct attribute *b,
+                 break;
+             if (cpu_online(cpu))
+                 continue;
+-            cpu_up(cpu);
+-            pr_info(MPDEC_TAG"Hotplugging CPU[%i]...\n", cpu);
++            mpdec_cpu_up(cpu);
+         }
+         pr_info(MPDEC_TAG"min_cpus set to %u. Affected CPUs were hotplugged!\n", input);
+     }
+@@ -863,17 +879,9 @@ static ssize_t store_enabled(struct kobject *a, struct attribute *b,
+     case '0':
+         state = MSM_MPDEC_DISABLED;
+         pr_info(MPDEC_TAG"nap time... Hot plugging offline CPUs...\n");
+-
+-        for (cpu = 1; cpu < CONFIG_NR_CPUS; cpu++) {
+-            if (!cpu_online(cpu)) {
+-                per_cpu(msm_mpdec_cpudata, cpu).on_time = ktime_to_ms(ktime_get());
+-                per_cpu(msm_mpdec_cpudata, cpu).online = true;
+-                per_cpu(msm_mpdec_cpudata, cpu).times_cpu_hotplugged += 1;
+-                cpu_up(cpu);
+-                pr_info(MPDEC_TAG"nap time... Hot plugged CPU[%d] | Mask=[%d%d%d%d]\n",
+-                        cpu, cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
+-            }
+-        }
++        for (cpu = 1; cpu < CONFIG_NR_CPUS; cpu++)
++            if (!cpu_online(cpu))
++                mpdec_cpu_up(cpu);
+         break;
+     case '1':
+         state = MSM_MPDEC_IDLE;
+@@ -1073,7 +1081,7 @@ static int __init msm_mpdec_init(void) {
+ #endif
+ 
+     for_each_possible_cpu(cpu) {
+-        mutex_init(&(per_cpu(msm_mpdec_cpudata, cpu).suspend_mutex));
++        mutex_init(&(per_cpu(msm_mpdec_cpudata, cpu).hotplug_mutex));
+         per_cpu(msm_mpdec_cpudata, cpu).device_suspended = false;
+         per_cpu(msm_mpdec_cpudata, cpu).online = true;
+         per_cpu(msm_mpdec_cpudata, cpu).on_time_total = 0;
+-- 
+1.7.9.5
+

@@ -1,0 +1,32 @@
+From 90642b3f4e788885d8b189be1cdc94bf7838bb42 Mon Sep 17 00:00:00 2001
+From: Pat Tjin <pattjin@google.com>
+Date: Wed, 13 Nov 2013 21:41:22 +0000
+Subject: [PATCH 267/338] Revert "hammerhead: Enable /dev/diag"
+
+Bug: 11335064
+
+This reverts commit 103e1f69925f03c72c9564cd114073da2475a1d5.
+
+Change-Id: I7571298afefe973010557dfe2f2387f04cde9a9d
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/hammerhead_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/configs/hammerhead_defconfig b/arch/arm/configs/hammerhead_defconfig
+index 4a3d274..b12688f 100644
+--- a/arch/arm/configs/hammerhead_defconfig
++++ b/arch/arm/configs/hammerhead_defconfig
+@@ -333,6 +333,8 @@ CONFIG_INPUT_UINPUT=y
+ CONFIG_SERIAL_MSM_HS=y
+ CONFIG_SERIAL_MSM_HSL=y
+ CONFIG_SERIAL_MSM_HSL_CONSOLE=y
++# CONFIG_DIAG_CHAR is not set
++# CONFIG_DIAG_OVER_USB is not set
+ CONFIG_HW_RANDOM_MSM=y
+ CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+-- 
+1.7.9.5
+

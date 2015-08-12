@@ -1,0 +1,47 @@
+From d7840b988e810ca6e801c0dc23a4fdaa5b561813 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 07:39:33 +0100
+Subject: [PATCH 126/338] msm_mpdecision: fix disabling mpdecision over sysfs
+ for multicore
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |   21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 80d25cc..b4c3533 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -537,16 +537,17 @@ static ssize_t store_enabled(struct kobject *a, struct attribute *b,
+ 	switch (buf[0]) {
+ 	case '0':
+ 		state = MSM_MPDEC_DISABLED;
+-		cpu = (CONFIG_NR_CPUS - 1);
+-		if (!cpu_online(cpu)) {
+-			per_cpu(msm_mpdec_cpudata, cpu).on_time = ktime_to_ms(ktime_get());
+-			per_cpu(msm_mpdec_cpudata, cpu).online = true;
+-			cpu_up(cpu);
+-			pr_info(MPDEC_TAG"nap time... Hot plugged CPU[%d] | Mask=[%d%d]\n",
+-					 cpu, cpu_online(0), cpu_online(1));
+-		} else {
+-			pr_info(MPDEC_TAG"nap time...\n");
+-		}
++                pr_info(MPDEC_TAG"nap time... Hot plugging offline CPUs...\n");
++
++                for (cpu = 1; cpu < CONFIG_NR_CPUS; cpu++) {
++                        if (!cpu_online(cpu)) {
++                                per_cpu(msm_thermal_info_mpdec_cpudata, cpu).on_time = ktime_to_ms(ktime_get());
++                                per_cpu(msm_thermal_info_mpdec_cpudata, cpu).online = true;
++                                cpu_up(cpu);
++                                pr_info(MPDEC_TAG"nap time... Hot plugged CPU[%d] | Mask=[%d%d%d%d]\n",
++                                        cpu, cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
++                        }
++                }
+ 		break;
+ 	case '1':
+ 		state = MSM_MPDEC_IDLE;
+-- 
+1.7.9.5
+

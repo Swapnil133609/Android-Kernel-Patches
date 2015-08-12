@@ -1,0 +1,39 @@
+From 3881d27a58a8703c7df2de7633411d6ac3680199 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 06:46:07 +0100
+Subject: [PATCH 118/338] msm_mpdecision: make debug output more compact &
+ informative
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index cf9747b..fb57022 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -152,9 +152,6 @@ static int mp_decision(void)
+ 
+ 	rq_depth = get_rq_info();
+ 	nr_cpu_online = num_online_cpus();
+-#if DEBUG
+-        pr_info(MPDEC_TAG"[DEBUG]: RQ: %u, cpus_on: %i", rq_depth, nr_cpu_online);
+-#endif
+ 
+ 	if (nr_cpu_online) {
+ 		index = (nr_cpu_online - 1) * 2;
+@@ -184,7 +181,8 @@ static int mp_decision(void)
+ 
+ 	last_time = ktime_to_ms(ktime_get());
+ #if DEBUG
+-        pr_info(MPDEC_TAG"[DEBUG] New State: %i", new_state);
++        pr_info(MPDEC_TAG"[DEBUG] rq: %u, new_state: %i | Mask=[%d%d%d%d]\n",
++                rq_depth, new_state, cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
+ #endif
+ 	return new_state;
+ }
+-- 
+1.7.9.5
+

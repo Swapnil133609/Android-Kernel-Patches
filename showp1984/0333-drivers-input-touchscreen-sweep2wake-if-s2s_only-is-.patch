@@ -1,0 +1,28 @@
+From 43087424a5ace389e5419ae17565d4ea0a6e971c Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sat, 7 Dec 2013 10:58:40 +0100
+Subject: [PATCH 333/338] drivers/input/touchscreen/sweep2wake: if s2s_only is
+ true, opt out early
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/sweep2wake.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/input/touchscreen/sweep2wake.c b/drivers/input/touchscreen/sweep2wake.c
+index 18ec7d9..1c11ef5 100644
+--- a/drivers/input/touchscreen/sweep2wake.c
++++ b/drivers/input/touchscreen/sweep2wake.c
+@@ -158,7 +158,7 @@ static void detect_sweep2wake(int x, int y, bool st)
+                 x, y, (single_touch) ? "true" : "false");
+ #endif
+ 	//left->right
+-	if ((single_touch) && (scr_suspended == true) && (s2w_switch > 0)) {
++	if ((single_touch) && (scr_suspended == true) && (s2w_switch > 0 && !s2w_s2sonly)) {
+ 		prevx = 0;
+ 		nextx = S2W_X_B1;
+ 		if ((barrier[0] == true) ||
+-- 
+1.7.9.5
+

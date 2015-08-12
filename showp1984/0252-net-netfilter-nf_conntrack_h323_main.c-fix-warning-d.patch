@@ -1,0 +1,46 @@
+From e511c732d89825ec2a3996810be6bfa1d01a9996 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 11 Nov 2013 02:18:07 +0100
+Subject: [PATCH 252/338] net/netfilter/nf_conntrack_h323_main.c: fix:
+ warning: 'dataoff/datalen/ret' may be used
+ uninitialized in this function
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ net/netfilter/nf_conntrack_h323_main.c |   12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/net/netfilter/nf_conntrack_h323_main.c b/net/netfilter/nf_conntrack_h323_main.c
+index 722291f..2bf7a80 100644
+--- a/net/netfilter/nf_conntrack_h323_main.c
++++ b/net/netfilter/nf_conntrack_h323_main.c
+@@ -566,9 +566,9 @@ static int h245_help(struct sk_buff *skb, unsigned int protoff,
+ {
+ 	static MultimediaSystemControlMessage mscm;
+ 	unsigned char *data = NULL;
+-	int datalen;
+-	int dataoff;
+-	int ret;
++	int datalen = 0;
++	int dataoff = 0;
++	int ret = 0;
+ 
+ 	/* Until there's been traffic both ways, don't look in packets. */
+ 	if (ctinfo != IP_CT_ESTABLISHED && ctinfo != IP_CT_ESTABLISHED_REPLY)
+@@ -1118,9 +1118,9 @@ static int q931_help(struct sk_buff *skb, unsigned int protoff,
+ {
+ 	static Q931 q931;
+ 	unsigned char *data = NULL;
+-	int datalen;
+-	int dataoff;
+-	int ret;
++	int datalen = 0;
++	int dataoff = 0;
++	int ret = 0;
+ 
+ 	/* Until there's been traffic both ways, don't look in packets. */
+ 	if (ctinfo != IP_CT_ESTABLISHED && ctinfo != IP_CT_ESTABLISHED_REPLY)
+-- 
+1.7.9.5
+

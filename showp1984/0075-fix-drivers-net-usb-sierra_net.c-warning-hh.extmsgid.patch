@@ -1,0 +1,41 @@
+From 35e4b877ba8e5e6fafeaf6d22d60a0867d603e0b Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 5 Nov 2013 19:18:42 +0100
+Subject: [PATCH 075/338] fix: drivers/net/usb/sierra_net.c: warning:
+ 'hh.extmsgid.<U8114>.word' may be used
+ uninitialized in this function
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/net/usb/sierra_net.c |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/usb/sierra_net.c b/drivers/net/usb/sierra_net.c
+index b59cf20..87debc3 100644
+--- a/drivers/net/usb/sierra_net.c
++++ b/drivers/net/usb/sierra_net.c
+@@ -484,7 +484,8 @@ static void sierra_net_kevent(struct work_struct *work)
+ 			netdev_err(dev->net,
+ 				"usb_control_msg failed, status %d\n", len);
+ 		} else {
+-			struct hip_hdr	hh;
++			struct hip_hdr hh;
++			hh.extmsgid.word = 0;
+ 
+ 			dev_dbg(&dev->udev->dev, "%s: Received status message,"
+ 				" %04x bytes", __func__, len);
+@@ -845,8 +846,9 @@ static struct sk_buff *sierra_net_skb_clone(struct usbnet *dev,
+ static int sierra_net_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
+ {
+ 	int err;
+-	struct hip_hdr  hh;
++	struct hip_hdr hh;
+ 	struct sk_buff *new_skb;
++	hh.extmsgid.word = 0;
+ 
+ 	dev_dbg(&dev->udev->dev, "%s", __func__);
+ 
+-- 
+1.7.9.5
+

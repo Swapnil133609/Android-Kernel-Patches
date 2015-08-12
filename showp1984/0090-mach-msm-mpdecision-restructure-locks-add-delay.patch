@@ -1,0 +1,89 @@
+From 896df4f15dd78497a17037599cef177d481d64e2 Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Fri, 22 Jun 2012 04:55:32 +0200
+Subject: [PATCH 090/338] mach-msm: mpdecision: restructure locks, add delay
+
+The new delay allows the CPU to come up before any other action is taken.
+This prevents fast plugging and also ensures the CPU hotplug process
+is really done, before trying to unplug it again (or plug it).
+
+The new locks are more efficient, and only used if necessary.
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |   17 +++++++++++------
+ 1 file changed, 11 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 5ca0028..5133081 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -30,9 +30,12 @@
+ #include <linux/cpumask.h>
+ #include <asm-generic/cputime.h>
+ #include <linux/hrtimer.h>
++#include <linux/delay.h>
+ 
+ #define MPDEC_TAG "[MPDEC]: "
+-#define MSM_MPDEC_DELAY 400
++#define MSM_MPDEC_DELAY 500
++#define CPU_UPDELAY 200
++#define CPU_DOWNDELAY 200
+ 
+ enum {
+ 	MSM_MPDEC_DISABLED = 0,
+@@ -48,7 +51,7 @@ struct msm_mpdec_suspend_t {
+ static DEFINE_PER_CPU(struct msm_mpdec_suspend_t, msm_mpdec_suspend);
+ 
+ static struct delayed_work msm_mpdec_work;
+-static DEFINE_SPINLOCK(msm_cpu_lock);
++static DEFINE_MUTEX(msm_cpu_lock);
+ 
+ bool scroff_single_core = true;
+ 
+@@ -110,12 +113,13 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ {
+ 	int ret = 0;
+ 	unsigned int cpu = nr_cpu_ids;
+-	unsigned long flags = 0;
+ 
+ 	if (per_cpu(msm_mpdec_suspend, (CONFIG_NR_CPUS - 1)).device_suspended == true)
+ 		goto out;
+ 
+-	spin_lock_irqsave(&msm_cpu_lock, flags);
++
++	if (!mutex_trylock(&msm_cpu_lock))
++		goto out;
+ 
+ 	ret = mp_decision();
+ 	switch (ret) {
+@@ -126,6 +130,7 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 		cpu = (CONFIG_NR_CPUS - 1);
+ 		if ((cpu < nr_cpu_ids) && (cpu_online(cpu))) {
+ 			cpu_down(cpu);
++			msleep(CPU_DOWNDELAY);
+ 			pr_info(MPDEC_TAG"CPU[%d] 1->0 | Mask=[%d%d]\n",
+ 					cpu, cpu_online(0), cpu_online(1));
+ 		}
+@@ -134,6 +139,7 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 		cpu = (CONFIG_NR_CPUS - 1);
+ 		if ((cpu < nr_cpu_ids) && (!cpu_online(cpu))) {
+ 			cpu_up(cpu);
++			msleep(CPU_UPDELAY);
+ 			pr_info(MPDEC_TAG"CPU[%d] 0->1 | Mask=[%d%d]\n",
+ 					cpu, cpu_online(0), cpu_online(1));
+ 		}
+@@ -142,8 +148,7 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 		pr_err(MPDEC_TAG"%s: invalid mpdec hotplug state %d\n",
+ 		       __func__, ret);
+ 	}
+-
+-	spin_unlock_irqrestore(&msm_cpu_lock, flags);
++	mutex_unlock(&msm_cpu_lock);
+ 
+ out:
+ 	schedule_delayed_work(&msm_mpdec_work,
+-- 
+1.7.9.5
+

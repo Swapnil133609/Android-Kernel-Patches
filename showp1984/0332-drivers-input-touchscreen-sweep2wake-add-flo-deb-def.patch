@@ -1,0 +1,34 @@
+From 64c8bcd2010f417a4bafbfcc84b29e9775c7e357 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sat, 7 Dec 2013 10:32:47 +0100
+Subject: [PATCH 332/338] drivers/input/touchscreen/sweep2wake: add flo/deb
+ definitions
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/sweep2wake.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/input/touchscreen/sweep2wake.c b/drivers/input/touchscreen/sweep2wake.c
+index c962988..18ec7d9 100644
+--- a/drivers/input/touchscreen/sweep2wake.c
++++ b/drivers/input/touchscreen/sweep2wake.c
+@@ -71,6 +71,14 @@ MODULE_LICENSE("GPLv2");
+ #define S2W_X_B1                500
+ #define S2W_X_B2                1000
+ #define S2W_X_FINAL             300
++#elif defined(CONFIG_MACH_APQ8064_FLO)
++/* Flo/Deb aka Nexus 7 2013 */
++#define S2W_Y_MAX               2240
++#define S2W_X_MAX               1344
++#define S2W_Y_LIMIT             S2W_Y_MAX-110
++#define S2W_X_B1                500
++#define S2W_X_B2                700
++#define S2W_X_FINAL             450
+ #else
+ /* defaults */
+ #define S2W_Y_LIMIT             2350
+-- 
+1.7.9.5
+

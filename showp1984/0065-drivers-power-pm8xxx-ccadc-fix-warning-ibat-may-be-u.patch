@@ -1,0 +1,28 @@
+From f2d1046e64a3774bbae4b7d7e3af3e86ae2af97e Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 04:22:42 +0100
+Subject: [PATCH 065/338] drivers/power/pm8xxx-ccadc: fix: 'warning: 'ibat'
+ may be used uninitialized in this function'
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/power/pm8xxx-ccadc.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/power/pm8xxx-ccadc.c b/drivers/power/pm8xxx-ccadc.c
+index c53bcd2..58006b2 100644
+--- a/drivers/power/pm8xxx-ccadc.c
++++ b/drivers/power/pm8xxx-ccadc.c
+@@ -680,7 +680,7 @@ DEFINE_SIMPLE_ATTRIBUTE(reg_fops, get_reg, set_reg, "0x%02llx\n");
+ 
+ static int get_calc(void *data, u64 * val)
+ {
+-	int ibat, rc;
++	int ibat = 0, rc;
+ 
+ 	rc = pm8xxx_ccadc_get_battery_current(&ibat);
+ 	*val = ibat;
+-- 
+1.7.9.5
+

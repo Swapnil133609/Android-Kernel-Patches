@@ -1,0 +1,29 @@
+From 4da10d02f199d54286da5cc239dbdace4f8c360b Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 04:13:47 +0100
+Subject: [PATCH 059/338] drivers/media/common/tuners/xc5000: fix 'warning:
+ 'quality' may be used uninitialized in this
+ function'
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/media/common/tuners/xc5000.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/media/common/tuners/xc5000.c b/drivers/media/common/tuners/xc5000.c
+index eab2ea4..1eec090 100644
+--- a/drivers/media/common/tuners/xc5000.c
++++ b/drivers/media/common/tuners/xc5000.c
+@@ -646,7 +646,7 @@ static void xc_debug_dump(struct xc5000_priv *priv)
+ 	u16 lock_status;
+ 	u32 hsync_freq_hz = 0;
+ 	u16 frame_lines;
+-	u16 quality;
++	u16 quality = 0;
+ 	u8 hw_majorversion = 0, hw_minorversion = 0;
+ 	u8 fw_majorversion = 0, fw_minorversion = 0;
+ 	u16 fw_buildversion = 0;
+-- 
+1.7.9.5
+

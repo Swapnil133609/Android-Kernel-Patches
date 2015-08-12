@@ -1,0 +1,37 @@
+From 134590228c083f25f4c67b47de25abf2a97c9bde Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Mon, 12 Sep 2011 13:20:51 +0200
+Subject: [PATCH 045/338] Makefile: Added Snapdragon optimizations
+
+Conflicts:
+
+	Makefile
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ Makefile |    9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index b05c386..99c0522 100644
+--- a/Makefile
++++ b/Makefile
+@@ -351,10 +351,11 @@ CC		= $(srctree)/scripts/gcc-wrapper.py $(REAL_CC)
+ 
+ CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
+ 		  -Wbitwise -Wno-return-void $(CF)
+-CFLAGS_MODULE   =
+-AFLAGS_MODULE   =
+-LDFLAGS_MODULE  =
+-CFLAGS_KERNEL	=
++MODFLAGS	= -DMODULE -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr -ffast-math -fsingle-precision-constant -mtune=cortex-a8 -march=armv7-a -mfpu=neon -ftree-vectorize -funswitch-loops
++CFLAGS_MODULE   = $(MODFLAGS)
++AFLAGS_MODULE   = $(MODFLAGS)
++LDFLAGS_MODULE  = -T $(srctree)/scripts/module-common.lds
++CFLAGS_KERNEL	= -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr -ffast-math -fsingle-precision-constant -mtune=cortex-a8 -march=armv7-a -mfpu=neon -ftree-vectorize -funswitch-loops
+ AFLAGS_KERNEL	=
+ CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
+ 
+-- 
+1.7.9.5
+

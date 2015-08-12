@@ -1,0 +1,48 @@
+From f6719d5a827d93e4803f72439ac86791c49cd31a Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Fri, 15 Nov 2013 05:24:06 +0100
+Subject: [PATCH 270/338] cpu: noop nonboot_cpu calls if MSM_MPDEC is compiled
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/cpu.h |    2 +-
+ kernel/cpu.c        |    2 ++
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/include/linux/cpu.h b/include/linux/cpu.h
+index 1743b63..d50d59d 100644
+--- a/include/linux/cpu.h
++++ b/include/linux/cpu.h
+@@ -204,7 +204,7 @@ static inline void cpu_hotplug_driver_unlock(void)
+ #define unregister_hotcpu_notifier(nb)	({ (void)(nb); })
+ #endif		/* CONFIG_HOTPLUG_CPU */
+ 
+-#ifdef CONFIG_PM_SLEEP_SMP
++#if defined(CONFIG_PM_SLEEP_SMP) && !defined(CONFIG_MSM_MPDEC)
+ extern int disable_nonboot_cpus(void);
+ extern void enable_nonboot_cpus(void);
+ #else /* !CONFIG_PM_SLEEP_SMP */
+diff --git a/kernel/cpu.c b/kernel/cpu.c
+index 7b7f03e..6985f72 100644
+--- a/kernel/cpu.c
++++ b/kernel/cpu.c
+@@ -388,6 +388,7 @@ EXPORT_SYMBOL_GPL(cpu_up);
+ #ifdef CONFIG_PM_SLEEP_SMP
+ static cpumask_var_t frozen_cpus;
+ 
++#if !defined(CONFIG_MSM_MPDEC)
+ void __weak arch_disable_nonboot_cpus_begin(void)
+ {
+ }
+@@ -473,6 +474,7 @@ void __ref enable_nonboot_cpus(void)
+ out:
+ 	cpu_maps_update_done();
+ }
++#endif
+ 
+ static int __init alloc_frozen_cpus(void)
+ {
+-- 
+1.7.9.5
+

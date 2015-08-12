@@ -1,0 +1,26 @@
+From cbe8a7b5d433a895b4768d8ac41303b2ff4eb408 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 08:23:14 +0100
+Subject: [PATCH 136/338] defconfig: enable mpdecision
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index ddfc184..0d66a05 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -430,6 +430,7 @@ CONFIG_MSM_IPC_ROUTER_SECURITY=y
+ CONFIG_MSM_QMI_INTERFACE=y
+ # CONFIG_MSM_TEST_QMI_CLIENT is not set
+ # CONFIG_MSM_DALRPC is not set
++CONFIG_MSM_MPDEC=y
+ CONFIG_MSM_CPU_FREQ_SET_MIN_MAX=y
+ CONFIG_MSM_CPU_FREQ_MAX=2265600
+ CONFIG_MSM_CPU_FREQ_MIN=300000
+-- 
+1.7.9.5
+

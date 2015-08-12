@@ -1,0 +1,55 @@
+From 3eb978d492da29454a58acdcec13716162fd7910 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 04:04:49 +0100
+Subject: [PATCH 055/338] fs/fuse/control: fix 'warning: 'val' may be used
+ uninitialized in this function'
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ fs/fuse/control.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/fs/fuse/control.c b/fs/fuse/control.c
+index 42593c5..a16b175 100644
+--- a/fs/fuse/control.c
++++ b/fs/fuse/control.c
+@@ -107,7 +107,7 @@ static ssize_t fuse_conn_max_background_read(struct file *file,
+ 					     loff_t *ppos)
+ {
+ 	struct fuse_conn *fc;
+-	unsigned val;
++	unsigned val = 0;
+ 
+ 	fc = fuse_ctl_file_conn_get(file);
+ 	if (!fc)
+@@ -123,7 +123,7 @@ static ssize_t fuse_conn_max_background_write(struct file *file,
+ 					      const char __user *buf,
+ 					      size_t count, loff_t *ppos)
+ {
+-	unsigned val;
++	unsigned val = 0;
+ 	ssize_t ret;
+ 
+ 	ret = fuse_conn_limit_write(file, buf, count, ppos, &val,
+@@ -144,7 +144,7 @@ static ssize_t fuse_conn_congestion_threshold_read(struct file *file,
+ 						   loff_t *ppos)
+ {
+ 	struct fuse_conn *fc;
+-	unsigned val;
++	unsigned val = 0;
+ 
+ 	fc = fuse_ctl_file_conn_get(file);
+ 	if (!fc)
+@@ -160,7 +160,7 @@ static ssize_t fuse_conn_congestion_threshold_write(struct file *file,
+ 						    const char __user *buf,
+ 						    size_t count, loff_t *ppos)
+ {
+-	unsigned val;
++	unsigned val = 0;
+ 	ssize_t ret;
+ 
+ 	ret = fuse_conn_limit_write(file, buf, count, ppos, &val,
+-- 
+1.7.9.5
+

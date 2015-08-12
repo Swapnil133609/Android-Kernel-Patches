@@ -1,0 +1,27 @@
+From 4cff8611585ee39d176d4fb200b56e41b8c15bcc Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 5 Nov 2013 22:50:59 +0100
+Subject: [PATCH 191/338] msm_dcvs: increase max dcvs freqs
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_dcvs.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/msm_dcvs.c b/arch/arm/mach-msm/msm_dcvs.c
+index 1a919fc..ceff5f8 100644
+--- a/arch/arm/mach-msm/msm_dcvs.c
++++ b/arch/arm/mach-msm/msm_dcvs.c
+@@ -146,7 +146,7 @@ static struct dcvs_core core_list[CORES_MAX];
+ 
+ static struct kobject *cores_kobj;
+ 
+-#define DCVS_MAX_NUM_FREQS 15
++#define DCVS_MAX_NUM_FREQS 25
+ static struct msm_dcvs_freq_entry cpu_freq_tbl[DCVS_MAX_NUM_FREQS];
+ static unsigned num_cpu_freqs;
+ static struct msm_dcvs_platform_data *dcvs_pdata;
+-- 
+1.7.9.5
+

@@ -1,0 +1,147 @@
+From 21c2caf67627e3c7554e2801e77a825666d188b4 Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Fri, 22 Jun 2012 05:31:52 +0200
+Subject: [PATCH 091/338] mach-msm: mpdecision: pause if CPU is unplugged
+ outside of mpdecision
+
+This fixes cpu wars if something else tries to control the cpus.
+default delay: 10000ms
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |   63 ++++++++++++++++++++++++++++--------
+ 1 file changed, 49 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 5133081..2d3e664 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -34,8 +34,9 @@
+ 
+ #define MPDEC_TAG "[MPDEC]: "
+ #define MSM_MPDEC_DELAY 500
+-#define CPU_UPDELAY 200
+-#define CPU_DOWNDELAY 200
++#define MSM_MPDEC_CPU_UPDELAY 200
++#define MSM_MPDEC_CPU_DOWNDELAY 200
++#define MSM_MPDEC_PAUSE 10000
+ 
+ enum {
+ 	MSM_MPDEC_DISABLED = 0,
+@@ -46,6 +47,7 @@ enum {
+ 
+ struct msm_mpdec_suspend_t {
+ 	struct mutex suspend_mutex;
++	int online;
+ 	int device_suspended;
+ };
+ static DEFINE_PER_CPU(struct msm_mpdec_suspend_t, msm_mpdec_suspend);
+@@ -54,6 +56,7 @@ static struct delayed_work msm_mpdec_work;
+ static DEFINE_MUTEX(msm_cpu_lock);
+ 
+ bool scroff_single_core = true;
++bool was_paused = false;
+ 
+ static unsigned int NwNs_Threshold[4] = {20, 0, 0, 5};
+ static unsigned int TwTs_Threshold[4] = {250, 0, 0, 250};
+@@ -121,6 +124,17 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 	if (!mutex_trylock(&msm_cpu_lock))
+ 		goto out;
+ 
++	/* if sth messed with the cpus, update the check vars so we can proceed */
++	if (was_paused) {
++		for_each_possible_cpu(cpu) {
++			if (cpu_online(cpu))
++				per_cpu(msm_mpdec_suspend, cpu).online = true;
++			else if (!cpu_online(cpu))
++				per_cpu(msm_mpdec_suspend, cpu).online = false;
++		}
++		was_paused = false;
++	}
++
+ 	ret = mp_decision();
+ 	switch (ret) {
+ 	case MSM_MPDEC_DISABLED:
+@@ -128,20 +142,36 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 		break;
+ 	case MSM_MPDEC_DOWN:
+ 		cpu = (CONFIG_NR_CPUS - 1);
+-		if ((cpu < nr_cpu_ids) && (cpu_online(cpu))) {
+-			cpu_down(cpu);
+-			msleep(CPU_DOWNDELAY);
+-			pr_info(MPDEC_TAG"CPU[%d] 1->0 | Mask=[%d%d]\n",
+-					cpu, cpu_online(0), cpu_online(1));
++		if (cpu < nr_cpu_ids) {
++			if ((per_cpu(msm_mpdec_suspend, cpu).online == true) && (cpu_online(cpu))) {
++				cpu_down(cpu);
++				per_cpu(msm_mpdec_suspend, cpu).online = false;
++				msleep(MSM_MPDEC_CPU_DOWNDELAY);
++				pr_info(MPDEC_TAG"CPU[%d] 1->0 | Mask=[%d%d]\n",
++						cpu, cpu_online(0), cpu_online(1));
++			} else {
++				pr_info(MPDEC_TAG"CPU[%d] was hotplugged outside of mpdecision! | pausing [%d]ms\n",
++						cpu, MSM_MPDEC_PAUSE);
++				msleep(MSM_MPDEC_PAUSE);
++				was_paused = true;
++			}
+ 		}
+ 		break;
+ 	case MSM_MPDEC_UP:
+ 		cpu = (CONFIG_NR_CPUS - 1);
+-		if ((cpu < nr_cpu_ids) && (!cpu_online(cpu))) {
+-			cpu_up(cpu);
+-			msleep(CPU_UPDELAY);
+-			pr_info(MPDEC_TAG"CPU[%d] 0->1 | Mask=[%d%d]\n",
+-					cpu, cpu_online(0), cpu_online(1));
++		if (cpu < nr_cpu_ids) {
++			if ((per_cpu(msm_mpdec_suspend, cpu).online == false) && (!cpu_online(cpu))) {
++				cpu_up(cpu);
++				per_cpu(msm_mpdec_suspend, cpu).online = true;
++				msleep(MSM_MPDEC_CPU_UPDELAY);
++				pr_info(MPDEC_TAG"CPU[%d] 0->1 | Mask=[%d%d]\n",
++						cpu, cpu_online(0), cpu_online(1));
++			} else {
++				pr_info(MPDEC_TAG"CPU[%d] was unplugged outside of mpdecision! | pausing [%d]ms\n",
++						cpu, MSM_MPDEC_PAUSE);
++				msleep(MSM_MPDEC_PAUSE);
++				was_paused = true;
++			}
+ 		}
+ 		break;
+ 	default:
+@@ -162,8 +192,10 @@ static void msm_mpdec_early_suspend(struct early_suspend *h)
+ 	for_each_possible_cpu(cpu) {
+ 		mutex_lock(&per_cpu(msm_mpdec_suspend, cpu).suspend_mutex);
+ 		if (((cpu >= (CONFIG_NR_CPUS - 1)) && (num_online_cpus() > 1)) && (scroff_single_core)) {
+-			pr_info(MPDEC_TAG"Screen -> off. Suspending CPU%d", cpu);
++			pr_info(MPDEC_TAG"Screen -> off. Suspending CPU%d | Mask=[%d%d]\n",
++					cpu, cpu_online(0), cpu_online(1));
+ 			cpu_down(cpu);
++			per_cpu(msm_mpdec_suspend, cpu).online = false;
+ 			per_cpu(msm_mpdec_suspend, cpu).device_suspended = true;
+ 		}
+ 		mutex_unlock(&per_cpu(msm_mpdec_suspend, cpu).suspend_mutex);
+@@ -179,8 +211,10 @@ static void msm_mpdec_late_resume(struct early_suspend *h)
+ 			/* Always enable cpus when screen comes online.
+ 			 * This boosts the wakeup process.
+ 			 */
+-			pr_info(MPDEC_TAG"Screen -> on. Hot plugging CPU%d", cpu);
++			pr_info(MPDEC_TAG"Screen -> on. Hot plugging CPU%d | Mask=[%d%d]\n",
++					cpu, cpu_online(0), cpu_online(1));
+ 			cpu_up(cpu);
++			per_cpu(msm_mpdec_suspend, cpu).online = true;
+ 			per_cpu(msm_mpdec_suspend, cpu).device_suspended = false;
+ 		}
+ 		mutex_unlock(&per_cpu(msm_mpdec_suspend, cpu).suspend_mutex);
+@@ -199,6 +233,7 @@ static int __init msm_mpdec(void)
+ 	for_each_possible_cpu(cpu) {
+ 		mutex_init(&(per_cpu(msm_mpdec_suspend, cpu).suspend_mutex));
+ 		per_cpu(msm_mpdec_suspend, cpu).device_suspended = false;
++		per_cpu(msm_mpdec_suspend, cpu).online = true;
+ 	}
+ 
+ 	INIT_DELAYED_WORK(&msm_mpdec_work, msm_mpdec_work_thread);
+-- 
+1.7.9.5
+

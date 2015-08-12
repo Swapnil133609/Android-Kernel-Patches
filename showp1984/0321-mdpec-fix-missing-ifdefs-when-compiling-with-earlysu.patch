@@ -1,0 +1,39 @@
+From 9af0a8bd9c7b262f8d9305b31dc47bf1595ce017 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sun, 1 Dec 2013 01:40:21 +0100
+Subject: [PATCH 321/338] mdpec: fix missing ifdefs when compiling with
+ earlysuspend
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 92c5b35..241bc47 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -51,7 +51,9 @@ DEFINE_PER_CPU(struct msm_mpdec_cpudata_t, msm_mpdec_cpudata);
+ EXPORT_PER_CPU_SYMBOL_GPL(msm_mpdec_cpudata);
+ 
+ static bool mpdec_suspended = false;
++#ifndef CONFIG_HAS_EARLYSUSPEND
+ static struct notifier_block msm_mpdec_lcd_notif;
++#endif
+ static struct delayed_work msm_mpdec_work;
+ static struct workqueue_struct *msm_mpdec_workq;
+ static DEFINE_MUTEX(mpdec_msm_cpu_lock);
+@@ -1212,7 +1214,9 @@ static int __init msm_mpdec_init(void) {
+ late_initcall(msm_mpdec_init);
+ 
+ void msm_mpdec_exit(void) {
++#ifndef CONFIG_HAS_EARLYSUSPEND
+ 	lcd_unregister_client(&msm_mpdec_lcd_notif);
++#endif
+ #ifdef CONFIG_MSM_MPDEC_INPUTBOOST_CPUMIN
+ 	input_unregister_handler(&mpdec_input_handler);
+ 	destroy_workqueue(msm_mpdec_revib_workq);
+-- 
+1.7.9.5
+

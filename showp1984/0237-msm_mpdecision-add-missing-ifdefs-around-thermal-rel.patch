@@ -1,0 +1,31 @@
+From 6b8e4aad71c7dc50556b2b5f85600f4c89c640fa Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 11 Nov 2013 00:47:44 +0100
+Subject: [PATCH 237/338] msm_mpdecision: add missing #ifdefs around thermal
+ related code This fixes issue #19 (compilation
+ without thermal)
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 8dd17b2..a16fc67 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -441,7 +441,10 @@ static void mpdec_input_callback(struct work_struct *unused) {
+ 	return;
+ }
+ 
++#ifdef CONFIG_BRICKED_THERMAL
+ extern int bricked_thermal_throttled;
++#endif
++
+ static void mpdec_input_event(struct input_handle *handle, unsigned int type,
+ 				unsigned int code, int value) {
+ 	int i = 0;
+-- 
+1.7.9.5
+

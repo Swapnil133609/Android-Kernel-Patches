@@ -1,0 +1,28 @@
+From 3c0cbe33ec91a7847304d98f0a33e4ea7fdca591 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 5 Nov 2013 18:41:22 +0100
+Subject: [PATCH 072/338] fix: kernel/auditsc.c:927:23: warning: 'state' may
+ be used uninitialized in this function
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/auditsc.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/auditsc.c b/kernel/auditsc.c
+index af1de0f..e3fd8e5 100644
+--- a/kernel/auditsc.c
++++ b/kernel/auditsc.c
+@@ -913,7 +913,7 @@ static int audit_filter_inode_name(struct task_struct *tsk,
+ 	int h = audit_hash_ino((u32)n->ino);
+ 	struct list_head *list = &audit_inode_hash[h];
+ 	struct audit_entry *e;
+-	enum audit_state state;
++	enum audit_state state = 0;
+ 
+ 	word = AUDIT_WORD(ctx->major);
+ 	bit  = AUDIT_BIT(ctx->major);
+-- 
+1.7.9.5
+

@@ -1,0 +1,37 @@
+From 98ff1243a547239eff508fc00f72d3582119c6d9 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 11 Nov 2013 01:35:23 +0100
+Subject: [PATCH 248/338] net/socket.c: fix: warning: 'sock/sock1/sock2' may
+ be used uninitialized in this function
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ net/socket.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/net/socket.c b/net/socket.c
+index 851edcd..8fd89bf 100644
+--- a/net/socket.c
++++ b/net/socket.c
+@@ -1322,7 +1322,7 @@ EXPORT_SYMBOL(sock_create_kern);
+ SYSCALL_DEFINE3(socket, int, family, int, type, int, protocol)
+ {
+ 	int retval;
+-	struct socket *sock;
++	struct socket *sock = NULL;
+ 	int flags;
+ 
+ 	/* Check the SOCK_* constants for consistency.  */
+@@ -1363,7 +1363,7 @@ out_release:
+ SYSCALL_DEFINE4(socketpair, int, family, int, type, int, protocol,
+ 		int __user *, usockvec)
+ {
+-	struct socket *sock1, *sock2;
++	struct socket *sock1 = NULL, *sock2 = NULL;
+ 	int fd1, fd2, err;
+ 	struct file *newfile1, *newfile2;
+ 	int flags;
+-- 
+1.7.9.5
+

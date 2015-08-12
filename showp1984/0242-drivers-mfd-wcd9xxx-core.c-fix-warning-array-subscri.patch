@@ -1,0 +1,31 @@
+From 27648f6b6e8f4563a5185b539569a6b9143a71ad Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 11 Nov 2013 01:17:21 +0100
+Subject: [PATCH 242/338] drivers/mfd/wcd9xxx-core.c: fix: warning: array
+ subscript is below array bounds
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/mfd/wcd9xxx-core.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mfd/wcd9xxx-core.c b/drivers/mfd/wcd9xxx-core.c
+index 31750af..141d9f2 100644
+--- a/drivers/mfd/wcd9xxx-core.c
++++ b/drivers/mfd/wcd9xxx-core.c
+@@ -719,8 +719,9 @@ static int wcd9xxx_enable_static_supplies(struct wcd9xxx *wcd9xxx,
+ 	}
+ 
+ 	while (ret && --i)
+-		if (!pdata->regulator[i].ondemand)
+-			regulator_disable(wcd9xxx->supplies[i].consumer);
++		if (i < wcd9xxx->num_of_supplies)
++			if (!pdata->regulator[i].ondemand)
++				regulator_disable(wcd9xxx->supplies[i].consumer);
+ 
+ 	return ret;
+ }
+-- 
+1.7.9.5
+

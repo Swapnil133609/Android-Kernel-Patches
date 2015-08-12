@@ -1,0 +1,75 @@
+From c6806275b14ae984a85d557f13b8fc5f58eab9e8 Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Sun, 22 Jan 2012 03:49:34 +0100
+Subject: [PATCH 044/338] Makefile: adding config variable for Os/O2/O3
+ compilation
+
+Conflicts:
+
+	init/Kconfig
+
+Conflicts:
+	Makefile
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ Makefile     |   10 ++++++++--
+ init/Kconfig |   17 ++++++++++++-----
+ 2 files changed, 20 insertions(+), 7 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index be32c2f..b05c386 100644
+--- a/Makefile
++++ b/Makefile
+@@ -563,10 +563,16 @@ endif # $(dot-config)
+ all: vmlinux
+ 
+ ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
+-KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
+-else
++#we want all warnings to be seen and fixed
++#KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
++KBUILD_CFLAGS	+= -Os
++endif
++ifdef CONFIG_CC_OPTIMIZE_DEFAULT
+ KBUILD_CFLAGS	+= -O2
+ endif
++ifdef CONFIG_CC_OPTIMIZE_ALOT
++KBUILD_CFLAGS	+= -O3
++endif
+ 
+ include $(srctree)/arch/$(SRCARCH)/Makefile
+ 
+diff --git a/init/Kconfig b/init/Kconfig
+index e4b67a1..fcc7e62 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -939,13 +939,20 @@ source "usr/Kconfig"
+ 
+ endif
+ 
++choice
++  prompt "Optimization level"
++  default CC_OPTIMIZE_DEFAULT
++
+ config CC_OPTIMIZE_FOR_SIZE
+-	bool "Optimize for size"
+-	help
+-	  Enabling this option will pass "-Os" instead of "-O2" to gcc
+-	  resulting in a smaller kernel.
++	bool "Use -Os"
+ 
+-	  If unsure, say Y.
++config CC_OPTIMIZE_DEFAULT
++	bool "Use -O2"
++
++config CC_OPTIMIZE_ALOT
++	bool "Use -O3"
++
++endchoice
+ 
+ config SYSCTL
+ 	bool
+-- 
+1.7.9.5
+

@@ -1,0 +1,27 @@
+From 47df8b10a1a1077ff408b2e72300963b4d927284 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 5 Nov 2013 22:32:27 +0100
+Subject: [PATCH 159/338] defconfig: enable cpu over/underclocking
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index 818e336..640efe6 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -434,6 +434,8 @@ CONFIG_MSM_MPDEC=y
+ CONFIG_MSM_CPU_FREQ_SET_MIN_MAX=y
+ CONFIG_MSM_CPU_FREQ_MAX=2265600
+ CONFIG_MSM_CPU_FREQ_MIN=300000
++CONFIG_CPU_OVERCLOCK=y
++CONFIG_CPU_UNDERCLOCK=y
+ CONFIG_CPU_VOLTAGE_TABLE=y
+ # CONFIG_MSM_AVS_HW is not set
+ # CONFIG_MSM_HW3D is not set
+-- 
+1.7.9.5
+

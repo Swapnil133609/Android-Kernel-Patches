@@ -1,0 +1,27 @@
+From 9ee7dc660582d00ca1d40a2be797a3f55a858e77 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sun, 6 Jan 2013 01:22:49 +0100
+Subject: [PATCH 168/338] acpu: show a useful warn message
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/acpuclock-krait.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/acpuclock-krait.c b/arch/arm/mach-msm/acpuclock-krait.c
+index 37f15d2..a5da1e0 100644
+--- a/arch/arm/mach-msm/acpuclock-krait.c
++++ b/arch/arm/mach-msm/acpuclock-krait.c
+@@ -988,7 +988,7 @@ void acpuclk_set_vdd(unsigned int khz, int vdd_uv) {
+ 
+ 		drv.acpu_freq_tbl[i].vdd_core = new_vdd_uv;
+ 	}
+-	pr_warn("faux123: user voltage table modified!\n");
++	pr_warn("%s: user voltage table modified!\n", __func__);
+ 	mutex_unlock(&driver_lock);
+ }
+ #endif	/* CONFIG_CPU_VOTALGE_TABLE */
+-- 
+1.7.9.5
+

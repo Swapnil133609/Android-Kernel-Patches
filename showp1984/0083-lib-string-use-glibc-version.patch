@@ -1,0 +1,78 @@
+From 91e47fee546dc889ad6e8ca958afb9e6380abb2b Mon Sep 17 00:00:00 2001
+From: Miao Xie <miaox@cn.fujitsu.com>
+Date: Mon, 19 Mar 2012 17:14:04 -0700
+Subject: [PATCH 083/338] lib/string: use glibc version
+
+the performance of memcpy and memmove of the general version is very
+inefficient, this patch improved them.
+
+Signed-off-by: Miao Xie <miaox*******>
+
+Conflicts:
+
+	lib/string.c
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ lib/string.c |   29 ++++++++++++-----------------
+ 1 file changed, 12 insertions(+), 17 deletions(-)
+
+diff --git a/lib/string.c b/lib/string.c
+index e5878de..070a3ed 100644
+--- a/lib/string.c
++++ b/lib/string.c
+@@ -26,6 +26,7 @@
+ #include <linux/export.h>
+ #include <linux/bug.h>
+ #include <linux/errno.h>
++#include <linux/memcopy.h>
+ 
+ #ifndef __HAVE_ARCH_STRNICMP
+ /**
+@@ -598,11 +599,11 @@ EXPORT_SYMBOL(memset);
+  */
+ void *memcpy(void *dest, const void *src, size_t count)
+ {
+-	char *tmp = dest;
+-	const char *s = src;
++	unsigned long dstp = (unsigned long)dest; 
++	unsigned long srcp = (unsigned long)src; 
+ 
+-	while (count--)
+-		*tmp++ = *s++;
++	/* Copy from the beginning to the end */ 
++	mem_copy_fwd(dstp, srcp, count); 
+ 	return dest;
+ }
+ EXPORT_SYMBOL(memcpy);
+@@ -619,21 +620,15 @@ EXPORT_SYMBOL(memcpy);
+  */
+ void *memmove(void *dest, const void *src, size_t count)
+ {
+-	char *tmp;
+-	const char *s;
++	unsigned long dstp = (unsigned long)dest; 
++	unsigned long srcp = (unsigned long)src; 
+ 
+-	if (dest <= src) {
+-		tmp = dest;
+-		s = src;
+-		while (count--)
+-			*tmp++ = *s++;
++	if (dest - src >= count) { 
++		/* Copy from the beginning to the end */ 
++		mem_copy_fwd(dstp, srcp, count); 
+ 	} else {
+-		tmp = dest;
+-		tmp += count;
+-		s = src;
+-		s += count;
+-		while (count--)
+-			*--tmp = *--s;
++		/* Copy from the end to the beginning */ 
++		mem_copy_bwd(dstp, srcp, count); 
+ 	}
+ 	return dest;
+ }
+-- 
+1.7.9.5
+

@@ -1,0 +1,35 @@
+From ca1b17dfaa6dff2aa2f10d705431219eb4a850d8 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 04:20:45 +0100
+Subject: [PATCH 135/338] defconfig: set proper min/max speeds
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+
+Conflicts:
+	arch/arm/configs/bricked_defconfig
+
+Conflicts:
+	arch/arm/configs/bricked_defconfig
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index 37b3428..ddfc184 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -430,7 +430,9 @@ CONFIG_MSM_IPC_ROUTER_SECURITY=y
+ CONFIG_MSM_QMI_INTERFACE=y
+ # CONFIG_MSM_TEST_QMI_CLIENT is not set
+ # CONFIG_MSM_DALRPC is not set
+-# CONFIG_MSM_CPU_FREQ_SET_MIN_MAX is not set
++CONFIG_MSM_CPU_FREQ_SET_MIN_MAX=y
++CONFIG_MSM_CPU_FREQ_MAX=2265600
++CONFIG_MSM_CPU_FREQ_MIN=300000
+ # CONFIG_MSM_AVS_HW is not set
+ # CONFIG_MSM_HW3D is not set
+ CONFIG_AMSS_7X25_VERSION_2009=y
+-- 
+1.7.9.5
+

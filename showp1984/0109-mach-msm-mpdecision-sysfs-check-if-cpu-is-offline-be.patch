@@ -1,0 +1,40 @@
+From d867594fbe3aa7c831f5ea62ba0732c264546898 Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Sun, 24 Jun 2012 01:19:37 +0200
+Subject: [PATCH 109/338] mach-msm: mpdecision: sysfs: check if cpu is offline
+ before hotplugging it
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |   14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index e5031d8..73e21c7 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -396,11 +396,15 @@ static ssize_t store_enabled(struct kobject *a, struct attribute *b,
+ 	case '0':
+ 		state = MSM_MPDEC_DISABLED;
+ 		cpu = (CONFIG_NR_CPUS - 1);
+-		per_cpu(msm_mpdec_cpudata, cpu).on_time = ktime_to_ms(ktime_get());
+-		per_cpu(msm_mpdec_cpudata, cpu).online = true;
+-		cpu_up(cpu);
+-		pr_info(MPDEC_TAG"nap time... Hot plugged CPU[%d] | Mask=[%d%d]\n",
+-				 cpu, cpu_online(0), cpu_online(1));
++		if (!cpu_online(cpu)) {
++			per_cpu(msm_mpdec_cpudata, cpu).on_time = ktime_to_ms(ktime_get());
++			per_cpu(msm_mpdec_cpudata, cpu).online = true;
++			cpu_up(cpu);
++			pr_info(MPDEC_TAG"nap time... Hot plugged CPU[%d] | Mask=[%d%d]\n",
++					 cpu, cpu_online(0), cpu_online(1));
++		} else {
++			pr_info(MPDEC_TAG"nap time...\n");
++		}
+ 		break;
+ 	case '1':
+ 		state = MSM_MPDEC_IDLE;
+-- 
+1.7.9.5
+

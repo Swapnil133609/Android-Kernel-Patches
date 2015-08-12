@@ -1,0 +1,37 @@
+From 5bd524f1a992d9a4cb96a41b8d36a737488be24f Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 8 May 2013 22:44:45 +0200
+Subject: [PATCH 183/338] msm_mpdecision: boost: don't schedule more check
+ than needed
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index b22a797..9a96c76 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -403,7 +403,7 @@ static void msm_mpdec_revib_work_thread(struct work_struct *work) {
+         queue_delayed_work_on(cpu,
+                               msm_mpdec_revib_workq,
+                               &per_cpu(msm_mpdec_revib_work, cpu),
+-                              msecs_to_jiffies((MSM_MPDEC_BOOSTTIME-500)));
++                              msecs_to_jiffies((per_cpu(msm_mpdec_cpudata, cpu).boost_until - ktime_to_ms(ktime_get()))));
+     }
+     return;
+ }
+@@ -439,7 +439,7 @@ static void mpdec_input_callback(struct work_struct *unused) {
+         queue_delayed_work_on(cpu,
+                               msm_mpdec_revib_workq,
+                               &per_cpu(msm_mpdec_revib_work, cpu),
+-                              msecs_to_jiffies((MSM_MPDEC_BOOSTTIME-500)));
++                              msecs_to_jiffies(MSM_MPDEC_BOOSTTIME));
+     } else if (boosted && per_cpu(msm_mpdec_cpudata, cpu).revib_wq_running) {
+         per_cpu(msm_mpdec_cpudata, cpu).boost_until = ktime_to_ms(ktime_get()) + MSM_MPDEC_BOOSTTIME;
+     }
+-- 
+1.7.9.5
+

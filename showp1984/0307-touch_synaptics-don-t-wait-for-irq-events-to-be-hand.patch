@@ -1,0 +1,28 @@
+From cdc15b85801314911d354cb28a2924fb27d61d8d Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 18 Nov 2013 23:47:03 +0100
+Subject: [PATCH 307/338] touch_synaptics: don't wait for irq events to be
+ handled, just disable the irq
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/touch_synaptics.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/input/touchscreen/touch_synaptics.c b/drivers/input/touchscreen/touch_synaptics.c
+index fad2344..a99e1c2 100644
+--- a/drivers/input/touchscreen/touch_synaptics.c
++++ b/drivers/input/touchscreen/touch_synaptics.c
+@@ -1642,7 +1642,7 @@ static int synaptics_ts_stop(struct synaptics_ts_data *ts)
+ 	if (s2w_switch == 0)
+ #endif
+ 	{
+-		disable_irq(ts->client->irq);
++		disable_irq_nosync(ts->client->irq);
+ 
+ 		cancel_delayed_work_sync(&ts->work_init);
+ 		release_all_ts_event(ts);
+-- 
+1.7.9.5
+

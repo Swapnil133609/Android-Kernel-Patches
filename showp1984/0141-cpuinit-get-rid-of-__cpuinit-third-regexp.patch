@@ -1,0 +1,1372 @@
+From 6cf77476a655e128c77a8f80a2365cdd55fd5947 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 5 Nov 2013 19:43:34 +0100
+Subject: [PATCH 141/338] cpuinit: get rid of __cpuinit, third regexp This
+ commit is the result of:
+
+find -name "*.c" | xargs sed -i "s/ __cpuinitdata//g"
+
+Signed-off-by: Arjan van de Ven <arjan@linux.intel.com>
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/kernel/arch_timer.c              |    2 +-
+ arch/arm/kernel/hw_breakpoint.c           |    2 +-
+ arch/arm/kernel/perf_event.c              |    2 +-
+ arch/arm/kernel/smp_twd.c                 |    2 +-
+ arch/arm/mach-exynos/mct.c                |    2 +-
+ arch/arm/mach-exynos/platsmp.c            |    2 +-
+ arch/arm/mach-msm/acpuclock-8x60.c        |    2 +-
+ arch/arm/mach-msm/acpuclock-krait-debug.c |    2 +-
+ arch/arm/mach-msm/acpuclock-krait.c       |    2 +-
+ arch/arm/plat-versatile/platsmp.c         |    2 +-
+ arch/blackfin/mach-common/smp.c           |    2 +-
+ arch/ia64/kernel/err_inject.c             |    2 +-
+ arch/ia64/kernel/mca.c                    |    2 +-
+ arch/ia64/kernel/salinfo.c                |    2 +-
+ arch/ia64/kernel/topology.c               |    4 ++--
+ arch/ia64/sn/kernel/setup.c               |    2 +-
+ arch/mips/cavium-octeon/octeon-irq.c      |    2 +-
+ arch/mips/kernel/cpu-bugs64.c             |    2 +-
+ arch/mips/kernel/cpu-probe.c              |    6 +++---
+ arch/mips/kernel/sync-r4k.c               |    8 ++++----
+ arch/mips/kernel/traps.c                  |    4 ++--
+ arch/mips/mm/c-r4k.c                      |    6 +++---
+ arch/mips/mm/page.c                       |   24 ++++++++++++------------
+ arch/mips/mm/tlb-r4k.c                    |    2 +-
+ arch/mips/mm/tlbex.c                      |   18 +++++++++---------
+ arch/mips/pmc-sierra/yosemite/smp.c       |    6 +++---
+ arch/parisc/kernel/smp.c                  |    4 ++--
+ arch/powerpc/kernel/smp.c                 |    4 ++--
+ arch/powerpc/kernel/sysfs.c               |    2 +-
+ arch/powerpc/mm/mmu_context_nohash.c      |    2 +-
+ arch/powerpc/mm/numa.c                    |    2 +-
+ arch/powerpc/platforms/powermac/smp.c     |    2 +-
+ arch/s390/appldata/appldata_base.c        |    2 +-
+ arch/s390/kernel/smp.c                    |    2 +-
+ arch/sh/kernel/cpu/init.c                 |    2 +-
+ arch/sh/kernel/cpu/sh4a/smp-shx3.c        |    2 +-
+ arch/sparc/kernel/smp_32.c                |    4 ++--
+ arch/sparc/kernel/sysfs.c                 |    2 +-
+ arch/sparc/mm/srmmu.c                     |    2 +-
+ arch/tile/kernel/setup.c                  |    6 +++---
+ arch/tile/kernel/smpboot.c                |    2 +-
+ arch/x86/kernel/apic/apic.c               |    6 +++---
+ arch/x86/kernel/cpu/common.c              |   14 +++++++-------
+ arch/x86/kernel/cpu/cyrix.c               |    4 ++--
+ arch/x86/kernel/cpu/intel_cacheinfo.c     |    2 +-
+ arch/x86/kernel/cpu/mcheck/mce.c          |    2 +-
+ arch/x86/kernel/cpu/mcheck/therm_throt.c  |    2 +-
+ arch/x86/kernel/i387.c                    |    2 +-
+ arch/x86/kernel/kvm.c                     |    2 +-
+ arch/x86/kernel/mmconf-fam10h_64.c        |    4 ++--
+ arch/x86/kernel/setup.c                   |    2 +-
+ arch/x86/kernel/smpboot.c                 |    4 ++--
+ arch/x86/kernel/tboot.c                   |    2 +-
+ arch/x86/kernel/tsc_sync.c                |   12 ++++++------
+ arch/x86/kernel/x86_init.c                |    2 +-
+ arch/x86/mm/numa.c                        |    2 +-
+ arch/x86/mm/numa_emulation.c              |    2 +-
+ arch/x86/mm/setup_nx.c                    |    2 +-
+ arch/x86/pci/amd_bus.c                    |    2 +-
+ arch/x86/xen/enlighten.c                  |    2 +-
+ block/blk-iopoll.c                        |    2 +-
+ block/blk-softirq.c                       |    2 +-
+ drivers/acpi/processor_idle.c             |    4 ++--
+ drivers/cpufreq/powernow-k7.c             |    2 +-
+ drivers/infiniband/hw/ehca/ehca_irq.c     |    2 +-
+ kernel/hrtimer.c                          |    2 +-
+ kernel/printk.c                           |    2 +-
+ kernel/sched/core.c                       |    2 +-
+ kernel/smp.c                              |    2 +-
+ kernel/softirq.c                          |    4 ++--
+ kernel/stop_machine.c                     |    2 +-
+ kernel/timer.c                            |    4 ++--
+ kernel/watchdog.c                         |    2 +-
+ mm/page-writeback.c                       |    2 +-
+ mm/slab.c                                 |    2 +-
+ mm/slub.c                                 |    2 +-
+ mm/vmstat.c                               |    2 +-
+ 77 files changed, 131 insertions(+), 131 deletions(-)
+
+diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+index d7fcb68..ffde93d 100644
+--- a/arch/arm/kernel/arch_timer.c
++++ b/arch/arm/kernel/arch_timer.c
+@@ -389,7 +389,7 @@ static void arch_timer_stop(struct clock_event_device *clk)
+ 	clk->set_mode(CLOCK_EVT_MODE_UNUSED, clk);
+ }
+ 
+-static struct local_timer_ops arch_timer_ops __cpuinitdata = {
++static struct local_timer_ops arch_timer_ops = {
+ 	.setup	= arch_timer_setup,
+ 	.stop	= arch_timer_stop,
+ };
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index 457ed10..c0140c1 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -973,7 +973,7 @@ static int dbg_reset_notify(struct notifier_block *self,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata dbg_reset_nb = {
++static struct notifier_block dbg_reset_nb = {
+ 	.notifier_call = dbg_reset_notify,
+ };
+ 
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 3189ee3..d43daea 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -902,7 +902,7 @@ static void armpmu_update_counters(void)
+ 	}
+ }
+ 
+-static struct notifier_block __cpuinitdata pmu_cpu_notifier = {
++static struct notifier_block pmu_cpu_notifier = {
+ 	.notifier_call = pmu_cpu_notify,
+ };
+ 
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 52d4a96..7c3a444 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -257,7 +257,7 @@ static int twd_timer_setup(struct clock_event_device *clk)
+ 	return 0;
+ }
+ 
+-static struct local_timer_ops twd_lt_ops __cpuinitdata = {
++static struct local_timer_ops twd_lt_ops = {
+ 	.setup	= twd_timer_setup,
+ 	.stop	= twd_timer_stop,
+ };
+diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
+index fd442e9..b10e2d9 100644
+--- a/arch/arm/mach-exynos/mct.c
++++ b/arch/arm/mach-exynos/mct.c
+@@ -443,7 +443,7 @@ static void exynos4_local_timer_stop(struct clock_event_device *evt)
+ 		disable_percpu_irq(EXYNOS_IRQ_MCT_LOCALTIMER);
+ }
+ 
+-static struct local_timer_ops exynos4_mct_tick_ops __cpuinitdata = {
++static struct local_timer_ops exynos4_mct_tick_ops = {
+ 	.setup	= exynos4_local_timer_setup,
+ 	.stop	= exynos4_local_timer_stop,
+ };
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 59bb79f..067d6d9 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -42,7 +42,7 @@ extern void exynos4_secondary_startup(void);
+  * boot "holding pen"
+  */
+ 
+-volatile int __cpuinitdata pen_release = -1;
++volatile int pen_release = -1;
+ 
+ /*
+  * Write pen_release in a way that is guaranteed to be visible to all
+diff --git a/arch/arm/mach-msm/acpuclock-8x60.c b/arch/arm/mach-msm/acpuclock-8x60.c
+index 2dbf9cb..5a9d3e6 100644
+--- a/arch/arm/mach-msm/acpuclock-8x60.c
++++ b/arch/arm/mach-msm/acpuclock-8x60.c
+@@ -980,7 +980,7 @@ static int acpuclock_cpu_callback(struct notifier_block *nfb,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata acpuclock_cpu_notifier = {
++static struct notifier_block acpuclock_cpu_notifier = {
+ 	.notifier_call = acpuclock_cpu_callback,
+ };
+ 
+diff --git a/arch/arm/mach-msm/acpuclock-krait-debug.c b/arch/arm/mach-msm/acpuclock-krait-debug.c
+index 4a21313..5322268 100644
+--- a/arch/arm/mach-msm/acpuclock-krait-debug.c
++++ b/arch/arm/mach-msm/acpuclock-krait-debug.c
+@@ -359,7 +359,7 @@ static int debug_cpu_callback(struct notifier_block *nfb,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata debug_cpu_notifier = {
++static struct notifier_block debug_cpu_notifier = {
+ 	.notifier_call = debug_cpu_callback,
+ };
+ 
+diff --git a/arch/arm/mach-msm/acpuclock-krait.c b/arch/arm/mach-msm/acpuclock-krait.c
+index 05e4cf6..977652f 100644
+--- a/arch/arm/mach-msm/acpuclock-krait.c
++++ b/arch/arm/mach-msm/acpuclock-krait.c
+@@ -1036,7 +1036,7 @@ static int acpuclk_cpu_callback(struct notifier_block *nfb,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata acpuclk_cpu_notifier = {
++static struct notifier_block acpuclk_cpu_notifier = {
+ 	.notifier_call = acpuclk_cpu_callback,
+ };
+ 
+diff --git a/arch/arm/plat-versatile/platsmp.c b/arch/arm/plat-versatile/platsmp.c
+index 5dc5369..992693a 100644
+--- a/arch/arm/plat-versatile/platsmp.c
++++ b/arch/arm/plat-versatile/platsmp.c
+@@ -23,7 +23,7 @@
+  * control for which core is the next to come out of the secondary
+  * boot "holding pen"
+  */
+-volatile int __cpuinitdata pen_release = -1;
++volatile int pen_release = -1;
+ 
+ /*
+  * Write pen_release in a way that is guaranteed to be visible to all
+diff --git a/arch/blackfin/mach-common/smp.c b/arch/blackfin/mach-common/smp.c
+index 29080b8..21b6c7e 100644
+--- a/arch/blackfin/mach-common/smp.c
++++ b/arch/blackfin/mach-common/smp.c
+@@ -46,7 +46,7 @@ struct corelock_slot corelock __attribute__ ((__section__(".l2.bss")));
+ unsigned long blackfin_iflush_l1_entry[NR_CPUS];
+ #endif
+ 
+-struct blackfin_initial_pda __cpuinitdata initial_pda_coreb;
++struct blackfin_initial_pda initial_pda_coreb;
+ 
+ #define BFIN_IPI_TIMER	      0
+ #define BFIN_IPI_RESCHEDULE   1
+diff --git a/arch/ia64/kernel/err_inject.c b/arch/ia64/kernel/err_inject.c
+index 4428d50..4dc334c 100644
+--- a/arch/ia64/kernel/err_inject.c
++++ b/arch/ia64/kernel/err_inject.c
+@@ -256,7 +256,7 @@ static int err_inject_cpu_callback(struct notifier_block *nfb,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata err_inject_cpu_notifier =
++static struct notifier_block err_inject_cpu_notifier =
+ {
+ 	.notifier_call = err_inject_cpu_callback,
+ };
+diff --git a/arch/ia64/kernel/mca.c b/arch/ia64/kernel/mca.c
+index a54bb82..c377b54 100644
+--- a/arch/ia64/kernel/mca.c
++++ b/arch/ia64/kernel/mca.c
+@@ -1922,7 +1922,7 @@ static int mca_cpu_callback(struct notifier_block *nfb,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block mca_cpu_notifier __cpuinitdata = {
++static struct notifier_block mca_cpu_notifier = {
+ 	.notifier_call = mca_cpu_callback
+ };
+ 
+diff --git a/arch/ia64/kernel/salinfo.c b/arch/ia64/kernel/salinfo.c
+index 79802e5..1a89ec5 100644
+--- a/arch/ia64/kernel/salinfo.c
++++ b/arch/ia64/kernel/salinfo.c
+@@ -616,7 +616,7 @@ salinfo_cpu_callback(struct notifier_block *nb, unsigned long action, void *hcpu
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block salinfo_cpu_notifier __cpuinitdata =
++static struct notifier_block salinfo_cpu_notifier =
+ {
+ 	.notifier_call = salinfo_cpu_callback,
+ 	.priority = 0,
+diff --git a/arch/ia64/kernel/topology.c b/arch/ia64/kernel/topology.c
+index fb9e402..3032795 100644
+--- a/arch/ia64/kernel/topology.c
++++ b/arch/ia64/kernel/topology.c
+@@ -135,7 +135,7 @@ struct cpu_cache_info {
+ 	struct kobject kobj;
+ };
+ 
+-static struct cpu_cache_info	all_cpu_cache_info[NR_CPUS] __cpuinitdata;
++static struct cpu_cache_info	all_cpu_cache_info[NR_CPUS];
+ #define LEAF_KOBJECT_PTR(x,y)    (&all_cpu_cache_info[x].cache_leaves[y])
+ 
+ #ifdef CONFIG_SMP
+@@ -445,7 +445,7 @@ static int cache_cpu_callback(struct notifier_block *nfb,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata cache_cpu_notifier =
++static struct notifier_block cache_cpu_notifier =
+ {
+ 	.notifier_call = cache_cpu_callback
+ };
+diff --git a/arch/ia64/sn/kernel/setup.c b/arch/ia64/sn/kernel/setup.c
+index bc4ee2f..53b01b8 100644
+--- a/arch/ia64/sn/kernel/setup.c
++++ b/arch/ia64/sn/kernel/setup.c
+@@ -192,7 +192,7 @@ void __init early_sn_setup(void)
+ }
+ 
+ extern int platform_intr_list[];
+-static int __cpuinitdata shub_1_1_found;
++static int shub_1_1_found;
+ 
+ /*
+  * sn_check_for_wars
+diff --git a/arch/mips/cavium-octeon/octeon-irq.c b/arch/mips/cavium-octeon/octeon-irq.c
+index dd0ecd1..01345f4 100644
+--- a/arch/mips/cavium-octeon/octeon-irq.c
++++ b/arch/mips/cavium-octeon/octeon-irq.c
+@@ -847,7 +847,7 @@ static void (*octeon_irq_ip2)(void);
+ static void (*octeon_irq_ip3)(void);
+ static void (*octeon_irq_ip4)(void);
+ 
+-void __cpuinitdata (*octeon_irq_setup_secondary)(void);
++void (*octeon_irq_setup_secondary)(void);
+ 
+ static void octeon_irq_percpu_enable(void)
+ {
+diff --git a/arch/mips/kernel/cpu-bugs64.c b/arch/mips/kernel/cpu-bugs64.c
+index d6a1864..28c9cb5 100644
+--- a/arch/mips/kernel/cpu-bugs64.c
++++ b/arch/mips/kernel/cpu-bugs64.c
+@@ -167,7 +167,7 @@ static inline void check_mult_sh(void)
+ 	panic(bug64hit, !R4000_WAR ? r4kwar : nowar);
+ }
+ 
+-static volatile int daddi_ov __cpuinitdata;
++static volatile int daddi_ov;
+ 
+ asmlinkage void __init do_daddi_ov(struct pt_regs *regs)
+ {
+diff --git a/arch/mips/kernel/cpu-probe.c b/arch/mips/kernel/cpu-probe.c
+index d18c884..914df7a 100644
+--- a/arch/mips/kernel/cpu-probe.c
++++ b/arch/mips/kernel/cpu-probe.c
+@@ -126,7 +126,7 @@ static int __init wait_disable(char *s)
+ 
+ __setup("nowait", wait_disable);
+ 
+-static int __cpuinitdata mips_fpu_disabled;
++static int mips_fpu_disabled;
+ 
+ static int __init fpu_disable(char *s)
+ {
+@@ -138,7 +138,7 @@ static int __init fpu_disable(char *s)
+ 
+ __setup("nofpu", fpu_disable);
+ 
+-int __cpuinitdata mips_dsp_disabled;
++int mips_dsp_disabled;
+ 
+ static int __init dsp_disable(char *s)
+ {
+@@ -640,7 +640,7 @@ static inline void cpu_probe_legacy(struct cpuinfo_mips *c, unsigned int cpu)
+ 	}
+ }
+ 
+-static char unknown_isa[] __cpuinitdata = KERN_ERR \
++static char unknown_isa[] = KERN_ERR \
+ 	"Unsupported ISA type, c0.config0: %d.";
+ 
+ static inline unsigned int decode_config0(struct cpuinfo_mips *c)
+diff --git a/arch/mips/kernel/sync-r4k.c b/arch/mips/kernel/sync-r4k.c
+index 01d0e01..7cbb650 100644
+--- a/arch/mips/kernel/sync-r4k.c
++++ b/arch/mips/kernel/sync-r4k.c
+@@ -20,10 +20,10 @@
+ #include <asm/barrier.h>
+ #include <asm/mipsregs.h>
+ 
+-static atomic_t __cpuinitdata count_start_flag = ATOMIC_INIT(0);
+-static atomic_t __cpuinitdata count_count_start = ATOMIC_INIT(0);
+-static atomic_t __cpuinitdata count_count_stop = ATOMIC_INIT(0);
+-static atomic_t __cpuinitdata count_reference = ATOMIC_INIT(0);
++static atomic_t count_start_flag = ATOMIC_INIT(0);
++static atomic_t count_count_start = ATOMIC_INIT(0);
++static atomic_t count_count_stop = ATOMIC_INIT(0);
++static atomic_t count_reference = ATOMIC_INIT(0);
+ 
+ #define COUNTON	100
+ #define NR_LOOPS 5
+diff --git a/arch/mips/kernel/traps.c b/arch/mips/kernel/traps.c
+index d2dc865..c7bf91a 100644
+--- a/arch/mips/kernel/traps.c
++++ b/arch/mips/kernel/traps.c
+@@ -1506,7 +1506,7 @@ int cp0_compare_irq_shift;
+ int cp0_perfcount_irq;
+ EXPORT_SYMBOL_GPL(cp0_perfcount_irq);
+ 
+-static int __cpuinitdata noulri;
++static int noulri;
+ 
+ static int __init ulri_disable(char *s)
+ {
+@@ -1638,7 +1638,7 @@ void __init set_handler(unsigned long offset, void *addr, unsigned long size)
+ 	local_flush_icache_range(ebase + offset, ebase + offset + size);
+ }
+ 
+-static char panic_null_cerr[] __cpuinitdata =
++static char panic_null_cerr[] =
+ 	"Trying to set NULL cache error exception handler";
+ 
+ /*
+diff --git a/arch/mips/mm/c-r4k.c b/arch/mips/mm/c-r4k.c
+index af20f53..6eb82ed 100644
+--- a/arch/mips/mm/c-r4k.c
++++ b/arch/mips/mm/c-r4k.c
+@@ -786,7 +786,7 @@ static inline void rm7k_erratum31(void)
+ 	}
+ }
+ 
+-static char *way_string[] __cpuinitdata = { NULL, "direct mapped", "2-way",
++static char *way_string[] = { NULL, "direct mapped", "2-way",
+ 	"3-way", "4-way", "5-way", "6-way", "7-way", "8-way"
+ };
+ 
+@@ -1320,7 +1320,7 @@ static void nxp_pr4450_fixup_config(void)
+ 	NXP_BARRIER();
+ }
+ 
+-static int __cpuinitdata cca = -1;
++static int cca = -1;
+ 
+ static int __init cca_setup(char *str)
+ {
+@@ -1373,7 +1373,7 @@ static void coherency_setup(void)
+ 
+ #if defined(CONFIG_DMA_NONCOHERENT)
+ 
+-static int __cpuinitdata coherentio;
++static int coherentio;
+ 
+ static int __init setcoherentio(char *str)
+ {
+diff --git a/arch/mips/mm/page.c b/arch/mips/mm/page.c
+index 511e745..b2382fb 100644
+--- a/arch/mips/mm/page.c
++++ b/arch/mips/mm/page.c
+@@ -65,8 +65,8 @@ UASM_L_LA(_copy_pref_both)
+ UASM_L_LA(_copy_pref_store)
+ 
+ /* We need one branch and therefore one relocation per target label. */
+-static struct uasm_label __cpuinitdata labels[5];
+-static struct uasm_reloc __cpuinitdata relocs[5];
++static struct uasm_label labels[5];
++static struct uasm_reloc relocs[5];
+ 
+ #define cpu_is_r4600_v1_x()	((read_c0_prid() & 0xfffffff0) == 0x00002010)
+ #define cpu_is_r4600_v2_x()	((read_c0_prid() & 0xfffffff0) == 0x00002020)
+@@ -110,20 +110,20 @@ void copy_page(void *to, void *from) __attribute__((alias("copy_page_array")));
+ EXPORT_SYMBOL(copy_page);
+ 
+ 
+-static int pref_bias_clear_store __cpuinitdata;
+-static int pref_bias_copy_load __cpuinitdata;
+-static int pref_bias_copy_store __cpuinitdata;
++static int pref_bias_clear_store;
++static int pref_bias_copy_load;
++static int pref_bias_copy_store;
+ 
+-static u32 pref_src_mode __cpuinitdata;
+-static u32 pref_dst_mode __cpuinitdata;
++static u32 pref_src_mode;
++static u32 pref_dst_mode;
+ 
+-static int clear_word_size __cpuinitdata;
+-static int copy_word_size __cpuinitdata;
++static int clear_word_size;
++static int copy_word_size;
+ 
+-static int half_clear_loop_size __cpuinitdata;
+-static int half_copy_loop_size __cpuinitdata;
++static int half_clear_loop_size;
++static int half_copy_loop_size;
+ 
+-static int cache_line_size __cpuinitdata;
++static int cache_line_size;
+ #define cache_line_mask() (cache_line_size - 1)
+ 
+ static inline void __cpuinit
+diff --git a/arch/mips/mm/tlb-r4k.c b/arch/mips/mm/tlb-r4k.c
+index 5807678..d727fe7 100644
+--- a/arch/mips/mm/tlb-r4k.c
++++ b/arch/mips/mm/tlb-r4k.c
+@@ -376,7 +376,7 @@ void add_wired_entry(unsigned long entrylo0, unsigned long entrylo1,
+ 	EXIT_CRITICAL(flags);
+ }
+ 
+-static int __cpuinitdata ntlb;
++static int ntlb;
+ static int __init set_ntlb(char *str)
+ {
+ 	get_option(&str, &ntlb);
+diff --git a/arch/mips/mm/tlbex.c b/arch/mips/mm/tlbex.c
+index 024dcf0..21d2a5e 100644
+--- a/arch/mips/mm/tlbex.c
++++ b/arch/mips/mm/tlbex.c
+@@ -226,19 +226,19 @@ static inline void dump_handler(const u32 *handler, int count)
+  * We deliberately chose a buffer size of 128, so we won't scribble
+  * over anything important on overflow before we panic.
+  */
+-static u32 tlb_handler[128] __cpuinitdata;
++static u32 tlb_handler[128];
+ 
+ /* simply assume worst case size for labels and relocs */
+-static struct uasm_label labels[128] __cpuinitdata;
+-static struct uasm_reloc relocs[128] __cpuinitdata;
++static struct uasm_label labels[128];
++static struct uasm_reloc relocs[128];
+ 
+ #ifdef CONFIG_64BIT
+-static int check_for_high_segbits __cpuinitdata;
++static int check_for_high_segbits;
+ #endif
+ 
+-static int check_for_high_segbits __cpuinitdata;
++static int check_for_high_segbits;
+ 
+-static unsigned int kscratch_used_mask __cpuinitdata;
++static unsigned int kscratch_used_mask;
+ 
+ static int allocate_kscratch(void)
+ {
+@@ -257,8 +257,8 @@ static int allocate_kscratch(void)
+ 	return r;
+ }
+ 
+-static int scratch_reg __cpuinitdata;
+-static int pgd_reg __cpuinitdata;
++static int scratch_reg;
++static int pgd_reg;
+ enum vmalloc64_mode {not_refill, refill_scratch, refill_noscratch};
+ 
+ static struct work_registers build_get_work_registers(u32 **p)
+@@ -387,7 +387,7 @@ static void build_r3000_tlb_refill_handler(void)
+  * other one.To keep things simple, we first assume linear space,
+  * then we relocate it to the final handler layout as needed.
+  */
+-static u32 final_handler[64] __cpuinitdata;
++static u32 final_handler[64];
+ 
+ /*
+  * Hazards
+diff --git a/arch/mips/pmc-sierra/yosemite/smp.c b/arch/mips/pmc-sierra/yosemite/smp.c
+index 10d4507..7e3b591 100644
+--- a/arch/mips/pmc-sierra/yosemite/smp.c
++++ b/arch/mips/pmc-sierra/yosemite/smp.c
+@@ -8,10 +8,10 @@
+ 
+ #define LAUNCHSTACK_SIZE 256
+ 
+-static __cpuinitdata arch_spinlock_t launch_lock = __ARCH_SPIN_LOCK_UNLOCKED;
++static arch_spinlock_t launch_lock = __ARCH_SPIN_LOCK_UNLOCKED;
+ 
+-static unsigned long secondary_sp __cpuinitdata;
+-static unsigned long secondary_gp __cpuinitdata;
++static unsigned long secondary_sp;
++static unsigned long secondary_gp;
+ 
+ static unsigned char launchstack[LAUNCHSTACK_SIZE] __initdata
+ 	__attribute__((aligned(2 * sizeof(long))));
+diff --git a/arch/parisc/kernel/smp.c b/arch/parisc/kernel/smp.c
+index bab71b8..f3494c8 100644
+--- a/arch/parisc/kernel/smp.c
++++ b/arch/parisc/kernel/smp.c
+@@ -62,9 +62,9 @@ static int smp_debug_lvl = 0;
+ volatile struct task_struct *smp_init_current_idle_task;
+ 
+ /* track which CPU is booting */
+-static volatile int cpu_now_booting __cpuinitdata;
++static volatile int cpu_now_booting;
+ 
+-static int parisc_max_cpus __cpuinitdata = 1;
++static int parisc_max_cpus = 1;
+ 
+ static DEFINE_PER_CPU(spinlock_t, ipi_lock);
+ 
+diff --git a/arch/powerpc/kernel/smp.c b/arch/powerpc/kernel/smp.c
+index db3725d..0337086 100644
+--- a/arch/powerpc/kernel/smp.c
++++ b/arch/powerpc/kernel/smp.c
+@@ -64,7 +64,7 @@
+ */
+ #ifdef CONFIG_HOTPLUG_CPU
+ /*
+- * Needed only for CONFIG_HOTPLUG_CPU because __cpuinitdata is
++ * Needed only for CONFIG_HOTPLUG_CPU because is
+  * removed after init for !CONFIG_HOTPLUG_CPU.
+  */
+ static DEFINE_PER_CPU(struct task_struct *, idle_thread_array);
+@@ -75,7 +75,7 @@ static DEFINE_PER_CPU(struct task_struct *, idle_thread_array);
+ static DEFINE_PER_CPU(int, cpu_state) = { 0 };
+ 
+ #else
+-static struct task_struct *idle_thread_array[NR_CPUS] __cpuinitdata ;
++static struct task_struct *idle_thread_array[NR_CPUS] ;
+ #define get_idle_for_cpu(x)      (idle_thread_array[(x)])
+ #define set_idle_for_cpu(x, p)   (idle_thread_array[(x)] = (p))
+ #endif
+diff --git a/arch/powerpc/kernel/sysfs.c b/arch/powerpc/kernel/sysfs.c
+index 4b4a399..a6289ae 100644
+--- a/arch/powerpc/kernel/sysfs.c
++++ b/arch/powerpc/kernel/sysfs.c
+@@ -512,7 +512,7 @@ static int sysfs_cpu_notify(struct notifier_block *self,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata sysfs_cpu_nb = {
++static struct notifier_block sysfs_cpu_nb = {
+ 	.notifier_call	= sysfs_cpu_notify,
+ };
+ 
+diff --git a/arch/powerpc/mm/mmu_context_nohash.c b/arch/powerpc/mm/mmu_context_nohash.c
+index 26b941c..6c3f2f4 100644
+--- a/arch/powerpc/mm/mmu_context_nohash.c
++++ b/arch/powerpc/mm/mmu_context_nohash.c
+@@ -370,7 +370,7 @@ static int mmu_context_cpu_notify(struct notifier_block *self,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata mmu_context_cpu_nb = {
++static struct notifier_block mmu_context_cpu_nb = {
+ 	.notifier_call	= mmu_context_cpu_notify,
+ };
+ 
+diff --git a/arch/powerpc/mm/numa.c b/arch/powerpc/mm/numa.c
+index 184c4af..8c34b7f 100644
+--- a/arch/powerpc/mm/numa.c
++++ b/arch/powerpc/mm/numa.c
+@@ -942,7 +942,7 @@ static void __init *careful_zallocation(int nid, unsigned long size,
+ 	return ret;
+ }
+ 
+-static struct notifier_block __cpuinitdata ppc64_numa_nb = {
++static struct notifier_block ppc64_numa_nb = {
+ 	.notifier_call = cpu_numa_callback,
+ 	.priority = 1 /* Must run before sched domains notifier. */
+ };
+diff --git a/arch/powerpc/platforms/powermac/smp.c b/arch/powerpc/platforms/powermac/smp.c
+index b4ddaa3..54b8627 100644
+--- a/arch/powerpc/platforms/powermac/smp.c
++++ b/arch/powerpc/platforms/powermac/smp.c
+@@ -885,7 +885,7 @@ static int smp_core99_cpu_notify(struct notifier_block *self,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata smp_core99_cpu_nb = {
++static struct notifier_block smp_core99_cpu_nb = {
+ 	.notifier_call	= smp_core99_cpu_notify,
+ };
+ #endif /* CONFIG_HOTPLUG_CPU */
+diff --git a/arch/s390/appldata/appldata_base.c b/arch/s390/appldata/appldata_base.c
+index 38d5bf1..6bf612d 100644
+--- a/arch/s390/appldata/appldata_base.c
++++ b/arch/s390/appldata/appldata_base.c
+@@ -610,7 +610,7 @@ static int appldata_cpu_notify(struct notifier_block *self,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata appldata_nb = {
++static struct notifier_block appldata_nb = {
+ 	.notifier_call = appldata_cpu_notify,
+ };
+ 
+diff --git a/arch/s390/kernel/smp.c b/arch/s390/kernel/smp.c
+index a7a3322..621a394 100644
+--- a/arch/s390/kernel/smp.c
++++ b/arch/s390/kernel/smp.c
+@@ -1052,7 +1052,7 @@ static int smp_cpu_notify(struct notifier_block *self,
+ 	return notifier_from_errno(err);
+ }
+ 
+-static struct notifier_block __cpuinitdata smp_cpu_nb = {
++static struct notifier_block smp_cpu_nb = {
+ 	.notifier_call = smp_cpu_notify,
+ };
+ 
+diff --git a/arch/sh/kernel/cpu/init.c b/arch/sh/kernel/cpu/init.c
+index 56de6c5..0a2ef46 100644
+--- a/arch/sh/kernel/cpu/init.c
++++ b/arch/sh/kernel/cpu/init.c
+@@ -43,7 +43,7 @@
+  * peripherals (nofpu, nodsp, and so forth).
+  */
+ #define onchip_setup(x)					\
+-static int x##_disabled __cpuinitdata = !cpu_has_##x;	\
++static int x##_disabled = !cpu_has_##x;	\
+ 							\
+ static int x##_setup(char *opts)			\
+ {							\
+diff --git a/arch/sh/kernel/cpu/sh4a/smp-shx3.c b/arch/sh/kernel/cpu/sh4a/smp-shx3.c
+index bac5fca..cb53ec6 100644
+--- a/arch/sh/kernel/cpu/sh4a/smp-shx3.c
++++ b/arch/sh/kernel/cpu/sh4a/smp-shx3.c
+@@ -143,7 +143,7 @@ shx3_cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata shx3_cpu_notifier = {
++static struct notifier_block shx3_cpu_notifier = {
+ 	.notifier_call		= shx3_cpu_callback,
+ };
+ 
+diff --git a/arch/sparc/kernel/smp_32.c b/arch/sparc/kernel/smp_32.c
+index f63cb8f..7071fed 100644
+--- a/arch/sparc/kernel/smp_32.c
++++ b/arch/sparc/kernel/smp_32.c
+@@ -36,7 +36,7 @@
+ 
+ #include "irq.h"
+ 
+-volatile unsigned long cpu_callin_map[NR_CPUS] __cpuinitdata = {0,};
++volatile unsigned long cpu_callin_map[NR_CPUS] = {0,};
+ 
+ cpumask_t smp_commenced_mask = CPU_MASK_NONE;
+ 
+@@ -123,7 +123,7 @@ void cpu_panic(void)
+ 	panic("SMP bolixed\n");
+ }
+ 
+-struct linux_prom_registers smp_penguin_ctable __cpuinitdata = { 0 };
++struct linux_prom_registers smp_penguin_ctable = { 0 };
+ 
+ void smp_send_reschedule(int cpu)
+ {
+diff --git a/arch/sparc/kernel/sysfs.c b/arch/sparc/kernel/sysfs.c
+index 3f2b5ec..c21c673 100644
+--- a/arch/sparc/kernel/sysfs.c
++++ b/arch/sparc/kernel/sysfs.c
+@@ -266,7 +266,7 @@ static int sysfs_cpu_notify(struct notifier_block *self,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata sysfs_cpu_nb = {
++static struct notifier_block sysfs_cpu_nb = {
+ 	.notifier_call	= sysfs_cpu_notify,
+ };
+ 
+diff --git a/arch/sparc/mm/srmmu.c b/arch/sparc/mm/srmmu.c
+index ea286c3..5bd7ac9 100644
+--- a/arch/sparc/mm/srmmu.c
++++ b/arch/sparc/mm/srmmu.c
+@@ -1256,7 +1256,7 @@ static inline void map_kernel(void)
+ /* Paging initialization on the Sparc Reference MMU. */
+ extern void sparc_context_init(int);
+ 
+-void (*poke_srmmu)(void) __cpuinitdata = NULL;
++void (*poke_srmmu)(void) = NULL;
+ 
+ extern unsigned long bootmem_init(unsigned long *pages_avail);
+ 
+diff --git a/arch/tile/kernel/setup.c b/arch/tile/kernel/setup.c
+index 7925f87..7bd2060 100644
+--- a/arch/tile/kernel/setup.c
++++ b/arch/tile/kernel/setup.c
+@@ -53,8 +53,8 @@ EXPORT_SYMBOL(node_data);
+ static bootmem_data_t __initdata node0_bdata;
+ 
+ /* Information on the NUMA nodes that we compute early */
+-unsigned long __cpuinitdata node_start_pfn[MAX_NUMNODES];
+-unsigned long __cpuinitdata node_end_pfn[MAX_NUMNODES];
++unsigned long node_start_pfn[MAX_NUMNODES];
++unsigned long node_end_pfn[MAX_NUMNODES];
+ unsigned long __initdata node_memmap_pfn[MAX_NUMNODES];
+ unsigned long __initdata node_percpu_pfn[MAX_NUMNODES];
+ unsigned long __initdata node_free_pfn[MAX_NUMNODES];
+@@ -63,7 +63,7 @@ static unsigned long __initdata node_percpu[MAX_NUMNODES];
+ 
+ #ifdef CONFIG_HIGHMEM
+ /* Page frame index of end of lowmem on each controller. */
+-unsigned long __cpuinitdata node_lowmem_end_pfn[MAX_NUMNODES];
++unsigned long node_lowmem_end_pfn[MAX_NUMNODES];
+ 
+ /* Number of pages that can be mapped into lowmem. */
+ static unsigned long __initdata mappable_physpages;
+diff --git a/arch/tile/kernel/smpboot.c b/arch/tile/kernel/smpboot.c
+index ac57759..3e51e70 100644
+--- a/arch/tile/kernel/smpboot.c
++++ b/arch/tile/kernel/smpboot.c
+@@ -133,7 +133,7 @@ static __init int reset_init_affinity(void)
+ }
+ late_initcall(reset_init_affinity);
+ 
+-static struct cpumask cpu_started __cpuinitdata;
++static struct cpumask cpu_started;
+ 
+ /*
+  * Activate a secondary processor.  Very minimal; don't add anything
+diff --git a/arch/x86/kernel/apic/apic.c b/arch/x86/kernel/apic/apic.c
+index 2e55ff8..774c0b2 100644
+--- a/arch/x86/kernel/apic/apic.c
++++ b/arch/x86/kernel/apic/apic.c
+@@ -56,7 +56,7 @@
+ 
+ unsigned int num_processors;
+ 
+-unsigned disabled_cpus __cpuinitdata;
++unsigned disabled_cpus;
+ 
+ /* Processor that is doing the boot up */
+ unsigned int boot_cpu_physical_apicid = -1U;
+@@ -2331,8 +2331,8 @@ static int apic_cluster_num(void)
+ 	return clusters;
+ }
+ 
+-static int __cpuinitdata multi_checked;
+-static int __cpuinitdata multi;
++static int multi_checked;
++static int multi;
+ 
+ static int set_multi(const struct dmi_system_id *d)
+ {
+diff --git a/arch/x86/kernel/cpu/common.c b/arch/x86/kernel/cpu/common.c
+index 5b514aa..d15885a 100644
+--- a/arch/x86/kernel/cpu/common.c
++++ b/arch/x86/kernel/cpu/common.c
+@@ -84,7 +84,7 @@ static const struct cpu_dev __cpuinitconst default_cpu = {
+ 	.c_x86_vendor	= X86_VENDOR_UNKNOWN,
+ };
+ 
+-static const struct cpu_dev *this_cpu __cpuinitdata = &default_cpu;
++static const struct cpu_dev *this_cpu = &default_cpu;
+ 
+ DEFINE_PER_CPU_PAGE_ALIGNED(struct gdt_page, gdt_page) = { .gdt = {
+ #ifdef CONFIG_X86_64
+@@ -156,8 +156,8 @@ static int __init x86_xsaveopt_setup(char *s)
+ __setup("noxsaveopt", x86_xsaveopt_setup);
+ 
+ #ifdef CONFIG_X86_32
+-static int cachesize_override __cpuinitdata = -1;
+-static int disable_x86_serial_nr __cpuinitdata = 1;
++static int cachesize_override = -1;
++static int disable_x86_serial_nr = 1;
+ 
+ static int __init cachesize_setup(char *str)
+ {
+@@ -257,7 +257,7 @@ static inline void squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
+ }
+ #endif
+ 
+-static int disable_smep __cpuinitdata;
++static int disable_smep;
+ static __init int setup_disable_smep(char *arg)
+ {
+ 	disable_smep = 1;
+@@ -352,8 +352,8 @@ static const char *__cpuinit table_lookup_model(struct cpuinfo_x86 *c)
+ 	return NULL;		/* Not found */
+ }
+ 
+-__u32 cpu_caps_cleared[NCAPINTS] __cpuinitdata;
+-__u32 cpu_caps_set[NCAPINTS] __cpuinitdata;
++__u32 cpu_caps_cleared[NCAPINTS];
++__u32 cpu_caps_set[NCAPINTS];
+ 
+ void load_percpu_segment(int cpu)
+ {
+@@ -954,7 +954,7 @@ static void __print_cpu_msr(void)
+ 	}
+ }
+ 
+-static int show_msr __cpuinitdata;
++static int show_msr;
+ 
+ static __init int setup_show_msr(char *arg)
+ {
+diff --git a/arch/x86/kernel/cpu/cyrix.c b/arch/x86/kernel/cpu/cyrix.c
+index 23c0795..b613a7e 100644
+--- a/arch/x86/kernel/cpu/cyrix.c
++++ b/arch/x86/kernel/cpu/cyrix.c
+@@ -59,7 +59,7 @@ static void do_cyrix_devid(unsigned char *dir0, unsigned char *dir1)
+  * Actually since bugs.h doesn't even reference this perhaps someone should
+  * fix the documentation ???
+  */
+-static unsigned char Cx86_dir0_msb __cpuinitdata = 0;
++static unsigned char Cx86_dir0_msb = 0;
+ 
+ static const char __cpuinitconst Cx86_model[][9] = {
+ 	"Cx486", "Cx486", "5x86 ", "6x86", "MediaGX ", "6x86MX ",
+@@ -75,7 +75,7 @@ static const char __cpuinitconst Cx486S_name[][4] = {
+ static const char __cpuinitconst Cx486D_name[][4] = {
+ 	"DX", "DX2", "?", "?", "?", "DX4"
+ };
+-static char Cx86_cb[] __cpuinitdata = "?.5x Core/Bus Clock";
++static char Cx86_cb[] = "?.5x Core/Bus Clock";
+ static const char __cpuinitconst cyrix_model_mult1[] = "12??43";
+ static const char __cpuinitconst cyrix_model_mult2[] = "12233445";
+ 
+diff --git a/arch/x86/kernel/cpu/intel_cacheinfo.c b/arch/x86/kernel/cpu/intel_cacheinfo.c
+index 0691776..f22300a 100644
+--- a/arch/x86/kernel/cpu/intel_cacheinfo.c
++++ b/arch/x86/kernel/cpu/intel_cacheinfo.c
+@@ -1188,7 +1188,7 @@ static int cacheinfo_cpu_callback(struct notifier_block *nfb,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata cacheinfo_cpu_notifier = {
++static struct notifier_block cacheinfo_cpu_notifier = {
+ 	.notifier_call = cacheinfo_cpu_callback,
+ };
+ 
+diff --git a/arch/x86/kernel/cpu/mcheck/mce.c b/arch/x86/kernel/cpu/mcheck/mce.c
+index 0abb2ef..c310ae8 100644
+--- a/arch/x86/kernel/cpu/mcheck/mce.c
++++ b/arch/x86/kernel/cpu/mcheck/mce.c
+@@ -2238,7 +2238,7 @@ mce_cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block mce_cpu_notifier __cpuinitdata = {
++static struct notifier_block mce_cpu_notifier = {
+ 	.notifier_call = mce_cpu_callback,
+ };
+ 
+diff --git a/arch/x86/kernel/cpu/mcheck/therm_throt.c b/arch/x86/kernel/cpu/mcheck/therm_throt.c
+index d8b3074..7b7e8fd 100644
+--- a/arch/x86/kernel/cpu/mcheck/therm_throt.c
++++ b/arch/x86/kernel/cpu/mcheck/therm_throt.c
+@@ -288,7 +288,7 @@ thermal_throttle_cpu_callback(struct notifier_block *nfb,
+ 	return notifier_from_errno(err);
+ }
+ 
+-static struct notifier_block thermal_throttle_cpu_notifier __cpuinitdata =
++static struct notifier_block thermal_throttle_cpu_notifier =
+ {
+ 	.notifier_call = thermal_throttle_cpu_callback,
+ };
+diff --git a/arch/x86/kernel/i387.c b/arch/x86/kernel/i387.c
+index d6ca5f1..95bc326 100644
+--- a/arch/x86/kernel/i387.c
++++ b/arch/x86/kernel/i387.c
+@@ -123,7 +123,7 @@ static unsigned int		mxcsr_feature_mask __read_mostly = 0xffffffffu;
+ unsigned int xstate_size;
+ EXPORT_SYMBOL_GPL(xstate_size);
+ unsigned int sig_xstate_ia32_size = sizeof(struct _fpstate_ia32);
+-static struct i387_fxsave_struct fx_scratch __cpuinitdata;
++static struct i387_fxsave_struct fx_scratch;
+ 
+ static void mxcsr_feature_mask_init(void)
+ {
+diff --git a/arch/x86/kernel/kvm.c b/arch/x86/kernel/kvm.c
+index 276184d..4ec4605 100644
+--- a/arch/x86/kernel/kvm.c
++++ b/arch/x86/kernel/kvm.c
+@@ -395,7 +395,7 @@ static int kvm_cpu_notify(struct notifier_block *self,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata kvm_cpu_notifier = {
++static struct notifier_block kvm_cpu_notifier = {
+         .notifier_call  = kvm_cpu_notify,
+ };
+ #endif
+diff --git a/arch/x86/kernel/mmconf-fam10h_64.c b/arch/x86/kernel/mmconf-fam10h_64.c
+index 47e5267..33fd4e6 100644
+--- a/arch/x86/kernel/mmconf-fam10h_64.c
++++ b/arch/x86/kernel/mmconf-fam10h_64.c
+@@ -24,9 +24,9 @@ struct pci_hostbridge_probe {
+ 	u32 device;
+ };
+ 
+-static u64 __cpuinitdata fam10h_pci_mmconf_base;
++static u64 fam10h_pci_mmconf_base;
+ 
+-static struct pci_hostbridge_probe pci_probes[] __cpuinitdata = {
++static struct pci_hostbridge_probe pci_probes[] = {
+ 	{ 0, 0x18, PCI_VENDOR_ID_AMD, 0x1200 },
+ 	{ 0xff, 0, PCI_VENDOR_ID_AMD, 0x1200 },
+ };
+diff --git a/arch/x86/kernel/setup.c b/arch/x86/kernel/setup.c
+index d6c956e..a3e9be2 100644
+--- a/arch/x86/kernel/setup.c
++++ b/arch/x86/kernel/setup.c
+@@ -176,7 +176,7 @@ static struct resource bss_resource = {
+ 
+ #ifdef CONFIG_X86_32
+ /* cpu data as detected by the assembly code in head.S */
+-struct cpuinfo_x86 new_cpu_data __cpuinitdata = {0, 0, 0, 0, -1, 1, 0, 0, -1};
++struct cpuinfo_x86 new_cpu_data = {0, 0, 0, 0, -1, 1, 0, 0, -1};
+ /* common cpu data for all cpus */
+ struct cpuinfo_x86 boot_cpu_data __read_mostly = {0, 0, 0, 0, -1, 1, 0, 0, -1};
+ EXPORT_SYMBOL(boot_cpu_data);
+diff --git a/arch/x86/kernel/smpboot.c b/arch/x86/kernel/smpboot.c
+index 34dd4e1..e529cd5 100644
+--- a/arch/x86/kernel/smpboot.c
++++ b/arch/x86/kernel/smpboot.c
+@@ -82,7 +82,7 @@ DEFINE_PER_CPU(int, cpu_state) = { 0 };
+ */
+ #ifdef CONFIG_HOTPLUG_CPU
+ /*
+- * Needed only for CONFIG_HOTPLUG_CPU because __cpuinitdata is
++ * Needed only for CONFIG_HOTPLUG_CPU because is
+  * removed after init for !CONFIG_HOTPLUG_CPU.
+  */
+ static DEFINE_PER_CPU(struct task_struct *, idle_thread_array);
+@@ -108,7 +108,7 @@ void cpu_hotplug_driver_unlock(void)
+ ssize_t arch_cpu_probe(const char *buf, size_t count) { return -1; }
+ ssize_t arch_cpu_release(const char *buf, size_t count) { return -1; }
+ #else
+-static struct task_struct *idle_thread_array[NR_CPUS] __cpuinitdata ;
++static struct task_struct *idle_thread_array[NR_CPUS] ;
+ #define get_idle_for_cpu(x)      (idle_thread_array[(x)])
+ #define set_idle_for_cpu(x, p)   (idle_thread_array[(x)] = (p))
+ #endif
+diff --git a/arch/x86/kernel/tboot.c b/arch/x86/kernel/tboot.c
+index 1c616fb..12adbef 100644
+--- a/arch/x86/kernel/tboot.c
++++ b/arch/x86/kernel/tboot.c
+@@ -332,7 +332,7 @@ static int tboot_cpu_callback(struct notifier_block *nfb,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block tboot_cpu_notifier __cpuinitdata =
++static struct notifier_block tboot_cpu_notifier =
+ {
+ 	.notifier_call = tboot_cpu_callback,
+ };
+diff --git a/arch/x86/kernel/tsc_sync.c b/arch/x86/kernel/tsc_sync.c
+index 36a649f..adfdf56 100644
+--- a/arch/x86/kernel/tsc_sync.c
++++ b/arch/x86/kernel/tsc_sync.c
+@@ -25,19 +25,19 @@
+  * Entry/exit counters that make sure that both CPUs
+  * run the measurement code at once:
+  */
+-static __cpuinitdata atomic_t start_count;
+-static __cpuinitdata atomic_t stop_count;
++static atomic_t start_count;
++static atomic_t stop_count;
+ 
+ /*
+  * We use a raw spinlock in this exceptional case, because
+  * we want to have the fastest, inlined, non-debug version
+  * of a critical section, to be able to prove TSC time-warps:
+  */
+-static __cpuinitdata arch_spinlock_t sync_lock = __ARCH_SPIN_LOCK_UNLOCKED;
++static arch_spinlock_t sync_lock = __ARCH_SPIN_LOCK_UNLOCKED;
+ 
+-static __cpuinitdata cycles_t last_tsc;
+-static __cpuinitdata cycles_t max_warp;
+-static __cpuinitdata int nr_warps;
++static cycles_t last_tsc;
++static cycles_t max_warp;
++static int nr_warps;
+ 
+ /*
+  * TSC-warp measurement loop running on both CPUs:
+diff --git a/arch/x86/kernel/x86_init.c b/arch/x86/kernel/x86_init.c
+index 5da6f6d..d36d4b4 100644
+--- a/arch/x86/kernel/x86_init.c
++++ b/arch/x86/kernel/x86_init.c
+@@ -90,7 +90,7 @@ struct x86_init_ops x86_init __initdata = {
+ 	},
+ };
+ 
+-struct x86_cpuinit_ops x86_cpuinit __cpuinitdata = {
++struct x86_cpuinit_ops x86_cpuinit = {
+ 	.early_percpu_clock_init	= x86_init_noop,
+ 	.setup_percpu_clockev		= setup_secondary_APIC_clock,
+ };
+diff --git a/arch/x86/mm/numa.c b/arch/x86/mm/numa.c
+index 4308c0c..5c27639 100644
+--- a/arch/x86/mm/numa.c
++++ b/arch/x86/mm/numa.c
+@@ -56,7 +56,7 @@ early_param("numa", numa_setup);
+ /*
+  * apicid, cpu, node mappings
+  */
+-s16 __apicid_to_node[MAX_LOCAL_APIC] __cpuinitdata = {
++s16 __apicid_to_node[MAX_LOCAL_APIC] = {
+ 	[0 ... MAX_LOCAL_APIC-1] = NUMA_NO_NODE
+ };
+ 
+diff --git a/arch/x86/mm/numa_emulation.c b/arch/x86/mm/numa_emulation.c
+index 2b39ea9..326a0ad 100644
+--- a/arch/x86/mm/numa_emulation.c
++++ b/arch/x86/mm/numa_emulation.c
+@@ -10,7 +10,7 @@
+ 
+ #include "numa_internal.h"
+ 
+-static int emu_nid_to_phys[MAX_NUMNODES] __cpuinitdata;
++static int emu_nid_to_phys[MAX_NUMNODES];
+ static char *emu_cmdline __initdata;
+ 
+ void __init numa_emu_cmdline(char *str)
+diff --git a/arch/x86/mm/setup_nx.c b/arch/x86/mm/setup_nx.c
+index da23af2..90555bf 100644
+--- a/arch/x86/mm/setup_nx.c
++++ b/arch/x86/mm/setup_nx.c
+@@ -5,7 +5,7 @@
+ #include <asm/pgtable.h>
+ #include <asm/proto.h>
+ 
+-static int disable_nx __cpuinitdata;
++static int disable_nx;
+ 
+ /*
+  * noexec = on|off
+diff --git a/arch/x86/pci/amd_bus.c b/arch/x86/pci/amd_bus.c
+index 0c3ad61..5d1a27f 100644
+--- a/arch/x86/pci/amd_bus.c
++++ b/arch/x86/pci/amd_bus.c
+@@ -355,7 +355,7 @@ static int amd_cpu_notify(struct notifier_block *self,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata amd_cpu_notifier = {
++static struct notifier_block amd_cpu_notifier = {
+ 	.notifier_call	= amd_cpu_notify,
+ };
+ 
+diff --git a/arch/x86/xen/enlighten.c b/arch/x86/xen/enlighten.c
+index e1628c6..ad6c4e0 100644
+--- a/arch/x86/xen/enlighten.c
++++ b/arch/x86/xen/enlighten.c
+@@ -1489,7 +1489,7 @@ static int xen_hvm_cpu_notify(struct notifier_block *self,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block xen_hvm_cpu_notifier __cpuinitdata = {
++static struct notifier_block xen_hvm_cpu_notifier = {
+ 	.notifier_call	= xen_hvm_cpu_notify,
+ };
+ 
+diff --git a/block/blk-iopoll.c b/block/blk-iopoll.c
+index d4419df..4f1a7bd 100644
+--- a/block/blk-iopoll.c
++++ b/block/blk-iopoll.c
+@@ -209,7 +209,7 @@ static int blk_iopoll_cpu_notify(struct notifier_block *self,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata blk_iopoll_cpu_notifier = {
++static struct notifier_block blk_iopoll_cpu_notifier = {
+ 	.notifier_call	= blk_iopoll_cpu_notify,
+ };
+ 
+diff --git a/block/blk-softirq.c b/block/blk-softirq.c
+index 3775cda..443ce63 100644
+--- a/block/blk-softirq.c
++++ b/block/blk-softirq.c
+@@ -98,7 +98,7 @@ static int blk_cpu_notify(struct notifier_block *self,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata blk_cpu_notifier = {
++static struct notifier_block blk_cpu_notifier = {
+ 	.notifier_call	= blk_cpu_notify,
+ };
+ 
+diff --git a/drivers/acpi/processor_idle.c b/drivers/acpi/processor_idle.c
+index 2f54a47..e7ccfd6 100644
+--- a/drivers/acpi/processor_idle.c
++++ b/drivers/acpi/processor_idle.c
+@@ -106,9 +106,9 @@ static int set_max_cstate(const struct dmi_system_id *id)
+ 	return 0;
+ }
+ 
+-/* Actually this shouldn't be __cpuinitdata, would be better to fix the
++/* Actually this shouldn't be, would be better to fix the
+    callers to only run once -AK */
+-static struct dmi_system_id __cpuinitdata processor_power_dmi_table[] = {
++static struct dmi_system_id processor_power_dmi_table[] = {
+ 	{ set_max_cstate, "Clevo 5600D", {
+ 	  DMI_MATCH(DMI_BIOS_VENDOR,"Phoenix Technologies LTD"),
+ 	  DMI_MATCH(DMI_BIOS_VERSION,"SHE845M0.86C.0013.D.0302131307")},
+diff --git a/drivers/cpufreq/powernow-k7.c b/drivers/cpufreq/powernow-k7.c
+index ccbab68..c25b43a 100644
+--- a/drivers/cpufreq/powernow-k7.c
++++ b/drivers/cpufreq/powernow-k7.c
+@@ -617,7 +617,7 @@ static int acer_cpufreq_pst(const struct dmi_system_id *d)
+  * A BIOS update is all that can save them.
+  * Mention this, and disable cpufreq.
+  */
+-static struct dmi_system_id __cpuinitdata powernow_dmi_table[] = {
++static struct dmi_system_id powernow_dmi_table[] = {
+ 	{
+ 		.callback = acer_cpufreq_pst,
+ 		.ident = "Acer Aspire",
+diff --git a/drivers/infiniband/hw/ehca/ehca_irq.c b/drivers/infiniband/hw/ehca/ehca_irq.c
+index db25592..e5d3697 100644
+--- a/drivers/infiniband/hw/ehca/ehca_irq.c
++++ b/drivers/infiniband/hw/ehca/ehca_irq.c
+@@ -884,7 +884,7 @@ static int comp_pool_callback(struct notifier_block *nfb,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block comp_pool_callback_nb __cpuinitdata = {
++static struct notifier_block comp_pool_callback_nb = {
+ 	.notifier_call	= comp_pool_callback,
+ 	.priority	= 0,
+ };
+diff --git a/kernel/hrtimer.c b/kernel/hrtimer.c
+index 2652b2b..c7a19d0 100644
+--- a/kernel/hrtimer.c
++++ b/kernel/hrtimer.c
+@@ -1730,7 +1730,7 @@ static int hrtimer_cpu_notify(struct notifier_block *self,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata hrtimers_nb = {
++static struct notifier_block hrtimers_nb = {
+ 	.notifier_call = hrtimer_cpu_notify,
+ };
+ 
+diff --git a/kernel/printk.c b/kernel/printk.c
+index 03bee43..95f2d6e 100644
+--- a/kernel/printk.c
++++ b/kernel/printk.c
+@@ -1222,7 +1222,7 @@ static void console_flush(struct work_struct *work)
+ 	console_unlock();
+ }
+ 
+-static __cpuinitdata DECLARE_WORK(console_cpu_notify_work, console_flush);
++static DECLARE_WORK(console_cpu_notify_work, console_flush);
+ 
+ /**
+  * console_cpu_notify - print deferred console messages after CPU hotplug
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 29dff1a..b596661 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -5481,7 +5481,7 @@ migration_call(struct notifier_block *nfb, unsigned long action, void *hcpu)
+  * happens before everything else.  This has to be lower priority than
+  * the notifier in the perf_event subsystem, though.
+  */
+-static struct notifier_block __cpuinitdata migration_notifier = {
++static struct notifier_block migration_notifier = {
+ 	.notifier_call = migration_call,
+ 	.priority = CPU_PRI_MIGRATION,
+ };
+diff --git a/kernel/smp.c b/kernel/smp.c
+index 3cbd828..213ab1d 100644
+--- a/kernel/smp.c
++++ b/kernel/smp.c
+@@ -70,7 +70,7 @@ hotplug_cfd(struct notifier_block *nfb, unsigned long action, void *hcpu)
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata hotplug_cfd_notifier = {
++static struct notifier_block hotplug_cfd_notifier = {
+ 	.notifier_call		= hotplug_cfd,
+ };
+ 
+diff --git a/kernel/softirq.c b/kernel/softirq.c
+index feedba6..0df8be0 100644
+--- a/kernel/softirq.c
++++ b/kernel/softirq.c
+@@ -708,7 +708,7 @@ static int remote_softirq_cpu_notify(struct notifier_block *self,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata remote_softirq_cpu_notifier = {
++static struct notifier_block remote_softirq_cpu_notifier = {
+ 	.notifier_call	= remote_softirq_cpu_notify,
+ };
+ 
+@@ -888,7 +888,7 @@ static int cpu_callback(struct notifier_block *nfb,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata cpu_nfb = {
++static struct notifier_block cpu_nfb = {
+ 	.notifier_call = cpu_callback
+ };
+ 
+diff --git a/kernel/stop_machine.c b/kernel/stop_machine.c
+index eaa8ee3..9e4017a 100644
+--- a/kernel/stop_machine.c
++++ b/kernel/stop_machine.c
+@@ -362,7 +362,7 @@ static int cpu_stop_cpu_callback(struct notifier_block *nfb,
+  * cpu notifiers.  It currently shares the same priority as sched
+  * migration_notifier.
+  */
+-static struct notifier_block __cpuinitdata cpu_stop_cpu_notifier = {
++static struct notifier_block cpu_stop_cpu_notifier = {
+ 	.notifier_call	= cpu_stop_cpu_callback,
+ 	.priority	= 10,
+ };
+diff --git a/kernel/timer.c b/kernel/timer.c
+index 5016e25..4424fb8 100644
+--- a/kernel/timer.c
++++ b/kernel/timer.c
+@@ -1647,7 +1647,7 @@ static int init_timers_cpu(int cpu)
+ {
+ 	int j;
+ 	struct tvec_base *base;
+-	static char __cpuinitdata tvec_base_done[NR_CPUS];
++	static char tvec_base_done[NR_CPUS];
+ 
+ 	if (!tvec_base_done[cpu]) {
+ 		static char boot_done;
+@@ -1774,7 +1774,7 @@ static int timer_cpu_notify(struct notifier_block *self,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata timers_nb = {
++static struct notifier_block timers_nb = {
+ 	.notifier_call	= timer_cpu_notify,
+ };
+ 
+diff --git a/kernel/watchdog.c b/kernel/watchdog.c
+index 818920f..3145cdb 100644
+--- a/kernel/watchdog.c
++++ b/kernel/watchdog.c
+@@ -581,7 +581,7 @@ cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata cpu_nfb = {
++static struct notifier_block cpu_nfb = {
+ 	.notifier_call = cpu_callback
+ };
+ 
+diff --git a/mm/page-writeback.c b/mm/page-writeback.c
+index 26adea8..839c4bb 100644
+--- a/mm/page-writeback.c
++++ b/mm/page-writeback.c
+@@ -1580,7 +1580,7 @@ ratelimit_handler(struct notifier_block *self, unsigned long u, void *v)
+ 	return NOTIFY_DONE;
+ }
+ 
+-static struct notifier_block __cpuinitdata ratelimit_nb = {
++static struct notifier_block ratelimit_nb = {
+ 	.notifier_call	= ratelimit_handler,
+ 	.next		= NULL,
+ };
+diff --git a/mm/slab.c b/mm/slab.c
+index 30a985d..10d0d00 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -1385,7 +1385,7 @@ static int cpuup_callback(struct notifier_block *nfb,
+ 	return notifier_from_errno(err);
+ }
+ 
+-static struct notifier_block __cpuinitdata cpucache_notifier = {
++static struct notifier_block cpucache_notifier = {
+ 	&cpuup_callback, NULL, 0
+ };
+ 
+diff --git a/mm/slub.c b/mm/slub.c
+index e7948a0..9a7afcd 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -4019,7 +4019,7 @@ static int slab_cpuup_callback(struct notifier_block *nfb,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata slab_notifier = {
++static struct notifier_block slab_notifier = {
+ 	.notifier_call = slab_cpuup_callback
+ };
+ 
+diff --git a/mm/vmstat.c b/mm/vmstat.c
+index 3eae117..760ae65 100644
+--- a/mm/vmstat.c
++++ b/mm/vmstat.c
+@@ -1197,7 +1197,7 @@ static int vmstat_cpuup_callback(struct notifier_block *nfb,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block __cpuinitdata vmstat_notifier =
++static struct notifier_block vmstat_notifier =
+ 	{ &vmstat_cpuup_callback, NULL, 0 };
+ #endif
+ 
+-- 
+1.7.9.5
+

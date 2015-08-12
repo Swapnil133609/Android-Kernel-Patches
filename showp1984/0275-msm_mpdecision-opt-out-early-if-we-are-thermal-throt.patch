@@ -1,0 +1,41 @@
+From acc0cb0b6791fb16e4fa136634dfd2b0cec147cb Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Fri, 15 Nov 2013 06:02:05 +0100
+Subject: [PATCH 275/338] msm_mpdecision: opt out early if we are thermal
+ throttled
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 5e17faf..92c5b35 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -449,16 +449,16 @@ static void mpdec_input_event(struct input_handle *handle, unsigned int type,
+ 				unsigned int code, int value) {
+ 	int i = 0;
+ 
+-	if (!msm_mpdec_tuners_ins.boost_enabled)
++#ifdef CONFIG_BRICKED_THERMAL
++	if (bricked_thermal_throttled > 0)
+ 		return;
++#endif
+ 
+-	if (!is_screen_on)
++	if (!msm_mpdec_tuners_ins.boost_enabled)
+ 		return;
+ 
+-#ifdef CONFIG_BRICKED_THERMAL
+-	if (bricked_thermal_throttled > 0)
++	if (!is_screen_on)
+ 		return;
+-#endif
+ 
+ 	for_each_online_cpu(i) {
+ 		queue_work_on(i, mpdec_input_wq, &per_cpu(mpdec_input_work, i));
+-- 
+1.7.9.5
+

@@ -1,0 +1,31 @@
+From 0e7bc02a02b8bd3ed0a3e000944eada4f89689ad Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Fri, 19 Apr 2013 12:03:49 +0200
+Subject: [PATCH 138/338] gitignore: ignore kcontrol directory (for kcontrol
+ modules)
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ .gitignore |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/.gitignore b/.gitignore
+index c9b8354..e03bcd5 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -46,6 +46,11 @@ modules.builtin
+ /Module.symvers
+ 
+ #
++# KControl modules directory (make deb-pkg)
++#
++/kcontrol/
++
++#
+ # Debian directory (make deb-pkg)
+ #
+ /debian/
+-- 
+1.7.9.5
+

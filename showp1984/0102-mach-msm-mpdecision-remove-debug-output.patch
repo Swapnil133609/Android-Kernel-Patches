@@ -1,0 +1,26 @@
+From 4de288f7063bab070972b1fd91a46c0c49df17f1 Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Fri, 22 Jun 2012 08:19:08 +0200
+Subject: [PATCH 102/338] mach-msm: mpdecision: remove debug output
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index a42eea0..9e40a38 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -135,7 +135,6 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 	if (per_cpu(msm_mpdec_cpudata, (CONFIG_NR_CPUS - 1)).device_suspended == true)
+ 		goto out;
+ 
+-
+ 	if (!mutex_trylock(&msm_cpu_lock))
+ 		goto out;
+ 
+-- 
+1.7.9.5
+

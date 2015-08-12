@@ -1,0 +1,40 @@
+From d6cea5bb5862a7f8240dbb8bcf7513d984c4e54a Mon Sep 17 00:00:00 2001
+From: Devin Kim <dojip.kim@lge.com>
+Date: Thu, 31 Oct 2013 14:36:33 -0700
+Subject: [PATCH 033/338] msm8974_pwm_vibrator: Improve the accuracy for
+ duration
+
+When you press 2 more touches simultaneously, vibration would be weak.
+This is the reason why the driving state is not gauranteed.
+If the vibrator is already in the driving state. just keep going
+for the driving force.
+
+Change-Id: Iea3f1b4895d0798b0465eaa16b83381c6f4ae914
+Signed-off-by: Devin Kim <dojip.kim@lge.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/misc/msm8974_pwm_vibrator.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/misc/msm8974_pwm_vibrator.c b/drivers/misc/msm8974_pwm_vibrator.c
+index 1a32332..3c67b3e 100644
+--- a/drivers/misc/msm8974_pwm_vibrator.c
++++ b/drivers/misc/msm8974_pwm_vibrator.c
+@@ -296,6 +296,14 @@ static int msm8974_pwm_vibrator_force_set(struct timed_vibrator_data *vib,
+ 
+ 		if (delayed_work_pending(&vib->work_vibrator_off))
+ 			cancel_delayed_work_sync(&vib->work_vibrator_off);
++
++		/* if the vibrator already is in the driving state,
++		 * just keep going
++		 */
++		if (vib->status == VIB_STAT_DRIVING &&
++				hrtimer_active(&vib->timer))
++				return 0;
++
+ 		hrtimer_cancel(&vib->timer);
+ 
+ 		vibrator_set_power(1, vib);
+-- 
+1.7.9.5
+

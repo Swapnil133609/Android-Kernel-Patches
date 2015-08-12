@@ -1,0 +1,27 @@
+From 581bacc500becbd2608647f926d9c855b33ed7fb Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Fri, 22 Jun 2012 08:19:20 +0200
+Subject: [PATCH 097/338] mach-msm: mpdecision: add email to (c)
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 27b4479..82b294c 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -4,7 +4,7 @@
+  * cpu auto-hotplug/unplug based on system load for MSM dualcore cpus
+  * single core while screen is off
+  *
+- * Copyright (c) 2012, Dennis Rassmann.
++ * Copyright (c) 2012, Dennis Rassmann <showp1984@gmail.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+-- 
+1.7.9.5
+

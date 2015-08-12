@@ -1,0 +1,41 @@
+From 1ce13bd51d77cc3c2f56e1a7821bcfea690c8467 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 11 Nov 2013 01:27:22 +0100
+Subject: [PATCH 246/338] drivers/video/msm/mdss/mdss_mdp_util.c: fix:
+ warning: array subscript is below array bounds
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_mdp_util.c |   14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_mdp_util.c b/drivers/video/msm/mdss/mdss_mdp_util.c
+index b65d894..5d19fb8 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_util.c
++++ b/drivers/video/msm/mdss/mdss_mdp_util.c
+@@ -389,13 +389,15 @@ int mdss_mdp_data_check(struct mdss_mdp_data *data,
+ 	for (i = 0; i < ps->num_planes; i++) {
+ 		curr = &data->p[i];
+ 		if (i >= data->num_planes) {
+-			u32 psize = ps->plane_size[i-1];
+-			prev = &data->p[i-1];
+-			if (prev->len > psize) {
+-				curr->len = prev->len - psize;
+-				prev->len = psize;
++			if (i > 0) {
++				u32 psize = ps->plane_size[i-1];
++				prev = &data->p[i-1];
++				if (prev->len > psize) {
++					curr->len = prev->len - psize;
++					prev->len = psize;
++				}
++				curr->addr = prev->addr + psize;
+ 			}
+-			curr->addr = prev->addr + psize;
+ 		}
+ 		if (curr->len < ps->plane_size[i]) {
+ 			pr_err("insufficient mem=%u p=%d len=%u\n",
+-- 
+1.7.9.5
+

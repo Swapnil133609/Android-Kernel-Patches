@@ -1,0 +1,786 @@
+From 6e310cb48de61139dc43fd9eb166e5505fb427bd Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 5 Nov 2013 19:44:10 +0100
+Subject: [PATCH 142/338] cpuinit: get rid of __cpuinit, fourth regexp This
+ commit is the result of:
+
+find -name "*.c" | xargs sed -i "s/ __cpuinit$//g"
+
+Signed-off-by: Arjan van de Ven <arjan@linux.intel.com>
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/alpha/kernel/smp.c                  |   10 +++++-----
+ arch/alpha/kernel/traps.c                |    4 ++--
+ arch/blackfin/kernel/perf_event.c        |    2 +-
+ arch/ia64/kernel/acpi.c                  |    2 +-
+ arch/ia64/kernel/mca.c                   |    6 +++---
+ arch/ia64/kernel/palinfo.c               |    2 +-
+ arch/ia64/kernel/salinfo.c               |    2 +-
+ arch/ia64/kernel/setup.c                 |    8 ++++----
+ arch/ia64/kernel/smpboot.c               |   10 +++++-----
+ arch/ia64/mm/contig.c                    |    2 +-
+ arch/ia64/xen/hypervisor.c               |    2 +-
+ arch/mips/mm/page.c                      |    2 +-
+ arch/mips/mm/tlbex.c                     |   32 +++++++++++++++---------------
+ arch/parisc/kernel/hardware.c            |    2 +-
+ arch/parisc/kernel/processor.c           |    2 +-
+ arch/powerpc/perf/core-book3s.c          |    2 +-
+ arch/sh/kernel/cpu/sh4a/smp-shx3.c       |    2 +-
+ arch/sh/kernel/perf_event.c              |    2 +-
+ arch/x86/kernel/apic/x2apic_cluster.c    |    2 +-
+ arch/x86/kernel/cpu/centaur.c            |    2 +-
+ arch/x86/kernel/cpu/intel_cacheinfo.c    |    2 +-
+ arch/x86/kernel/cpu/mcheck/mce.c         |    2 +-
+ arch/x86/kernel/cpu/mcheck/mce_amd.c     |    2 +-
+ arch/x86/kernel/cpu/perf_event.c         |    2 +-
+ arch/x86/kernel/cpu/perf_event_amd_ibs.c |    2 +-
+ arch/x86/kernel/smpboot.c                |    4 ++--
+ arch/x86/kernel/vsyscall_64.c            |    2 +-
+ arch/x86/xen/smp.c                       |    2 +-
+ drivers/acpi/processor_core.c            |    2 +-
+ kernel/events/core.c                     |    2 +-
+ kernel/rcutorture.c                      |    4 ++--
+ kernel/rcutree.c                         |    2 +-
+ kernel/sched/core.c                      |    2 +-
+ kernel/watchdog.c                        |    2 +-
+ mm/page-writeback.c                      |    2 +-
+ 35 files changed, 66 insertions(+), 66 deletions(-)
+
+diff --git a/arch/alpha/kernel/smp.c b/arch/alpha/kernel/smp.c
+index 50d438d..619471c 100644
+--- a/arch/alpha/kernel/smp.c
++++ b/arch/alpha/kernel/smp.c
+@@ -116,7 +116,7 @@ wait_boot_cpu_to_stop(int cpuid)
+ /*
+  * Where secondaries begin a life of C.
+  */
+-void __cpuinit
++void
+ smp_callin(void)
+ {
+ 	int cpuid = hard_smp_processor_id();
+@@ -194,7 +194,7 @@ wait_for_txrdy (unsigned long cpumask)
+  * Send a message to a secondary's console.  "START" is one such
+  * interesting message.  ;-)
+  */
+-static void __cpuinit
++static void
+ send_secondary_console_msg(char *str, int cpuid)
+ {
+ 	struct percpu_struct *cpu;
+@@ -285,7 +285,7 @@ recv_secondary_console_msg(void)
+ /*
+  * Convince the console to have a secondary cpu begin execution.
+  */
+-static int __cpuinit
++static int
+ secondary_cpu_start(int cpuid, struct task_struct *idle)
+ {
+ 	struct percpu_struct *cpu;
+@@ -356,7 +356,7 @@ secondary_cpu_start(int cpuid, struct task_struct *idle)
+ /*
+  * Bring one cpu online.
+  */
+-static int __cpuinit
++static int
+ smp_boot_one_cpu(int cpuid)
+ {
+ 	struct task_struct *idle;
+@@ -486,7 +486,7 @@ smp_prepare_boot_cpu(void)
+ {
+ }
+ 
+-int __cpuinit
++int
+ __cpu_up(unsigned int cpu)
+ {
+ 	smp_boot_one_cpu(cpu);
+diff --git a/arch/alpha/kernel/traps.c b/arch/alpha/kernel/traps.c
+index 80d987c..c28d03d 100644
+--- a/arch/alpha/kernel/traps.c
++++ b/arch/alpha/kernel/traps.c
+@@ -32,7 +32,7 @@
+ 
+ static int opDEC_fix;
+ 
+-static void __cpuinit
++static void
+ opDEC_check(void)
+ {
+ 	__asm__ __volatile__ (
+@@ -1066,7 +1066,7 @@ give_sigbus:
+ 	return;
+ }
+ 
+-void __cpuinit
++void
+ trap_init(void)
+ {
+ 	/* Tell PAL-code what global pointer we want in the kernel.  */
+diff --git a/arch/blackfin/kernel/perf_event.c b/arch/blackfin/kernel/perf_event.c
+index e47d19a..974e554 100644
+--- a/arch/blackfin/kernel/perf_event.c
++++ b/arch/blackfin/kernel/perf_event.c
+@@ -468,7 +468,7 @@ static void bfin_pmu_setup(int cpu)
+ 	memset(cpuhw, 0, sizeof(struct cpu_hw_events));
+ }
+ 
+-static int __cpuinit
++static int
+ bfin_pmu_notifier(struct notifier_block *self, unsigned long action, void *hcpu)
+ {
+ 	unsigned int cpu = (long)hcpu;
+diff --git a/arch/ia64/kernel/acpi.c b/arch/ia64/kernel/acpi.c
+index 3004f2f..2deae9a 100644
+--- a/arch/ia64/kernel/acpi.c
++++ b/arch/ia64/kernel/acpi.c
+@@ -804,7 +804,7 @@ int acpi_isa_irq_to_gsi(unsigned isa_irq, u32 *gsi)
+  *  ACPI based hotplug CPU support
+  */
+ #ifdef CONFIG_ACPI_HOTPLUG_CPU
+-static __cpuinit
++static
+ int acpi_map_cpu2node(acpi_handle handle, int cpu, int physid)
+ {
+ #ifdef CONFIG_ACPI_NUMA
+diff --git a/arch/ia64/kernel/mca.c b/arch/ia64/kernel/mca.c
+index c377b54..4102833 100644
+--- a/arch/ia64/kernel/mca.c
++++ b/arch/ia64/kernel/mca.c
+@@ -631,7 +631,7 @@ ia64_mca_register_cpev (int cpev)
+  * Outputs
+  *	None
+  */
+-void __cpuinit
++void
+ ia64_mca_cmc_vector_setup (void)
+ {
+ 	cmcv_reg_t	cmcv;
+@@ -1814,7 +1814,7 @@ static struct irqaction mca_cpep_irqaction = {
+  * format most of the fields.
+  */
+ 
+-static void __cpuinit
++static void
+ format_mca_init_stack(void *mca_data, unsigned long offset,
+ 		const char *type, int cpu)
+ {
+@@ -1844,7 +1844,7 @@ static void * __init_refok mca_bootmem(void)
+ }
+ 
+ /* Do per-CPU MCA-related initialization.  */
+-void __cpuinit
++void
+ ia64_mca_cpu_init(void *cpu_data)
+ {
+ 	void *pal_vaddr;
+diff --git a/arch/ia64/kernel/palinfo.c b/arch/ia64/kernel/palinfo.c
+index eb4538f..6c19881 100644
+--- a/arch/ia64/kernel/palinfo.c
++++ b/arch/ia64/kernel/palinfo.c
+@@ -968,7 +968,7 @@ palinfo_read_entry(char *page, char **start, off_t off, int count, int *eof, voi
+ 	return len;
+ }
+ 
+-static void __cpuinit
++static void
+ create_palinfo_proc_entries(unsigned int cpu)
+ {
+ #	define CPUSTR	"cpu%d"
+diff --git a/arch/ia64/kernel/salinfo.c b/arch/ia64/kernel/salinfo.c
+index 1a89ec5..787c793 100644
+--- a/arch/ia64/kernel/salinfo.c
++++ b/arch/ia64/kernel/salinfo.c
+@@ -575,7 +575,7 @@ static const struct file_operations salinfo_data_fops = {
+ 	.llseek  = default_llseek,
+ };
+ 
+-static int __cpuinit
++static int
+ salinfo_cpu_callback(struct notifier_block *nb, unsigned long action, void *hcpu)
+ {
+ 	unsigned int i, cpu = (unsigned long)hcpu;
+diff --git a/arch/ia64/kernel/setup.c b/arch/ia64/kernel/setup.c
+index 2ca636b..88fc6ce 100644
+--- a/arch/ia64/kernel/setup.c
++++ b/arch/ia64/kernel/setup.c
+@@ -748,7 +748,7 @@ const struct seq_operations cpuinfo_op = {
+ #define MAX_BRANDS	8
+ static char brandname[MAX_BRANDS][128];
+ 
+-static char * __cpuinit
++static char *
+ get_model_name(__u8 family, __u8 model)
+ {
+ 	static int overflow;
+@@ -778,7 +778,7 @@ get_model_name(__u8 family, __u8 model)
+ 	return "Unknown";
+ }
+ 
+-static void __cpuinit
++static void
+ identify_cpu (struct cpuinfo_ia64 *c)
+ {
+ 	union {
+@@ -850,7 +850,7 @@ identify_cpu (struct cpuinfo_ia64 *c)
+  * 2. the minimum of the i-cache stride sizes for "flush_icache_range()".
+  * 3. the minimum of the cache stride sizes for "clflush_cache_range()".
+  */
+-static void __cpuinit
++static void
+ get_cache_info(void)
+ {
+ 	unsigned long line_size, max = 1;
+@@ -915,7 +915,7 @@ get_cache_info(void)
+  * cpu_init() initializes state that is per-CPU.  This function acts
+  * as a 'CPU state barrier', nothing should get across.
+  */
+-void __cpuinit
++void
+ cpu_init (void)
+ {
+ 	extern void ia64_mmu_init (void *);
+diff --git a/arch/ia64/kernel/smpboot.c b/arch/ia64/kernel/smpboot.c
+index 11a546b..a997010 100644
+--- a/arch/ia64/kernel/smpboot.c
++++ b/arch/ia64/kernel/smpboot.c
+@@ -365,7 +365,7 @@ smp_setup_percpu_timer (void)
+ {
+ }
+ 
+-static void __cpuinit
++static void
+ smp_callin (void)
+ {
+ 	int cpuid, phys_id, itc_master;
+@@ -458,7 +458,7 @@ smp_callin (void)
+ /*
+  * Activate a secondary processor.  head.S calls this.
+  */
+-int __cpuinit
++int
+ start_secondary (void *unused)
+ {
+ 	/* Early console may use I/O ports */
+@@ -487,7 +487,7 @@ struct create_idle {
+ 	int cpu;
+ };
+ 
+-void __cpuinit
++void
+ do_fork_idle(struct work_struct *work)
+ {
+ 	struct create_idle *c_idle =
+@@ -497,7 +497,7 @@ do_fork_idle(struct work_struct *work)
+ 	complete(&c_idle->done);
+ }
+ 
+-static int __cpuinit
++static int
+ do_boot_cpu (int sapicid, int cpu)
+ {
+ 	int timeout;
+@@ -792,7 +792,7 @@ set_cpu_sibling_map(int cpu)
+ 	}
+ }
+ 
+-int __cpuinit
++int
+ __cpu_up (unsigned int cpu)
+ {
+ 	int ret;
+diff --git a/arch/ia64/mm/contig.c b/arch/ia64/mm/contig.c
+index 1516d1d..8d32e16 100644
+--- a/arch/ia64/mm/contig.c
++++ b/arch/ia64/mm/contig.c
+@@ -154,7 +154,7 @@ static void *cpu_data;
+  *
+  * Allocate and setup per-cpu data areas.
+  */
+-void * __cpuinit
++void *
+ per_cpu_init (void)
+ {
+ 	static bool first_time = true;
+diff --git a/arch/ia64/xen/hypervisor.c b/arch/ia64/xen/hypervisor.c
+index 52172ee..fab6252 100644
+--- a/arch/ia64/xen/hypervisor.c
++++ b/arch/ia64/xen/hypervisor.c
+@@ -74,7 +74,7 @@ void __init xen_setup_vcpu_info_placement(void)
+ 		xen_vcpu_setup(cpu);
+ }
+ 
+-void __cpuinit
++void
+ xen_cpu_init(void)
+ {
+ 	xen_smp_intr_init();
+diff --git a/arch/mips/mm/page.c b/arch/mips/mm/page.c
+index b2382fb..dc7caca 100644
+--- a/arch/mips/mm/page.c
++++ b/arch/mips/mm/page.c
+@@ -126,7 +126,7 @@ static int half_copy_loop_size;
+ static int cache_line_size;
+ #define cache_line_mask() (cache_line_size - 1)
+ 
+-static inline void __cpuinit
++static inline void
+ pg_addiu(u32 **buf, unsigned int reg1, unsigned int reg2, unsigned int off)
+ {
+ 	if (cpu_has_64bit_gp_regs && DADDI_WAR && r4k_daddiu_bug()) {
+diff --git a/arch/mips/mm/tlbex.c b/arch/mips/mm/tlbex.c
+index 21d2a5e..7f61bfb 100644
+--- a/arch/mips/mm/tlbex.c
++++ b/arch/mips/mm/tlbex.c
+@@ -661,7 +661,7 @@ static void build_huge_tlb_write_entry(u32 **p,
+ /*
+  * Check if Huge PTE is present, if so then jump to LABEL.
+  */
+-static void __cpuinit
++static void
+ build_is_huge_pte(u32 **p, struct uasm_reloc **r, unsigned int tmp,
+ 		unsigned int pmd, int lid)
+ {
+@@ -729,7 +729,7 @@ static void build_huge_handler_tail(u32 **p,
+  * TMP and PTR are scratch.
+  * TMP will be clobbered, PTR will hold the pmd entry.
+  */
+-static void __cpuinit
++static void
+ build_get_pmde64(u32 **p, struct uasm_label **l, struct uasm_reloc **r,
+ 		 unsigned int tmp, unsigned int ptr)
+ {
+@@ -821,7 +821,7 @@ build_get_pmde64(u32 **p, struct uasm_label **l, struct uasm_reloc **r,
+  * BVADDR is the faulting address, PTR is scratch.
+  * PTR will hold the pgd for vmalloc.
+  */
+-static void __cpuinit
++static void
+ build_get_pgd_vmalloc64(u32 **p, struct uasm_label **l, struct uasm_reloc **r,
+ 			unsigned int bvaddr, unsigned int ptr,
+ 			enum vmalloc64_mode mode)
+@@ -1043,7 +1043,7 @@ struct mips_huge_tlb_info {
+ 	int restore_scratch;
+ };
+ 
+-static struct mips_huge_tlb_info __cpuinit
++static struct mips_huge_tlb_info
+ build_fast_tlb_refill_handler (u32 **p, struct uasm_label **l,
+ 			       struct uasm_reloc **r, unsigned int tmp,
+ 			       unsigned int ptr, int c0_scratch)
+@@ -1457,7 +1457,7 @@ static void build_r4000_setup_pgd(void)
+ }
+ #endif
+ 
+-static void __cpuinit
++static void
+ iPTE_LW(u32 **p, unsigned int pte, unsigned int ptr)
+ {
+ #ifdef CONFIG_SMP
+@@ -1477,7 +1477,7 @@ iPTE_LW(u32 **p, unsigned int pte, unsigned int ptr)
+ #endif
+ }
+ 
+-static void __cpuinit
++static void
+ iPTE_SW(u32 **p, struct uasm_reloc **r, unsigned int pte, unsigned int ptr,
+ 	unsigned int mode)
+ {
+@@ -1537,7 +1537,7 @@ iPTE_SW(u32 **p, struct uasm_reloc **r, unsigned int pte, unsigned int ptr,
+  * the page table where this PTE is located, PTE will be re-loaded
+  * with it's original value.
+  */
+-static void __cpuinit
++static void
+ build_pte_present(u32 **p, struct uasm_reloc **r,
+ 		  int pte, int ptr, int scratch, enum label_id lid)
+ {
+@@ -1565,7 +1565,7 @@ build_pte_present(u32 **p, struct uasm_reloc **r,
+ }
+ 
+ /* Make PTE valid, store result in PTR. */
+-static void __cpuinit
++static void
+ build_make_valid(u32 **p, struct uasm_reloc **r, unsigned int pte,
+ 		 unsigned int ptr)
+ {
+@@ -1578,7 +1578,7 @@ build_make_valid(u32 **p, struct uasm_reloc **r, unsigned int pte,
+  * Check if PTE can be written to, if not branch to LABEL. Regardless
+  * restore PTE with value from PTR when done.
+  */
+-static void __cpuinit
++static void
+ build_pte_writable(u32 **p, struct uasm_reloc **r,
+ 		   unsigned int pte, unsigned int ptr, int scratch,
+ 		   enum label_id lid)
+@@ -1598,7 +1598,7 @@ build_pte_writable(u32 **p, struct uasm_reloc **r,
+ /* Make PTE writable, update software status bits as well, then store
+  * at PTR.
+  */
+-static void __cpuinit
++static void
+ build_make_write(u32 **p, struct uasm_reloc **r, unsigned int pte,
+ 		 unsigned int ptr)
+ {
+@@ -1612,7 +1612,7 @@ build_make_write(u32 **p, struct uasm_reloc **r, unsigned int pte,
+  * Check if PTE can be modified, if not branch to LABEL. Regardless
+  * restore PTE with value from PTR when done.
+  */
+-static void __cpuinit
++static void
+ build_pte_modifiable(u32 **p, struct uasm_reloc **r,
+ 		     unsigned int pte, unsigned int ptr, int scratch,
+ 		     enum label_id lid)
+@@ -1641,7 +1641,7 @@ build_pte_modifiable(u32 **p, struct uasm_reloc **r,
+  * This places the pte into ENTRYLO0 and writes it with tlbwi.
+  * Then it returns.
+  */
+-static void __cpuinit
++static void
+ build_r3000_pte_reload_tlbwi(u32 **p, unsigned int pte, unsigned int tmp)
+ {
+ 	uasm_i_mtc0(p, pte, C0_ENTRYLO0); /* cp0 delay */
+@@ -1657,7 +1657,7 @@ build_r3000_pte_reload_tlbwi(u32 **p, unsigned int pte, unsigned int tmp)
+  * may have the probe fail bit set as a result of a trap on a
+  * kseg2 access, i.e. without refill.  Then it returns.
+  */
+-static void __cpuinit
++static void
+ build_r3000_tlb_reload_write(u32 **p, struct uasm_label **l,
+ 			     struct uasm_reloc **r, unsigned int pte,
+ 			     unsigned int tmp)
+@@ -1675,7 +1675,7 @@ build_r3000_tlb_reload_write(u32 **p, struct uasm_label **l,
+ 	uasm_i_rfe(p); /* branch delay */
+ }
+ 
+-static void __cpuinit
++static void
+ build_r3000_tlbchange_handler_head(u32 **p, unsigned int pte,
+ 				   unsigned int ptr)
+ {
+@@ -1789,7 +1789,7 @@ static void build_r3000_tlb_modify_handler(void)
+ /*
+  * R4000 style TLB load/store/modify handlers.
+  */
+-static struct work_registers __cpuinit
++static struct work_registers
+ build_r4000_tlbchange_handler_head(u32 **p, struct uasm_label **l,
+ 				   struct uasm_reloc **r)
+ {
+@@ -1825,7 +1825,7 @@ build_r4000_tlbchange_handler_head(u32 **p, struct uasm_label **l,
+ 	return wr;
+ }
+ 
+-static void __cpuinit
++static void
+ build_r4000_tlbchange_handler_tail(u32 **p, struct uasm_label **l,
+ 				   struct uasm_reloc **r, unsigned int tmp,
+ 				   unsigned int ptr)
+diff --git a/arch/parisc/kernel/hardware.c b/arch/parisc/kernel/hardware.c
+index f48a640..7ccc146 100644
+--- a/arch/parisc/kernel/hardware.c
++++ b/arch/parisc/kernel/hardware.c
+@@ -1366,7 +1366,7 @@ parisc_hardware_description(struct parisc_device_id *id)
+ 
+ 
+ /* Interpret hversion (ret[0]) from PDC_MODEL(4)/PDC_MODEL_INFO(0) */
+-enum cpu_type __cpuinit
++enum cpu_type
+ parisc_get_cpu_type(unsigned long hversion)
+ {
+ 	struct hp_cpu_type_mask *ptr;
+diff --git a/arch/parisc/kernel/processor.c b/arch/parisc/kernel/processor.c
+index 56a7442..a128a94 100644
+--- a/arch/parisc/kernel/processor.c
++++ b/arch/parisc/kernel/processor.c
+@@ -73,7 +73,7 @@ extern int update_cr16_clocksource(void);	/* from time.c */
+  *
+  * FIXME: doesn't do much yet...
+  */
+-static void __cpuinit
++static void
+ init_percpu_prof(unsigned long cpunum)
+ {
+ 	struct cpuinfo_parisc *p;
+diff --git a/arch/powerpc/perf/core-book3s.c b/arch/powerpc/perf/core-book3s.c
+index 7046f53..aa2e379 100644
+--- a/arch/powerpc/perf/core-book3s.c
++++ b/arch/powerpc/perf/core-book3s.c
+@@ -1443,7 +1443,7 @@ static void power_pmu_setup(int cpu)
+ 	cpuhw->mmcr[0] = MMCR0_FC;
+ }
+ 
+-static int __cpuinit
++static int
+ power_pmu_notifier(struct notifier_block *self, unsigned long action, void *hcpu)
+ {
+ 	unsigned int cpu = (long)hcpu;
+diff --git a/arch/sh/kernel/cpu/sh4a/smp-shx3.c b/arch/sh/kernel/cpu/sh4a/smp-shx3.c
+index cb53ec6..4a29880 100644
+--- a/arch/sh/kernel/cpu/sh4a/smp-shx3.c
++++ b/arch/sh/kernel/cpu/sh4a/smp-shx3.c
+@@ -124,7 +124,7 @@ static void shx3_update_boot_vector(unsigned int cpu)
+ 	__raw_writel(STBCR_RESET, STBCR_REG(cpu));
+ }
+ 
+-static int __cpuinit
++static int
+ shx3_cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
+ {
+ 	unsigned int cpu = (unsigned int)hcpu;
+diff --git a/arch/sh/kernel/perf_event.c b/arch/sh/kernel/perf_event.c
+index cdc09a9..b9cefeb 100644
+--- a/arch/sh/kernel/perf_event.c
++++ b/arch/sh/kernel/perf_event.c
+@@ -367,7 +367,7 @@ static void sh_pmu_setup(int cpu)
+ 	memset(cpuhw, 0, sizeof(struct cpu_hw_events));
+ }
+ 
+-static int __cpuinit
++static int
+ sh_pmu_notifier(struct notifier_block *self, unsigned long action, void *hcpu)
+ {
+ 	unsigned int cpu = (long)hcpu;
+diff --git a/arch/x86/kernel/apic/x2apic_cluster.c b/arch/x86/kernel/apic/x2apic_cluster.c
+index 48f3103..b6802b2 100644
+--- a/arch/x86/kernel/apic/x2apic_cluster.c
++++ b/arch/x86/kernel/apic/x2apic_cluster.c
+@@ -147,7 +147,7 @@ static void init_x2apic_ldr(void)
+  /*
+   * At CPU state changes, update the x2apic cluster sibling info.
+   */
+-static int __cpuinit
++static int
+ update_clusterinfo(struct notifier_block *nfb, unsigned long action, void *hcpu)
+ {
+ 	unsigned int this_cpu = (unsigned long)hcpu;
+diff --git a/arch/x86/kernel/cpu/centaur.c b/arch/x86/kernel/cpu/centaur.c
+index c196f36..1867e75 100644
+--- a/arch/x86/kernel/cpu/centaur.c
++++ b/arch/x86/kernel/cpu/centaur.c
+@@ -468,7 +468,7 @@ static void init_centaur(struct cpuinfo_x86 *c)
+ #endif
+ }
+ 
+-static unsigned int __cpuinit
++static unsigned int
+ centaur_size_cache(struct cpuinfo_x86 *c, unsigned int size)
+ {
+ #ifdef CONFIG_X86_32
+diff --git a/arch/x86/kernel/cpu/intel_cacheinfo.c b/arch/x86/kernel/cpu/intel_cacheinfo.c
+index f22300a..ab131f2 100644
+--- a/arch/x86/kernel/cpu/intel_cacheinfo.c
++++ b/arch/x86/kernel/cpu/intel_cacheinfo.c
+@@ -220,7 +220,7 @@ static const unsigned short __cpuinitconst assocs[] = {
+ static const unsigned char __cpuinitconst levels[] = { 1, 1, 2, 3 };
+ static const unsigned char __cpuinitconst types[] = { 1, 2, 3, 3 };
+ 
+-static void __cpuinit
++static void
+ amd_cpuid4(int leaf, union _cpuid4_leaf_eax *eax,
+ 		     union _cpuid4_leaf_ebx *ebx,
+ 		     union _cpuid4_leaf_ecx *ecx)
+diff --git a/arch/x86/kernel/cpu/mcheck/mce.c b/arch/x86/kernel/cpu/mcheck/mce.c
+index c310ae8..2890911 100644
+--- a/arch/x86/kernel/cpu/mcheck/mce.c
++++ b/arch/x86/kernel/cpu/mcheck/mce.c
+@@ -2197,7 +2197,7 @@ static void mce_reenable_cpu(void *h)
+ }
+ 
+ /* Get notified when a cpu comes on/off. Be hotplug friendly. */
+-static int __cpuinit
++static int
+ mce_cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
+ {
+ 	unsigned int cpu = (unsigned long)hcpu;
+diff --git a/arch/x86/kernel/cpu/mcheck/mce_amd.c b/arch/x86/kernel/cpu/mcheck/mce_amd.c
+index 72c89e0..25785f7 100644
+--- a/arch/x86/kernel/cpu/mcheck/mce_amd.c
++++ b/arch/x86/kernel/cpu/mcheck/mce_amd.c
+@@ -708,7 +708,7 @@ static void threshold_remove_device(unsigned int cpu)
+ }
+ 
+ /* get notified when a cpu comes on/off */
+-static void __cpuinit
++static void
+ amd_64_threshold_cpu_callback(unsigned long action, unsigned int cpu)
+ {
+ 	switch (action) {
+diff --git a/arch/x86/kernel/cpu/perf_event.c b/arch/x86/kernel/cpu/perf_event.c
+index bb8e034..6df7320 100644
+--- a/arch/x86/kernel/cpu/perf_event.c
++++ b/arch/x86/kernel/cpu/perf_event.c
+@@ -1260,7 +1260,7 @@ perf_event_nmi_handler(unsigned int cmd, struct pt_regs *regs)
+ struct event_constraint emptyconstraint;
+ struct event_constraint unconstrained;
+ 
+-static int __cpuinit
++static int
+ x86_pmu_notifier(struct notifier_block *self, unsigned long action, void *hcpu)
+ {
+ 	unsigned int cpu = (long)hcpu;
+diff --git a/arch/x86/kernel/cpu/perf_event_amd_ibs.c b/arch/x86/kernel/cpu/perf_event_amd_ibs.c
+index 3b8a2d3..522de7e 100644
+--- a/arch/x86/kernel/cpu/perf_event_amd_ibs.c
++++ b/arch/x86/kernel/cpu/perf_event_amd_ibs.c
+@@ -244,7 +244,7 @@ static void clear_APIC_ibs(void *dummy)
+ 		setup_APIC_eilvt(offset, 0, APIC_EILVT_MSG_FIX, 1);
+ }
+ 
+-static int __cpuinit
++static int
+ perf_ibs_cpu_notifier(struct notifier_block *self, unsigned long action, void *hcpu)
+ {
+ 	switch (action & ~CPU_TASKS_FROZEN) {
+diff --git a/arch/x86/kernel/smpboot.c b/arch/x86/kernel/smpboot.c
+index e529cd5..b993c5f 100644
+--- a/arch/x86/kernel/smpboot.c
++++ b/arch/x86/kernel/smpboot.c
+@@ -469,7 +469,7 @@ void __inquire_remote_apic(int apicid)
+  * INIT, INIT, STARTUP sequence will reset the chip hard for us, and this
+  * won't ... remember to clear down the APIC, etc later.
+  */
+-int __cpuinit
++int
+ wakeup_secondary_cpu_via_nmi(int logical_apicid, unsigned long start_eip)
+ {
+ 	unsigned long send_status, accept_status = 0;
+@@ -503,7 +503,7 @@ wakeup_secondary_cpu_via_nmi(int logical_apicid, unsigned long start_eip)
+ 	return (send_status | accept_status);
+ }
+ 
+-static int __cpuinit
++static int
+ wakeup_secondary_cpu_via_init(int phys_apicid, unsigned long start_eip)
+ {
+ 	unsigned long send_status, accept_status = 0;
+diff --git a/arch/x86/kernel/vsyscall_64.c b/arch/x86/kernel/vsyscall_64.c
+index 135815a..64ee906 100644
+--- a/arch/x86/kernel/vsyscall_64.c
++++ b/arch/x86/kernel/vsyscall_64.c
+@@ -314,7 +314,7 @@ static void cpu_vsyscall_init(void *arg)
+ 	vsyscall_set_cpu(raw_smp_processor_id());
+ }
+ 
+-static int __cpuinit
++static int
+ cpu_vsyscall_notifier(struct notifier_block *n, unsigned long action, void *arg)
+ {
+ 	long cpu = (long)arg;
+diff --git a/arch/x86/xen/smp.c b/arch/x86/xen/smp.c
+index 66e8451..b46afc0 100644
+--- a/arch/x86/xen/smp.c
++++ b/arch/x86/xen/smp.c
+@@ -279,7 +279,7 @@ static void __init xen_smp_prepare_cpus(unsigned int max_cpus)
+ 	}
+ }
+ 
+-static int __cpuinit
++static int
+ cpu_initialize_context(unsigned int cpu, struct task_struct *idle)
+ {
+ 	struct vcpu_guest_context *ctxt;
+diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
+index 1286bb9..8ba9c28 100644
+--- a/drivers/acpi/processor_core.c
++++ b/drivers/acpi/processor_core.c
+@@ -307,7 +307,7 @@ static struct acpi_object_list *__cpuinit acpi_processor_alloc_pdc(void)
+  * _PDC is required for a BIOS-OS handshake for most of the newer
+  * ACPI processor features.
+  */
+-static int __cpuinit
++static int
+ acpi_processor_eval_pdc(acpi_handle handle, struct acpi_object_list *pdc_in)
+ {
+ 	acpi_status status = AE_OK;
+diff --git a/kernel/events/core.c b/kernel/events/core.c
+index 8650880..8b0f750 100644
+--- a/kernel/events/core.c
++++ b/kernel/events/core.c
+@@ -7072,7 +7072,7 @@ static struct notifier_block perf_reboot_notifier = {
+ 	.priority = INT_MIN,
+ };
+ 
+-static int __cpuinit
++static int
+ perf_cpu_notify(struct notifier_block *self, unsigned long action, void *hcpu)
+ {
+ 	unsigned int cpu = (long)hcpu;
+diff --git a/kernel/rcutorture.c b/kernel/rcutorture.c
+index b363ec3..05ddf0b 100644
+--- a/kernel/rcutorture.c
++++ b/kernel/rcutorture.c
+@@ -1409,7 +1409,7 @@ rcu_torture_shutdown(void *arg)
+  * Execute random CPU-hotplug operations at the interval specified
+  * by the onoff_interval.
+  */
+-static int __cpuinit
++static int
+ rcu_torture_onoff(void *arg)
+ {
+ 	int cpu;
+@@ -1462,7 +1462,7 @@ rcu_torture_onoff(void *arg)
+ 	return 0;
+ }
+ 
+-static int __cpuinit
++static int
+ rcu_torture_onoff_init(void)
+ {
+ 	int ret;
+diff --git a/kernel/rcutree.c b/kernel/rcutree.c
+index fdc433c..d494b93 100644
+--- a/kernel/rcutree.c
++++ b/kernel/rcutree.c
+@@ -2276,7 +2276,7 @@ rcu_boot_init_percpu_data(int cpu, struct rcu_state *rsp)
+  * can accept some slop in the rsp->completed access due to the fact
+  * that this CPU cannot possibly have any RCU callbacks in flight yet.
+  */
+-static void __cpuinit
++static void
+ rcu_init_percpu_data(int cpu, struct rcu_state *rsp, int preemptible)
+ {
+ 	unsigned long flags;
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index b596661..d49b851 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -5428,7 +5428,7 @@ static void set_rq_offline(struct rq *rq)
+  * migration_call - callback that gets triggered when a CPU is added.
+  * Here we can start up the necessary migration thread for the new CPU.
+  */
+-static int __cpuinit
++static int
+ migration_call(struct notifier_block *nfb, unsigned long action, void *hcpu)
+ {
+ 	int cpu = (long)hcpu;
+diff --git a/kernel/watchdog.c b/kernel/watchdog.c
+index 3145cdb..064dc35 100644
+--- a/kernel/watchdog.c
++++ b/kernel/watchdog.c
+@@ -546,7 +546,7 @@ out:
+ /*
+  * Create/destroy watchdog threads as CPUs come and go:
+  */
+-static int __cpuinit
++static int
+ cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
+ {
+ 	int hotcpu = (unsigned long)hcpu;
+diff --git a/mm/page-writeback.c b/mm/page-writeback.c
+index 839c4bb..5d88005 100644
+--- a/mm/page-writeback.c
++++ b/mm/page-writeback.c
+@@ -1573,7 +1573,7 @@ void writeback_set_ratelimit(void)
+ 		ratelimit_pages = 16;
+ }
+ 
+-static int __cpuinit
++static int
+ ratelimit_handler(struct notifier_block *self, unsigned long u, void *v)
+ {
+ 	writeback_set_ratelimit();
+-- 
+1.7.9.5
+

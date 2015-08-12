@@ -1,0 +1,27 @@
+From 6ecdb5a0cc0cf0ed8c892aef57aceaa700e5a6d3 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Thu, 20 Dec 2012 02:33:32 +0100
+Subject: [PATCH 155/338] msm_mpdecision: disable debug
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index f2827c0..85ed227 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -35,7 +35,7 @@
+ #include <linux/delay.h>
+ #include "acpuclock.h"
+ 
+-#define DEBUG 1
++#define DEBUG 0
+ 
+ #define MPDEC_TAG                       "[MPDEC]: "
+ #define MSM_MPDEC_STARTDELAY            20000
+-- 
+1.7.9.5
+

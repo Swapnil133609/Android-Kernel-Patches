@@ -1,0 +1,30 @@
+From 1de7c746651a765a325ddb1aef26d3dc05e8d3f9 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 07:14:21 +0100
+Subject: [PATCH 079/338] defconfig: Enable Automatic process group scheduling
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+
+Conflicts:
+	arch/arm/configs/bricked_defconfig
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index 7b16c7d..15deb05 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -109,7 +109,7 @@ CONFIG_NAMESPACES=y
+ # CONFIG_USER_NS is not set
+ # CONFIG_PID_NS is not set
+ CONFIG_NET_NS=y
+-# CONFIG_SCHED_AUTOGROUP is not set
++CONFIG_SCHED_AUTOGROUP=y
+ # CONFIG_SYSFS_DEPRECATED is not set
+ CONFIG_RELAY=y
+ CONFIG_BLK_DEV_INITRD=y
+-- 
+1.7.9.5
+

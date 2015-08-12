@@ -1,0 +1,37 @@
+From 54adc5a335188e5e25a570b7edb44aacaa706615 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 06:27:02 +0100
+Subject: [PATCH 114/338] msm_mpdecision: add debug output
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index da01dfc..438d8bd 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -32,6 +32,8 @@
+ #include <linux/hrtimer.h>
+ #include <linux/delay.h>
+ 
++#define DEBUG 1
++
+ #define MPDEC_TAG                       "[MPDEC]: "
+ #define MSM_MPDEC_STARTDELAY            70000
+ #define MSM_MPDEC_DELAY                 500
+@@ -107,6 +109,9 @@ static int mp_decision(void)
+ 
+ 	rq_depth = get_rq_info();
+ 	nr_cpu_online = num_online_cpus();
++#if DEBUG
++        pr_info(MPDEC_TAG"[DEBUG]: RQ: %u, cpus_on: %i", rq_depth, nr_cpu_online);
++#endif
+ 
+ 	if (nr_cpu_online) {
+ 		index = (nr_cpu_online - 1) * 2;
+-- 
+1.7.9.5
+

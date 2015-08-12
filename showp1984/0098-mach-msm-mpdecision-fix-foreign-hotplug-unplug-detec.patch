@@ -1,0 +1,45 @@
+From 9c91a2364b8c261d3bfa5232a98af6e52db4f0ed Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Fri, 22 Jun 2012 13:29:41 +0200
+Subject: [PATCH 098/338] mach-msm: mpdecision: fix foreign hotplug/unplug
+ detection
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+
+Conflicts:
+
+	arch/arm/mach-msm/msm_mpdecision.c
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 82b294c..70d726c 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -150,8 +150,8 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 				per_cpu(msm_mpdec_suspend, cpu).online = false;
+ 				pr_info(MPDEC_TAG"CPU[%d] 1->0 | Mask=[%d%d]\n",
+ 						cpu, cpu_online(0), cpu_online(1));
+-			} else {
+-				pr_info(MPDEC_TAG"CPU[%d] was hotplugged outside of mpdecision! | pausing [%d]ms\n",
++			} else if ((per_cpu(msm_mpdec_suspend, cpu).online == true) && (!cpu_online(cpu))) {
++				pr_info(MPDEC_TAG"CPU[%d] was unplugged outside of mpdecision! | pausing [%d]ms\n",
+ 						cpu, MSM_MPDEC_PAUSE);
+ 				msleep(MSM_MPDEC_PAUSE);
+ 				was_paused = true;
+@@ -166,8 +166,8 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 				per_cpu(msm_mpdec_suspend, cpu).online = true;
+ 				pr_info(MPDEC_TAG"CPU[%d] 0->1 | Mask=[%d%d]\n",
+ 						cpu, cpu_online(0), cpu_online(1));
+-			} else {
+-				pr_info(MPDEC_TAG"CPU[%d] was unplugged outside of mpdecision! | pausing [%d]ms\n",
++			} else if ((per_cpu(msm_mpdec_suspend, cpu).online == false) && (cpu_online(cpu))) {
++				pr_info(MPDEC_TAG"CPU[%d] was hotplugged outside of mpdecision! | pausing [%d]ms\n",
+ 						cpu, MSM_MPDEC_PAUSE);
+ 				msleep(MSM_MPDEC_PAUSE);
+ 				was_paused = true;
+-- 
+1.7.9.5
+

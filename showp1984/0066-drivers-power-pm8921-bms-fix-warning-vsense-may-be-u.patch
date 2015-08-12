@@ -1,0 +1,31 @@
+From c18cc098b6a978e153b1c8fcee5ad83315ac2c54 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 04:24:51 +0100
+Subject: [PATCH 066/338] drivers/power/pm8921-bms: fix: 'warning: 'vsense'
+ may be used uninitialized in this function'
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+
+Conflicts:
+	drivers/power/pm8921-bms.c
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/power/pm8921-bms.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/power/pm8921-bms.c b/drivers/power/pm8921-bms.c
+index a969a8d..2794386 100644
+--- a/drivers/power/pm8921-bms.c
++++ b/drivers/power/pm8921-bms.c
+@@ -2675,7 +2675,7 @@ EXPORT_SYMBOL(pm8921_bms_get_vsense_avg);
+ 
+ int pm8921_bms_get_battery_current(int *result_ua)
+ {
+-	int vsense_uv;
++	int vsense_uv = 0;
+ 	int rc = 0;
+ 
+ 	*result_ua = 0;
+-- 
+1.7.9.5
+

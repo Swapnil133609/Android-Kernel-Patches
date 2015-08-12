@@ -1,0 +1,29 @@
+From 8d8c5deae7ef47914f441787ac45a84e412152d8 Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Fri, 22 Jun 2012 13:09:53 +0200
+Subject: [PATCH 103/338] mach-msm: mpdecision: increase startdelay for sense
+
+Surprise! Sense needs a lot longer to boot up than aosp...
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 9e40a38..ae14b92 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -33,7 +33,7 @@
+ #include <linux/delay.h>
+ 
+ #define MPDEC_TAG "[MPDEC]: "
+-#define MSM_MPDEC_STARTDELAY 40000
++#define MSM_MPDEC_STARTDELAY 60000
+ #define MSM_MPDEC_DELAY 500
+ #define MSM_MPDEC_PAUSE 10000
+ 
+-- 
+1.7.9.5
+

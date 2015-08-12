@@ -1,0 +1,181 @@
+From 9d69e0f93d7954355fd29f1c8c86f0bf119797c4 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 5 Nov 2013 19:44:29 +0100
+Subject: [PATCH 143/338] cpuinit: get rid of __cpuinit, fifth regexp This
+ commit is the result of:
+
+find arch/ -name "*.h" | xargs sed -i "s/ __cpuinit//g"
+
+Signed-off-by: Arjan van de Ven <arjan@linux.intel.com>
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/platsmp.h     |    4 ++--
+ arch/mips/include/asm/uasm.h    |    4 ++--
+ arch/powerpc/include/asm/rtas.h |    4 ++--
+ arch/sparc/kernel/entry.h       |    2 +-
+ arch/x86/include/asm/mmconfig.h |    4 ++--
+ arch/x86/include/asm/mpspec.h   |    2 +-
+ arch/x86/include/asm/numa.h     |   10 +++++-----
+ arch/x86/include/asm/prom.h     |    2 +-
+ arch/x86/include/asm/smp.h      |    2 +-
+ arch/x86/xen/xen-ops.h          |    2 +-
+ 10 files changed, 18 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm/mach-msm/platsmp.h b/arch/arm/mach-msm/platsmp.h
+index 1d176d2..ad1baea 100644
+--- a/arch/arm/mach-msm/platsmp.h
++++ b/arch/arm/mach-msm/platsmp.h
+@@ -16,8 +16,8 @@
+  */
+ extern volatile int pen_release;
+ 
+-void __cpuinit msm_secondary_startup(void);
+-void __cpuinit write_pen_release(int val);
++void msm_secondary_startup(void);
++void write_pen_release(int val);
+ 
+ /* HOTPLUG Interface */
+ int platform_cpu_kill(unsigned int cpu);
+diff --git a/arch/mips/include/asm/uasm.h b/arch/mips/include/asm/uasm.h
+index 504d40a..ce1a7d9 100644
+--- a/arch/mips/include/asm/uasm.h
++++ b/arch/mips/include/asm/uasm.h
+@@ -16,8 +16,8 @@
+ #define __uasminitdata
+ #define UASM_EXPORT_SYMBOL(sym) EXPORT_SYMBOL(sym)
+ #else
+-#define __uasminit __cpuinit
+-#define __uasminitdata __cpuinitdata
++#define __uasminit
++#define __uasminitdatadata
+ #define UASM_EXPORT_SYMBOL(sym)
+ #endif
+ 
+diff --git a/arch/powerpc/include/asm/rtas.h b/arch/powerpc/include/asm/rtas.h
+index 557cff8..b3ca19a 100644
+--- a/arch/powerpc/include/asm/rtas.h
++++ b/arch/powerpc/include/asm/rtas.h
+@@ -342,8 +342,8 @@ static inline u32 rtas_config_addr(int busno, int devfn, int reg)
+ 			(devfn << 8) | (reg & 0xff);
+ }
+ 
+-extern void __cpuinit rtas_give_timebase(void);
+-extern void __cpuinit rtas_take_timebase(void);
++extern void rtas_give_timebase(void);
++extern void rtas_take_timebase(void);
+ 
+ #ifdef CONFIG_PPC_RTAS
+ static inline int page_is_rtas_user_buf(unsigned long pfn)
+diff --git a/arch/sparc/kernel/entry.h b/arch/sparc/kernel/entry.h
+index 0c218e4..138dcb5 100644
+--- a/arch/sparc/kernel/entry.h
++++ b/arch/sparc/kernel/entry.h
+@@ -243,7 +243,7 @@ extern struct ino_bucket *ivector_table;
+ extern unsigned long ivector_table_pa;
+ 
+ extern void init_irqwork_curcpu(void);
+-extern void __cpuinit sun4v_register_mondo_queues(int this_cpu);
++extern void sun4v_register_mondo_queues(int this_cpu);
+ 
+ #endif /* CONFIG_SPARC32 */
+ #endif /* _ENTRY_H */
+diff --git a/arch/x86/include/asm/mmconfig.h b/arch/x86/include/asm/mmconfig.h
+index 9b119da..04a3fed 100644
+--- a/arch/x86/include/asm/mmconfig.h
++++ b/arch/x86/include/asm/mmconfig.h
+@@ -2,8 +2,8 @@
+ #define _ASM_X86_MMCONFIG_H
+ 
+ #ifdef CONFIG_PCI_MMCONFIG
+-extern void __cpuinit fam10h_check_enable_mmcfg(void);
+-extern void __cpuinit check_enable_amd_mmconf_dmi(void);
++extern void fam10h_check_enable_mmcfg(void);
++extern void check_enable_amd_mmconf_dmi(void);
+ #else
+ static inline void fam10h_check_enable_mmcfg(void) { }
+ static inline void check_enable_amd_mmconf_dmi(void) { }
+diff --git a/arch/x86/include/asm/mpspec.h b/arch/x86/include/asm/mpspec.h
+index 9c7d95f..97063b9 100644
+--- a/arch/x86/include/asm/mpspec.h
++++ b/arch/x86/include/asm/mpspec.h
+@@ -94,7 +94,7 @@ static inline void early_reserve_e820_mpc_new(void) { }
+ #define default_get_smp_config x86_init_uint_noop
+ #endif
+ 
+-void __cpuinit generic_processor_info(int apicid, int version);
++void generic_processor_info(int apicid, int version);
+ #ifdef CONFIG_ACPI
+ extern void mp_register_ioapic(int id, u32 address, u32 gsi_base);
+ extern void mp_override_legacy_irq(u8 bus_irq, u8 polarity, u8 trigger,
+diff --git a/arch/x86/include/asm/numa.h b/arch/x86/include/asm/numa.h
+index bfacd2c..f6e3793 100644
+--- a/arch/x86/include/asm/numa.h
++++ b/arch/x86/include/asm/numa.h
+@@ -39,7 +39,7 @@ static inline void set_apicid_to_node(int apicid, s16 node)
+ 	__apicid_to_node[apicid] = node;
+ }
+ 
+-extern int __cpuinit numa_cpu_node(int cpu);
++extern int numa_cpu_node(int cpu);
+ 
+ #else	/* CONFIG_NUMA */
+ static inline void set_apicid_to_node(int apicid, s16 node)
+@@ -59,11 +59,11 @@ static inline int numa_cpu_node(int cpu)
+ #endif
+ 
+ #ifdef CONFIG_NUMA
+-extern void __cpuinit numa_set_node(int cpu, int node);
+-extern void __cpuinit numa_clear_node(int cpu);
++extern void numa_set_node(int cpu, int node);
++extern void numa_clear_node(int cpu);
+ extern void __init init_cpu_to_node(void);
+-extern void __cpuinit numa_add_cpu(int cpu);
+-extern void __cpuinit numa_remove_cpu(int cpu);
++extern void numa_add_cpu(int cpu);
++extern void numa_remove_cpu(int cpu);
+ #else	/* CONFIG_NUMA */
+ static inline void numa_set_node(int cpu, int node)	{ }
+ static inline void numa_clear_node(int cpu)		{ }
+diff --git a/arch/x86/include/asm/prom.h b/arch/x86/include/asm/prom.h
+index 60bef66..bade6ac 100644
+--- a/arch/x86/include/asm/prom.h
++++ b/arch/x86/include/asm/prom.h
+@@ -27,7 +27,7 @@ extern int of_ioapic;
+ extern u64 initial_dtb;
+ extern void add_dtb(u64 data);
+ extern void x86_add_irq_domains(void);
+-void __cpuinit x86_of_pci_init(void);
++void x86_of_pci_init(void);
+ void x86_dtb_init(void);
+ #else
+ static inline void add_dtb(u64 data) { }
+diff --git a/arch/x86/include/asm/smp.h b/arch/x86/include/asm/smp.h
+index 0434c40..7ecdedb 100644
+--- a/arch/x86/include/asm/smp.h
++++ b/arch/x86/include/asm/smp.h
+@@ -180,7 +180,7 @@ static inline int wbinvd_on_all_cpus(void)
+ }
+ #endif /* CONFIG_SMP */
+ 
+-extern unsigned disabled_cpus __cpuinitdata;
++extern unsigned disabled_cpusdata;
+ 
+ #ifdef CONFIG_X86_32_SMP
+ /*
+diff --git a/arch/x86/xen/xen-ops.h b/arch/x86/xen/xen-ops.h
+index b095739..c35fa2d 100644
+--- a/arch/x86/xen/xen-ops.h
++++ b/arch/x86/xen/xen-ops.h
+@@ -74,7 +74,7 @@ static inline void xen_hvm_smp_init(void) {}
+ 
+ #ifdef CONFIG_PARAVIRT_SPINLOCKS
+ void __init xen_init_spinlocks(void);
+-void __cpuinit xen_init_lock_cpu(int cpu);
++void xen_init_lock_cpu(int cpu);
+ void xen_uninit_lock_cpu(int cpu);
+ #else
+ static inline void xen_init_spinlocks(void)
+-- 
+1.7.9.5
+

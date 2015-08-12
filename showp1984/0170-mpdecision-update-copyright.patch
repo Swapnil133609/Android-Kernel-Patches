@@ -1,0 +1,27 @@
+From a2a1e43435d9a126b15002460afd7ce2852e2a99 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sun, 6 Jan 2013 01:33:21 +0100
+Subject: [PATCH 170/338] mpdecision: update copyright
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 7ad6ad8..088d8b4 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -6,7 +6,7 @@
+  * -single core while screen is off
+  * -extensive sysfs tuneables
+  *
+- * Copyright (c) 2012, Dennis Rassmann <showp1984@gmail.com>
++ * Copyright (c) 2012-2013, Dennis Rassmann <showp1984@gmail.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+-- 
+1.7.9.5
+

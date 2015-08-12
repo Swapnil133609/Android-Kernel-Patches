@@ -1,0 +1,38 @@
+From ca9faf4d2dcf8c81ed7a774c90b1bb3f7b3237d8 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 30 Dec 2013 03:47:20 +0100
+Subject: [PATCH 338/338] defconfig: update for kexec
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index c7739b6..240a47c 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -682,7 +682,9 @@ CONFIG_ZBOOT_ROM_BSS=0
+ # CONFIG_ARM_APPENDED_DTB is not set
+ CONFIG_CMDLINE=""
+ # CONFIG_XIP_KERNEL is not set
+-# CONFIG_KEXEC is not set
++CONFIG_KEXEC=y
++# CONFIG_ATAGS_PROC is not set
++CONFIG_KEXEC_HARDBOOT=y
+ # CONFIG_CRASH_DUMP is not set
+ # CONFIG_AUTO_ZRELADDR is not set
+ 
+@@ -1250,7 +1252,7 @@ CONFIG_OF=y
+ #
+ # Device Tree and Open Firmware support
+ #
+-# CONFIG_PROC_DEVICETREE is not set
++CONFIG_PROC_DEVICETREE=y
+ # CONFIG_OF_SELFTEST is not set
+ CONFIG_OF_FLATTREE=y
+ CONFIG_OF_EARLY_FLATTREE=y
+-- 
+1.7.9.5
+

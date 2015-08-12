@@ -1,0 +1,27 @@
+From b6414dc4c43f3d49f82b6fe50479d1409686d541 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Fri, 15 Nov 2013 06:32:59 +0100
+Subject: [PATCH 276/338] defconfig: enable UACCESS_WITH_MEMCPY
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index 3b5dc69..df88d59 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -663,7 +663,7 @@ CONFIG_MEMORY_HOLE_CARVEOUT=y
+ CONFIG_DONT_MAP_HOLE_AFTER_MEMBANK0=y
+ CONFIG_FORCE_MAX_ZONEORDER=11
+ CONFIG_ALIGNMENT_TRAP=y
+-# CONFIG_UACCESS_WITH_MEMCPY is not set
++CONFIG_UACCESS_WITH_MEMCPY=y
+ # CONFIG_SECCOMP is not set
+ CONFIG_CC_STACKPROTECTOR=y
+ # CONFIG_DEPRECATED_PARAM_STRUCT is not set
+-- 
+1.7.9.5
+

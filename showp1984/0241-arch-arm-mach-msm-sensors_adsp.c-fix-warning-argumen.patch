@@ -1,0 +1,29 @@
+From 4adb748c8c90a81e650257e16ed23f8d1e35c7da Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 11 Nov 2013 01:11:27 +0100
+Subject: [PATCH 241/338] arch/arm/mach-msm/sensors_adsp.c: fix:  warning:
+ argument to 'sizeof' in 'memcpy' call is the same
+ expression as the source
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/sensors_adsp.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/sensors_adsp.c b/arch/arm/mach-msm/sensors_adsp.c
+index 1534358..4548b26 100644
+--- a/arch/arm/mach-msm/sensors_adsp.c
++++ b/arch/arm/mach-msm/sensors_adsp.c
+@@ -874,7 +874,7 @@ static int sns_ocmem_map_send(void)
+ 
+ 	vectors = ocmem_get_vectors(SNS_OCMEM_CLIENT_ID, sns_ctl.buf);
+ 	if ((vectors != NULL)) {
+-		memcpy(&msg.vectors, vectors, sizeof(vectors));
++		memcpy(&msg.vectors, vectors, sizeof(*vectors));
+ 		/* TODO: set vectors_len */
+ 		msg.vectors_valid = true;
+ 		msg.vectors_len = 0;
+-- 
+1.7.9.5
+

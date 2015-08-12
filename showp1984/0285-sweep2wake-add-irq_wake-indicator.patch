@@ -1,0 +1,142 @@
+From f2f3ba3dafdb4a6b95a670c7d34185b667df2b98 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sun, 10 Nov 2013 01:03:37 +0100
+Subject: [PATCH 285/338] sweep2wake: add irq_wake indicator
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/sweep2wake.c          |    2 +-
+ drivers/input/touchscreen/touch_synaptics_ds5.c |   45 ++++++++++++++++++++++-
+ include/linux/input/sweep2wake.h                |    1 +
+ 3 files changed, 46 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/input/touchscreen/sweep2wake.c b/drivers/input/touchscreen/sweep2wake.c
+index b81c0c9..3d73f63 100644
+--- a/drivers/input/touchscreen/sweep2wake.c
++++ b/drivers/input/touchscreen/sweep2wake.c
+@@ -51,7 +51,7 @@
+ 
+ /* Resources */
+ int s2w_switch = 1;
+-bool scr_suspended = false, exec_count = true;
++bool scr_suspended = false, exec_count = true, irq_wake = false;
+ bool scr_on_touch = false, barrier[2] = {false, false};
+ static struct input_dev * sweep2wake_pwrdev;
+ static DEFINE_MUTEX(pwrkeyworklock);
+diff --git a/drivers/input/touchscreen/touch_synaptics_ds5.c b/drivers/input/touchscreen/touch_synaptics_ds5.c
+index b3ef89e..0baef49 100644
+--- a/drivers/input/touchscreen/touch_synaptics_ds5.c
++++ b/drivers/input/touchscreen/touch_synaptics_ds5.c
+@@ -510,6 +510,12 @@ static void touch_init_func(struct work_struct *work_init)
+ 	if (!ts->curr_resume_state) {
+ 		enable_irq(ts->client->irq);
+ 		mutex_unlock(&ts->input_dev->mutex);
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++		if (irq_wake) {
++			irq_wake = false;
++			disable_irq_wake(ts->client->irq);
++		}
++#endif
+ 		return;
+ 	}
+ 
+@@ -518,7 +524,10 @@ static void touch_init_func(struct work_struct *work_init)
+ 	enable_irq(ts->client->irq);
+ 
+ #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-	enable_irq_wake(ts->client->irq);
++	if (irq_wake) {
++		irq_wake = false;
++		disable_irq_wake(ts->client->irq);
++	}
+ #endif
+ 
+ 	mutex_unlock(&ts->input_dev->mutex);
+@@ -536,9 +545,21 @@ static void touch_recover_func(struct work_struct *work_recover)
+ 				struct synaptics_ts_data, work_recover);
+ 
+ 	disable_irq(ts->client->irq);
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++	if (irq_wake) {
++		irq_wake = false;
++		disable_irq_wake(ts->client->irq);
++	}
++#endif
+ 	safety_reset(ts);
+ 	touch_ic_init(ts);
+ 	enable_irq(ts->client->irq);
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++	if (!irq_wake) {
++		irq_wake = false;
++		enable_irq_wake(ts->client->irq);
++	}
++#endif
+ }
+ 
+ /* touch_ic_init
+@@ -567,6 +588,12 @@ static int touch_ic_init(struct synaptics_ts_data *ts)
+ err_out_retry:
+ 	ts->ic_init_err_cnt++;
+ 	disable_irq_nosync(ts->client->irq);
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++	if (irq_wake) {
++		irq_wake = false;
++		disable_irq_wake(ts->client->irq);
++	}
++#endif
+ 	safety_reset(ts);
+ 	queue_delayed_work(synaptics_wq, &ts->work_init, msecs_to_jiffies(10));
+ 
+@@ -1413,6 +1440,12 @@ static ssize_t store_ts_reset(struct device *dev,
+ 	sscanf(buf, "%s", string);
+ 
+ 	disable_irq_nosync(ts->client->irq);
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++	if (irq_wake) {
++		irq_wake = false;
++		disable_irq_wake(ts->client->irq);
++	}
++#endif
+ 
+ 	cancel_delayed_work_sync(&ts->work_init);
+ 
+@@ -1450,6 +1483,12 @@ static ssize_t store_ts_reset(struct device *dev,
+ 		touch_ic_init(ts);
+ 
+ 	enable_irq(ts->client->irq);
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++	if (!irq_wake) {
++		irq_wake = false;
++		enable_irq_wake(ts->client->irq);
++	}
++#endif
+ 
+ 	return count;
+ }
+@@ -1732,6 +1771,10 @@ static int lcd_notifier_callback(struct notifier_block *this,
+ 		}
+ #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+ 		scr_suspended = true;
++		if (!irq_wake) {
++			irq_wake = true;
++			enable_irq_wake(ts->client->irq);
++		}
+ #endif
+ 		break;
+ 	default:
+diff --git a/include/linux/input/sweep2wake.h b/include/linux/input/sweep2wake.h
+index 81a28bd..ac008f7 100644
+--- a/include/linux/input/sweep2wake.h
++++ b/include/linux/input/sweep2wake.h
+@@ -28,6 +28,7 @@
+ #define SWEEP2WAKE_I2C_SLEEP 40
+ 
+ extern int s2w_switch;
++extern bool irq_wake;
+ extern bool scr_suspended;
+ extern bool scr_on_touch;
+ extern bool exec_count;
+-- 
+1.7.9.5
+

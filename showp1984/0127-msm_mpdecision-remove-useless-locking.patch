@@ -1,0 +1,31 @@
+From ae3f7057fe28f75830705c74e9f9c1599a8ab141 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 07:50:48 +0100
+Subject: [PATCH 127/338] msm_mpdecision: remove useless locking
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index b4c3533..9fbd048 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -293,11 +293,8 @@ static void msm_mpdec_early_suspend(struct early_suspend *h)
+ static void msm_mpdec_late_resume(struct early_suspend *h)
+ {
+ 	int cpu = nr_cpu_ids;
+-	for_each_possible_cpu(cpu) {
+-		mutex_lock(&per_cpu(msm_mpdec_cpudata, cpu).suspend_mutex);
++	for_each_possible_cpu(cpu)
+ 		per_cpu(msm_mpdec_cpudata, cpu).device_suspended = false;
+-		mutex_unlock(&per_cpu(msm_mpdec_cpudata, cpu).suspend_mutex);
+-	}
+         pr_info(MPDEC_TAG"Screen -> on. Activated mpdecision. | Mask=[%d%d%d%d]\n",
+ 		cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3))
+ }
+-- 
+1.7.9.5
+

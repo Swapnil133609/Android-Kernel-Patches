@@ -1,0 +1,41 @@
+From dea02b4e2e64ed14b1780cdaf1547b810aea4fca Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 11 Nov 2013 00:46:42 +0100
+Subject: [PATCH 236/338] msm_mpdecision: fix boost_time not respecting sysfs
+ changes This fixes issue #17
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index d641c47..8dd17b2 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -418,7 +418,7 @@ static void mpdec_input_callback(struct work_struct *unused) {
+ 			pr_info(MPDEC_TAG"boosted cpu%i to %lu", cpu, per_cpu(msm_mpdec_cpudata, cpu).boost_freq);
+ #endif
+ 			per_cpu(msm_mpdec_cpudata, cpu).is_boosted = true;
+-			per_cpu(msm_mpdec_cpudata, cpu).boost_until = ktime_to_ms(ktime_get()) + MSM_MPDEC_BOOSTTIME;
++			per_cpu(msm_mpdec_cpudata, cpu).boost_until = ktime_to_ms(ktime_get()) + msm_mpdec_tuners_ins.boost_time;
+ 			boosted = true;
+ 			cpufreq_cpu_put(cpu_policy);
+ 			mutex_unlock(&per_cpu(msm_mpdec_cpudata, cpu).boost_mutex);
+@@ -432,10 +432,10 @@ static void mpdec_input_callback(struct work_struct *unused) {
+ 					cpu,
+ 					msm_mpdec_revib_workq,
+ 					&per_cpu(msm_mpdec_revib_work, cpu),
+-					msecs_to_jiffies(MSM_MPDEC_BOOSTTIME)
++					msecs_to_jiffies(msm_mpdec_tuners_ins.boost_time)
+ 					);
+ 	} else if (boosted && per_cpu(msm_mpdec_cpudata, cpu).revib_wq_running) {
+-		per_cpu(msm_mpdec_cpudata, cpu).boost_until = ktime_to_ms(ktime_get()) + MSM_MPDEC_BOOSTTIME;
++		per_cpu(msm_mpdec_cpudata, cpu).boost_until = ktime_to_ms(ktime_get()) + msm_mpdec_tuners_ins.boost_time;
+ 	}
+ 
+ 	return;
+-- 
+1.7.9.5
+

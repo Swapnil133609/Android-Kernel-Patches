@@ -1,0 +1,28 @@
+From b019e0ce97dda06ff132c23f592e0b55a10fab29 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Fri, 6 Dec 2013 17:39:51 +0100
+Subject: [PATCH 329/338] drivers/mfd/wcd9xxx-irq: fix: warning: array
+ subscript is above array bounds
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/mfd/wcd9xxx-irq.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/mfd/wcd9xxx-irq.c b/drivers/mfd/wcd9xxx-irq.c
+index 18d815b..1ffe1f2 100644
+--- a/drivers/mfd/wcd9xxx-irq.c
++++ b/drivers/mfd/wcd9xxx-irq.c
+@@ -264,7 +264,7 @@ static irqreturn_t wcd9xxx_irq_thread(int irq, void *data)
+ 	}
+ 
+ 	/* Apply masking */
+-	for (i = 0; i < num_irq_regs; i++)
++	for (i = 0; i < WCD9XXX_NUM_IRQ_REGS; i++)
+ 		status[i] &= ~wcd9xxx->irq_masks_cur[i];
+ 
+ 	memcpy(status1, status, sizeof(status1));
+-- 
+1.7.9.5
+

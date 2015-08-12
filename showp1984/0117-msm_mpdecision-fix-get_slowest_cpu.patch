@@ -1,0 +1,40 @@
+From d8c90d9ee55d2f167fe5d3ef6c4d5a508c0248ff Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 06:45:04 +0100
+Subject: [PATCH 117/338] msm_mpdecision: fix get_slowest_cpu()
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |   12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index c1168b6..cf9747b 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -87,12 +87,18 @@ static int get_slowest_cpu(void)
+         unsigned long rate, slow_rate = 0;
+ 
+         for (i = 0; i < CONFIG_NR_CPUS; i++) {
++                if (!cpu_online(i))
++                        continue;
++
+                 rate = get_rate(i);
+-                if ((rate < slow_rate) && (slow_rate != 0)) {
+-                        cpu = i;
++                if (slow_rate == 0) {
+                         slow_rate = rate;
+                 }
+-                if (slow_rate == 0) {
++
++                if ((rate <= slow_rate) && (slow_rate != 0)) {
++                        if (i == 0)
++                                continue;
++                        cpu = i;
+                         slow_rate = rate;
+                 }
+         }
+-- 
+1.7.9.5
+

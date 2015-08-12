@@ -1,0 +1,115 @@
+From ccca57c6f90422f913290d96ff454d73636f84a3 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 08:14:31 +0100
+Subject: [PATCH 131/338] msm_mpdecision: add max/min cpu limits to sysfs
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |   44 ++++++++++++++++++++++++++++++++++--
+ 1 file changed, 42 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index a6255a4..bb883f7 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -67,12 +67,16 @@ static struct msm_mpdec_tuners {
+ 	unsigned int pause;
+ 	bool scroff_single_core;
+ 	unsigned long int idle_freq;
++        unsigned int max_cpus;
++        unsigned int min_cpus;
+ } msm_mpdec_tuners_ins = {
+ 	.startdelay = MSM_MPDEC_STARTDELAY,
+ 	.delay = MSM_MPDEC_DELAY,
+ 	.pause = MSM_MPDEC_PAUSE,
+ 	.scroff_single_core = true,
+ 	.idle_freq = MSM_MPDEC_IDLE_FREQ,
++        .max_cpus = CONFIG_NR_CPUS,
++        .min_cpus = 1,
+ };
+ 
+ static unsigned int NwNs_Threshold[8] = {19, 30, 19, 11, 19, 11, 0, 11};
+@@ -159,13 +163,15 @@ static int mp_decision(void)
+ 	if (nr_cpu_online) {
+ 		index = (nr_cpu_online - 1) * 2;
+ 		if ((nr_cpu_online < CONFIG_NR_CPUS) && (rq_depth >= NwNs_Threshold[index])) {
+-			if (total_time >= TwTs_Threshold[index]) {
++			if ((total_time >= TwTs_Threshold[index]) &&
++                            (nr_cpu_online < msm_mpdec_tuners_ins.max_cpus)) {
+ 				new_state = MSM_MPDEC_UP;
+                                 if (get_slowest_cpu_rate() <=  msm_mpdec_tuners_ins.idle_freq)
+                                         new_state = MSM_MPDEC_IDLE;
+ 			}
+ 		} else if ((nr_cpu_online > 1) && (rq_depth <= NwNs_Threshold[index+1])) {
+-			if (total_time >= TwTs_Threshold[index+1] ) {
++			if ((total_time >= TwTs_Threshold[index+1]) &&
++                            (nr_cpu_online > msm_mpdec_tuners_ins.min_cpus)) {
+ 				new_state = MSM_MPDEC_DOWN;
+                                 if (get_slowest_cpu_rate() > msm_mpdec_tuners_ins.idle_freq)
+ 			                new_state = MSM_MPDEC_IDLE;
+@@ -328,6 +334,8 @@ show_one(startdelay, startdelay);
+ show_one(delay, delay);
+ show_one(pause, pause);
+ show_one(scroff_single_core, scroff_single_core);
++show_one(min_cpus, min_cpus);
++show_one(max_cpus, max_cpus);
+ 
+ #define show_one_twts(file_name, arraypos)                              \
+ static ssize_t show_##file_name                                         \
+@@ -515,6 +523,34 @@ static ssize_t store_scroff_single_core(struct kobject *a, struct attribute *b,
+ 	return count;
+ }
+ 
++static ssize_t store_max_cpus(struct kobject *a, struct attribute *b,
++				   const char *buf, size_t count)
++{
++	unsigned int input;
++	int ret;
++	ret = sscanf(buf, "%u", &input);
++	if ((ret != 1) || input > 4)
++                return -EINVAL;
++
++	msm_mpdec_tuners_ins.max_cpus = input;
++
++	return count;
++}
++
++static ssize_t store_min_cpus(struct kobject *a, struct attribute *b,
++				   const char *buf, size_t count)
++{
++	unsigned int input;
++	int ret;
++	ret = sscanf(buf, "%u", &input);
++	if ((ret != 1) || input < 1)
++                return -EINVAL;
++
++	msm_mpdec_tuners_ins.min_cpus = input;
++
++	return count;
++}
++
+ static ssize_t store_enabled(struct kobject *a, struct attribute *b,
+ 				   const char *buf, size_t count)
+ {
+@@ -573,6 +609,8 @@ define_one_global_rw(delay);
+ define_one_global_rw(pause);
+ define_one_global_rw(scroff_single_core);
+ define_one_global_rw(idle_freq);
++define_one_global_rw(min_cpus);
++define_one_global_rw(max_cpus);
+ define_one_global_rw(enabled);
+ 
+ static struct attribute *msm_mpdec_attributes[] = {
+@@ -581,6 +619,8 @@ static struct attribute *msm_mpdec_attributes[] = {
+ 	&pause.attr,
+ 	&scroff_single_core.attr,
+ 	&idle_freq.attr,
++        &min_cpus.attr,
++        &max_cpus.attr,
+ 	&enabled.attr,
+ 	&twts_threshold_0.attr,
+ 	&twts_threshold_1.attr,
+-- 
+1.7.9.5
+

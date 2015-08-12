@@ -1,0 +1,28 @@
+From 0a34e638c414fbca0cfbc8398a8c0cc6fd7a091b Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 03:34:40 +0100
+Subject: [PATCH 050/338] fs/namespace: fix: 'warning: 'kernel_dev' may be
+ used uninitialized in this function'
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ fs/namespace.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/fs/namespace.c b/fs/namespace.c
+index e608199..d5ff15b 100644
+--- a/fs/namespace.c
++++ b/fs/namespace.c
+@@ -2363,7 +2363,7 @@ SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
+ 	int ret;
+ 	char *kernel_type;
+ 	char *kernel_dir;
+-	char *kernel_dev;
++	char *kernel_dev = NULL;
+ 	unsigned long data_page;
+ 
+ 	ret = copy_mount_string(type, &kernel_type);
+-- 
+1.7.9.5
+

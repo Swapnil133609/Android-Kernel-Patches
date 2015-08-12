@@ -1,0 +1,28 @@
+From 8046393fac36e03173442720dab4c2b0a90258e0 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 05:14:17 +0100
+Subject: [PATCH 067/338] drivers/usb/host/ehci-sched: fix: 'warning: 'c_mask'
+ may be used uninitialized in this function'
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/usb/host/ehci-sched.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/usb/host/ehci-sched.c b/drivers/usb/host/ehci-sched.c
+index a60679c..9961c46 100644
+--- a/drivers/usb/host/ehci-sched.c
++++ b/drivers/usb/host/ehci-sched.c
+@@ -829,7 +829,7 @@ static int qh_schedule(struct ehci_hcd *ehci, struct ehci_qh *qh)
+ {
+ 	int		status;
+ 	unsigned	uframe;
+-	__hc32		c_mask;
++	__hc32		c_mask = 0;
+ 	unsigned	frame;		/* 0..(qh->period - 1), or NO_FRAME */
+ 	struct ehci_qh_hw	*hw = qh->hw;
+ 
+-- 
+1.7.9.5
+

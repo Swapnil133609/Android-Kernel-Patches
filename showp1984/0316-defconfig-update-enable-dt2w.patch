@@ -1,0 +1,28 @@
+From e14f7d41fecabf9e7b4b7153cdae22269cf199c7 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 20 Nov 2013 04:33:02 +0100
+Subject: [PATCH 316/338] defconfig: update & enable dt2w
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index bedc353..a87cbea 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -1619,7 +1619,8 @@ CONFIG_INPUT_TOUCHSCREEN=y
+ CONFIG_TOUCHSCREEN_LGE_SYNAPTICS=y
+ CONFIG_TOUCHSCREEN_CHARGER_NOTIFY=y
+ CONFIG_TOUCHSCREEN_SWEEP2WAKE=y
+-CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP=y
++CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE=y
++CONFIG_TOUCHSCREEN_PREVENT_SLEEP=y
+ CONFIG_INPUT_MISC=y
+ # CONFIG_INPUT_AD714X is not set
+ # CONFIG_INPUT_BMA150 is not set
+-- 
+1.7.9.5
+

@@ -1,0 +1,27 @@
+From 2fcb45b5124e92af507cc03765c403ebcb2a65cb Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sat, 25 Feb 2012 12:35:48 -0800
+Subject: [PATCH 085/338] defconfig: enable updated rwsem algo
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index 20c9251..37b3428 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -17,7 +17,7 @@ CONFIG_TRACE_IRQFLAGS_SUPPORT=y
+ CONFIG_HARDIRQS_SW_RESEND=y
+ CONFIG_GENERIC_IRQ_PROBE=y
+ CONFIG_ARM_TICKET_LOCKS=y
+-CONFIG_RWSEM_GENERIC_SPINLOCK=y
++CONFIG_RWSEM_XCHGADD_ALGORITHM=y
+ CONFIG_ARCH_HAS_CPUFREQ=y
+ CONFIG_ARCH_HAS_CPU_IDLE_WAIT=y
+ CONFIG_GENERIC_HWEIGHT=y
+-- 
+1.7.9.5
+

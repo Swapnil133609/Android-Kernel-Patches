@@ -1,0 +1,32 @@
+From fa44f72d00d4ed5b63240059b78fa2970f04bd1e Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 11 Nov 2013 00:49:52 +0100
+Subject: [PATCH 238/338] msm_mpdecision: add input boost triggers This fixes
+ issue #27 - No boost event triggered & issue #28 -
+ Power button should trigger boost_freq
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index a16fc67..8a322ff 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -467,7 +467,10 @@ static void mpdec_input_event(struct input_handle *handle, unsigned int type,
+ 
+ static int input_dev_filter(const char *input_dev_name) {
+ 	if (strstr(input_dev_name, "touch") ||
+-		strstr(input_dev_name, "keypad")) {
++		strstr(input_dev_name, "key") ||
++		strstr(input_dev_name, "power") ||
++		strstr(input_dev_name, "pwr") ||
++		strstr(input_dev_name, "lid")) {
+ 		return 0;
+ 	} else {
+ 		return 1;
+-- 
+1.7.9.5
+

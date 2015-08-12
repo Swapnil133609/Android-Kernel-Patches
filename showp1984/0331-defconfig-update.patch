@@ -1,0 +1,27 @@
+From 516a802d5242ed999c5fa5b72212545c5cfc52d5 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Fri, 6 Dec 2013 18:38:25 +0100
+Subject: [PATCH 331/338] defconfig: update
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index e5bea66..c7739b6 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -907,7 +907,7 @@ CONFIG_NETFILTER_XT_TARGET_NFQUEUE=y
+ # CONFIG_NETFILTER_XT_TARGET_TPROXY is not set
+ # CONFIG_NETFILTER_XT_TARGET_TRACE is not set
+ CONFIG_NETFILTER_XT_TARGET_SECMARK=y
+-# CONFIG_NETFILTER_XT_TARGET_TCPMSS is not set
++CONFIG_NETFILTER_XT_TARGET_TCPMSS=y
+ # CONFIG_NETFILTER_XT_TARGET_TCPOPTSTRIP is not set
+ 
+ #
+-- 
+1.7.9.5
+

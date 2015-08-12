@@ -1,0 +1,35 @@
+From 698f8ad058298ecdeeff4e9c94acb7ad2ee1c5d0 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 13 Nov 2013 03:16:02 +0100
+Subject: [PATCH 264/338] msm_mpdecision: fix early_suspend compilation
+
+This was not changed because we do not compile with early suspend
+and hence didn't encounter any errors. Fix it.
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 8a322ff..a967171 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -618,11 +618,11 @@ static int msm_mpdec_lcd_notifier_callback(struct notifier_block *this,
+ }
+ #else
+ static void msm_mpdec_early_suspend(struct early_suspend *h) {
+-	   msm_mpdec_suspend();
++	   schedule_work(&msm_mpdec_suspend_work);
+ }
+ 
+ static void msm_mpdec_late_resume(struct early_suspend *h) {
+-	   msm_mpdec_resume();
++	   schedule_work(&msm_mpdec_resume_work);
+ }
+ 
+ static struct early_suspend msm_mpdec_early_suspend_handler = {
+-- 
+1.7.9.5
+

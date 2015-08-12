@@ -1,0 +1,27 @@
+From d3fe16aea6c2e32111ad20bac2c31147dad974d1 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 08:15:22 +0100
+Subject: [PATCH 132/338] msm_mpdecision: use CONFIG_NR_CPUS for max_cpu sysfs
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index bb883f7..bf605fd 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -529,7 +529,7 @@ static ssize_t store_max_cpus(struct kobject *a, struct attribute *b,
+ 	unsigned int input;
+ 	int ret;
+ 	ret = sscanf(buf, "%u", &input);
+-	if ((ret != 1) || input > 4)
++	if ((ret != 1) || input > CONFIG_NR_CPUS)
+                 return -EINVAL;
+ 
+ 	msm_mpdec_tuners_ins.max_cpus = input;
+-- 
+1.7.9.5
+

@@ -1,0 +1,44 @@
+From ed2c3c6004bdb032b6e1937297063f6a6d075f3f Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Fri, 22 Jun 2012 06:46:04 +0200
+Subject: [PATCH 096/338] mach-msm: mpdecision: remove up/down delay, our
+ default delay is large enough
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 101b912..27b4479 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -35,8 +35,6 @@
+ #define MPDEC_TAG "[MPDEC]: "
+ #define MSM_MPDEC_STARTDELAY 40000
+ #define MSM_MPDEC_DELAY 500
+-#define MSM_MPDEC_CPU_UPDELAY 200
+-#define MSM_MPDEC_CPU_DOWNDELAY 200
+ #define MSM_MPDEC_PAUSE 10000
+ 
+ enum {
+@@ -150,7 +148,6 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 			if ((per_cpu(msm_mpdec_suspend, cpu).online == true) && (cpu_online(cpu))) {
+ 				cpu_down(cpu);
+ 				per_cpu(msm_mpdec_suspend, cpu).online = false;
+-				msleep(MSM_MPDEC_CPU_DOWNDELAY);
+ 				pr_info(MPDEC_TAG"CPU[%d] 1->0 | Mask=[%d%d]\n",
+ 						cpu, cpu_online(0), cpu_online(1));
+ 			} else {
+@@ -167,7 +164,6 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 			if ((per_cpu(msm_mpdec_suspend, cpu).online == false) && (!cpu_online(cpu))) {
+ 				cpu_up(cpu);
+ 				per_cpu(msm_mpdec_suspend, cpu).online = true;
+-				msleep(MSM_MPDEC_CPU_UPDELAY);
+ 				pr_info(MPDEC_TAG"CPU[%d] 0->1 | Mask=[%d%d]\n",
+ 						cpu, cpu_online(0), cpu_online(1));
+ 			} else {
+-- 
+1.7.9.5
+

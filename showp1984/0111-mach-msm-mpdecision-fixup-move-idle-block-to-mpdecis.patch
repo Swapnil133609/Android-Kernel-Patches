@@ -1,0 +1,43 @@
+From 0588b446d3ba5496b3a991a21b27023b15402219 Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Thu, 28 Jun 2012 05:24:38 +0200
+Subject: [PATCH 111/338] mach-msm: mpdecision: fixup: move idle block to
+ mpdecision()
+
+This belongs in mp_decision() because this influences the decision
+mpdecision is about to make.
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 519a34b..85ec739 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -117,6 +117,10 @@ static int mp_decision(void)
+ 		} else if (rq_depth <= NwNs_Threshold[index+1]) {
+ 			if (total_time >= TwTs_Threshold[index+1] ) {
+ 				new_state = MSM_MPDEC_DOWN;
++                                if (cpu_online((CONFIG_NR_CPUS - 1)))
++		                        if (acpuclk_8x60_get_rate((CONFIG_NR_CPUS - 1)) >
++                                            msm_mpdec_tuners_ins.idle_freq)
++			                        new_state = MSM_MPDEC_IDLE;
+ 			}
+ 		} else {
+ 			new_state = MSM_MPDEC_IDLE;
+@@ -165,9 +169,6 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 	case MSM_MPDEC_DOWN:
+ 		cpu = (CONFIG_NR_CPUS - 1);
+ 		if (cpu < nr_cpu_ids) {
+-			if (cpu_online(cpu))
+-				if (acpuclk_8x60_get_rate(cpu) > msm_mpdec_tuners_ins.idle_freq)
+-					break;
+ 			if ((per_cpu(msm_mpdec_cpudata, cpu).online == true) && (cpu_online(cpu))) {
+ 				cpu_down(cpu);
+ 				per_cpu(msm_mpdec_cpudata, cpu).online = false;
+-- 
+1.7.9.5
+

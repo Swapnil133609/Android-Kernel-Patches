@@ -1,0 +1,29 @@
+From 3b0e9b3060c4cc8760b51f02d3f9b8c6494d6fef Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 11 Nov 2013 02:13:56 +0100
+Subject: [PATCH 251/338] net/ipv4/tcp_input.c: fix: warning: array subscript
+ is above array bounds
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ net/ipv4/tcp_input.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/net/ipv4/tcp_input.c b/net/ipv4/tcp_input.c
+index 257b617..8614e7c 100644
+--- a/net/ipv4/tcp_input.c
++++ b/net/ipv4/tcp_input.c
+@@ -4383,7 +4383,8 @@ static void tcp_sack_remove(struct tcp_sock *tp)
+ 
+ 			/* Zap this SACK, by moving forward any other SACKS. */
+ 			for (i=this_sack+1; i < num_sacks; i++)
+-				tp->selective_acks[i-1] = tp->selective_acks[i];
++				if (i < 4)
++					tp->selective_acks[i-1] = tp->selective_acks[i];
+ 			num_sacks--;
+ 			continue;
+ 		}
+-- 
+1.7.9.5
+

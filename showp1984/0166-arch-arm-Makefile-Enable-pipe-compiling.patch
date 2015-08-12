@@ -1,0 +1,32 @@
+From de0cf6841058428b7a8ca764c013efda9746b4b1 Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Fri, 11 May 2012 06:42:21 +0200
+Subject: [PATCH 166/338] arch/arm/Makefile: Enable pipe compiling
+
+-pipe
+
+Use pipes rather than temporary files for communication between the various stages of
+compilation. This fails to work on some systems where the assembler is unable to read
+from a pipe; but the GNU assembler has no trouble.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/Makefile |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index a1f42d9..930ecc2 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -17,7 +17,7 @@ endif
+ 
+ OBJCOPYFLAGS	:=-O binary -R .comment -S
+ GZFLAGS		:=-9
+-#KBUILD_CFLAGS	+=-pipe
++KBUILD_CFLAGS	+=-pipe
+ # Explicitly specifiy 32-bit ARM ISA since toolchain default can be -mthumb:
+ KBUILD_CFLAGS	+=$(call cc-option,-marm,)
+ 
+-- 
+1.7.9.5
+

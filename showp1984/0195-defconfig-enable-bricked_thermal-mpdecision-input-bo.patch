@@ -1,0 +1,36 @@
+From faa2068cdbba477b9f6a0886ff4b78c4d7481d89 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 6 Nov 2013 00:28:11 +0100
+Subject: [PATCH 195/338] defconfig: enable bricked_thermal & mpdecision input
+ boost
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index 1fc5874..53f3afc 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -431,7 +431,7 @@ CONFIG_MSM_QMI_INTERFACE=y
+ # CONFIG_MSM_TEST_QMI_CLIENT is not set
+ # CONFIG_MSM_DALRPC is not set
+ CONFIG_MSM_MPDEC=y
+-CONFIG_MSM_MPDEC_INPUTBOOST_CPUMIN=y
++# CONFIG_MSM_MPDEC_INPUTBOOST_CPUMIN is not set
+ CONFIG_MSM_CPU_FREQ_SET_MIN_MAX=y
+ CONFIG_MSM_CPU_FREQ_MAX=2265600
+ CONFIG_MSM_CPU_FREQ_MIN=300000
+@@ -1994,6 +1994,7 @@ CONFIG_THERMAL_TSENS8974=y
+ CONFIG_THERMAL_MONITOR=y
+ CONFIG_THERMAL_QPNP=y
+ CONFIG_THERMAL_QPNP_ADC_TM=y
++CONFIG_BRICKED_THERMAL=y
+ # CONFIG_WATCHDOG is not set
+ CONFIG_SSB_POSSIBLE=y
+ 
+-- 
+1.7.9.5
+

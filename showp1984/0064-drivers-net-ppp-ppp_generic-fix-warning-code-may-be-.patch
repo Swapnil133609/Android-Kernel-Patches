@@ -1,0 +1,37 @@
+From 9b2bc1ed593af42449404d58531682374c49909a Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 04:21:32 +0100
+Subject: [PATCH 064/338] drivers/net/ppp/ppp_generic: fix: 'warning: 'code'
+ may be used uninitialized in this function'
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/net/ppp/ppp_generic.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ppp/ppp_generic.c b/drivers/net/ppp/ppp_generic.c
+index 21d7151..2de3ec5 100644
+--- a/drivers/net/ppp/ppp_generic.c
++++ b/drivers/net/ppp/ppp_generic.c
+@@ -741,7 +741,7 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ #ifdef CONFIG_PPP_FILTER
+ 	case PPPIOCSPASS:
+ 	{
+-		struct sock_filter *code;
++		struct sock_filter *code = NULL;
+ 		err = get_filter(argp, &code);
+ 		if (err >= 0) {
+ 			ppp_lock(ppp);
+@@ -755,7 +755,7 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 	}
+ 	case PPPIOCSACTIVE:
+ 	{
+-		struct sock_filter *code;
++		struct sock_filter *code = NULL;
+ 		err = get_filter(argp, &code);
+ 		if (err >= 0) {
+ 			ppp_lock(ppp);
+-- 
+1.7.9.5
+

@@ -1,0 +1,94 @@
+From 254b8ff3772b41f69445c5c0a70e9201b6653a66 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 6 Nov 2013 04:25:08 +0100
+Subject: [PATCH 203/338] msm_mpdecision: remove per_cpu suspend value This is
+ unneccessary and produces overhead when
+ checking/setting over loops
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |   20 ++++++--------------
+ 1 file changed, 6 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 673951c..a283904 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -69,7 +69,6 @@ enum {
+ struct msm_mpdec_cpudata_t {
+     struct mutex hotplug_mutex;
+     int online;
+-    int device_suspended;
+     cputime64_t on_time;
+     cputime64_t on_time_total;
+     long long unsigned int times_cpu_hotplugged;
+@@ -86,6 +85,7 @@ struct msm_mpdec_cpudata_t {
+ };
+ static DEFINE_PER_CPU(struct msm_mpdec_cpudata_t, msm_mpdec_cpudata);
+ 
++static bool mpdec_suspended = false;
+ static struct notifier_block msm_mpdec_lcd_notif;
+ static struct delayed_work msm_mpdec_work;
+ static struct workqueue_struct *msm_mpdec_workq;
+@@ -286,7 +286,6 @@ static int mp_decision(void) {
+ 
+ static void msm_mpdec_work_thread(struct work_struct *work) {
+     unsigned int cpu = nr_cpu_ids;
+-    bool suspended = false;
+ 
+     if (ktime_to_ms(ktime_get()) <= msm_mpdec_tuners_ins.startdelay)
+             goto out;
+@@ -295,13 +294,7 @@ static void msm_mpdec_work_thread(struct work_struct *work) {
+     if (mpdec_paused_until >= ktime_to_ms(ktime_get()))
+             goto out;
+ 
+-    for_each_possible_cpu(cpu) {
+-        if ((per_cpu(msm_mpdec_cpudata, cpu).device_suspended == true)) {
+-            suspended = true;
+-            break;
+-        }
+-    }
+-    if (suspended == true)
++    if (mpdec_suspended == true)
+         goto out;
+ 
+     if (!mutex_trylock(&mpdec_msm_cpu_lock))
+@@ -580,8 +573,8 @@ static void msm_mpdec_suspend(struct work_struct * msm_mpdec_suspend_work) {
+         if ((cpu >= 1) && (cpu_online(cpu))) {
+             mpdec_cpu_down(cpu);
+         }
+-        per_cpu(msm_mpdec_cpudata, cpu).device_suspended = true;
+     }
++    mpdec_suspended = true;
+ 
+     pr_info(MPDEC_TAG"Screen -> off. Deactivated mpdecision.\n");
+ }
+@@ -593,11 +586,10 @@ static void msm_mpdec_resume(struct work_struct * msm_mpdec_suspend_work) {
+     is_screen_on = true;
+ #endif
+ 
+-    if (!per_cpu(msm_mpdec_cpudata, 0).device_suspended)
++    if (!mpdec_suspended)
+         return;
+ 
+-    for_each_possible_cpu(cpu)
+-        per_cpu(msm_mpdec_cpudata, cpu).device_suspended = false;
++    mpdec_suspended = false;
+ 
+     if (msm_mpdec_tuners_ins.scroff_single_core) {
+         /* wake up main work thread */
+@@ -1142,9 +1134,9 @@ static int __init msm_mpdec_init(void) {
+     unsigned long int boost_freq = 0;
+ #endif
+ 
++    mpdec_suspended = false;
+     for_each_possible_cpu(cpu) {
+         mutex_init(&(per_cpu(msm_mpdec_cpudata, cpu).hotplug_mutex));
+-        per_cpu(msm_mpdec_cpudata, cpu).device_suspended = false;
+         per_cpu(msm_mpdec_cpudata, cpu).online = true;
+         per_cpu(msm_mpdec_cpudata, cpu).on_time_total = 0;
+         per_cpu(msm_mpdec_cpudata, cpu).times_cpu_unplugged = 0;
+-- 
+1.7.9.5
+

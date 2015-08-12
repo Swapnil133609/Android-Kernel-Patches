@@ -1,0 +1,815 @@
+From e2ee6c351d012588ac73bccd35043768aa858419 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 5 Nov 2013 23:59:43 +0100
+Subject: [PATCH 193/338] add 3-phase bricked_msm_thermal
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig            |    1 +
+ arch/arm/mach-msm/lge/board-8974-hammerhead.c |   24 +
+ drivers/thermal/Kconfig                       |   10 +
+ drivers/thermal/Makefile                      |    6 +-
+ drivers/thermal/bricked_thermal.c             |  597 +++++++++++++++++++++++++
+ drivers/thermal/msm_thermal.c                 |   14 +
+ include/linux/msm_thermal.h                   |   35 ++
+ 7 files changed, 686 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/thermal/bricked_thermal.c
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index 640efe6..c18573a 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -431,6 +431,7 @@ CONFIG_MSM_QMI_INTERFACE=y
+ # CONFIG_MSM_TEST_QMI_CLIENT is not set
+ # CONFIG_MSM_DALRPC is not set
+ CONFIG_MSM_MPDEC=y
++# CONFIG_MSM_MPDEC_INPUTBOOST_CPUMIN is not set
+ CONFIG_MSM_CPU_FREQ_SET_MIN_MAX=y
+ CONFIG_MSM_CPU_FREQ_MAX=2265600
+ CONFIG_MSM_CPU_FREQ_MIN=300000
+diff --git a/arch/arm/mach-msm/lge/board-8974-hammerhead.c b/arch/arm/mach-msm/lge/board-8974-hammerhead.c
+index d7cb967..6d40007 100644
+--- a/arch/arm/mach-msm/lge/board-8974-hammerhead.c
++++ b/arch/arm/mach-msm/lge/board-8974-hammerhead.c
+@@ -88,6 +88,26 @@ static void __init msm8974_early_memory(void)
+ 	of_scan_flat_dt(dt_scan_for_memory_hole, msm8974_reserve_table);
+ }
+ 
++#ifdef CONFIG_BRICKED_THERMAL
++static struct msm_thermal_data msm_thermal_pdata = {
++	.sensor_id = 0,
++	.poll_ms = 400,
++	.shutdown_temp = 83,
++
++	.allowed_max_high = 79,
++	.allowed_max_low = 74,
++	.allowed_max_freq = 300000,
++
++	.allowed_mid_high = 76,
++	.allowed_mid_low = 71,
++	.allowed_mid_freq = 960000,
++
++	.allowed_low_high = 74,
++	.allowed_low_low = 68,
++	.allowed_low_freq = 1728000,
++};
++#endif
++
+ /*
+  * Used to satisfy dependencies for devices that need to be
+  * run early or in a particular order. Most likely your device doesn't fall
+@@ -109,7 +129,11 @@ void __init msm8974_add_drivers(void)
+ 	krait_power_init();
+ 	msm_clock_init(&msm8974_clock_init_data);
+ 	tsens_tm_init_driver();
++#ifdef CONFIG_BRICKED_THERMAL
++	msm_thermal_init(&msm_thermal_pdata);
++#else
+ 	msm_thermal_device_init();
++#endif
+ 	lge_add_persistent_device();
+ #if defined (CONFIG_BCMDHD) || defined (CONFIG_BCMDHD_MODULE)
+ 	init_bcm_wifi();
+diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+index 347d9f2..cf5cbff 100644
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -117,3 +117,13 @@ config THERMAL_QPNP_ADC_TM
+ 	  Disabling the thermal zone device via the mode file results in disabling
+ 	  the sensor. Also able to set threshold temperature for both hot and cold
+ 	  and update when a threshold is reached.
++
++config BRICKED_THERMAL
++	tristate "Bricked thermal monitor based on pre core-control msm_thermal"
++	depends on THERMAL_TSENS8960 || THERMAL_TSENS8974
++	depends on CPU_FREQ_MSM
++	default n
++	help
++	  This enables thermal monitoring capability in the kernel.
++	  Monitors TSENS temperature and limits the max frequency of the cores.
++	  This replaces the qcom msm_thermal when defined!
+diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
+index 01dce2d..6b1b94a 100644
+--- a/drivers/thermal/Makefile
++++ b/drivers/thermal/Makefile
+@@ -7,7 +7,11 @@ obj-$(CONFIG_THERMAL_MSM_POPMEM)	+= msm_popmem-tm.o
+ obj-$(CONFIG_THERMAL_TSENS)	+= msm_tsens.o
+ obj-$(CONFIG_THERMAL_TSENS8960) += msm8960_tsens.o
+ obj-$(CONFIG_THERMAL_PM8XXX)	+= pm8xxx-tm.o
+-obj-$(CONFIG_THERMAL_MONITOR)	+= msm_thermal.o
++ifdef CONFIG_BRICKED_THERMAL
++	obj-y				+= bricked_thermal.o
++else
++	obj-$(CONFIG_THERMAL_MONITOR)	+= msm_thermal.o
++endif
+ obj-$(CONFIG_SPEAR_THERMAL)		+= spear_thermal.o
+ obj-$(CONFIG_THERMAL_TSENS8974)	+= msm8974-tsens.o
+ obj-$(CONFIG_THERMAL_QPNP)	+= qpnp-temp-alarm.o
+diff --git a/drivers/thermal/bricked_thermal.c b/drivers/thermal/bricked_thermal.c
+new file mode 100644
+index 0000000..9178a72
+--- /dev/null
++++ b/drivers/thermal/bricked_thermal.c
+@@ -0,0 +1,597 @@
++/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/msm_tsens.h>
++#include <linux/workqueue.h>
++#include <linux/cpu.h>
++#include <linux/reboot.h>
++#include <linux/cpufreq.h>
++#include <linux/msm_tsens.h>
++#include <linux/msm_thermal.h>
++#include <linux/platform_device.h>
++#include <linux/of.h>
++#include <linux/hrtimer.h>
++#include <mach/cpufreq.h>
++
++static DEFINE_MUTEX(emergency_shutdown_mutex);
++
++static int enabled;
++
++//Throttling indicator, 0=not throttled, 1=low, 2=mid, 3=max
++static int thermal_throttled = 0;
++
++//Save the cpu max freq before throttling
++static int pre_throttled_max = 0;
++
++static struct msm_thermal_data msm_thermal_info;
++
++static struct msm_thermal_stat msm_thermal_stats = {
++    .time_low_start = 0,
++    .time_mid_start = 0,
++    .time_max_start = 0,
++    .time_low = 0,
++    .time_mid = 0,
++    .time_max = 0,
++};
++
++static struct delayed_work check_temp_work;
++static struct workqueue_struct *check_temp_workq;
++
++static void update_stats(void)
++{
++    if (msm_thermal_stats.time_low_start > 0) {
++        msm_thermal_stats.time_low += (ktime_to_ms(ktime_get()) - msm_thermal_stats.time_low_start);
++        msm_thermal_stats.time_low_start = 0;
++    }
++    if (msm_thermal_stats.time_mid_start > 0) {
++        msm_thermal_stats.time_mid += (ktime_to_ms(ktime_get()) - msm_thermal_stats.time_mid_start);
++        msm_thermal_stats.time_mid_start = 0;
++    }
++    if (msm_thermal_stats.time_max_start > 0) {
++        msm_thermal_stats.time_max += (ktime_to_ms(ktime_get()) - msm_thermal_stats.time_max_start);
++        msm_thermal_stats.time_max_start = 0;
++    }
++}
++
++static void start_stats(int status)
++{
++    switch (thermal_throttled) {
++        case 1:
++            msm_thermal_stats.time_low_start = ktime_to_ms(ktime_get());
++            break;
++        case 2:
++            msm_thermal_stats.time_mid_start = ktime_to_ms(ktime_get());
++            break;
++        case 3:
++            msm_thermal_stats.time_max_start = ktime_to_ms(ktime_get());
++            break;
++    }
++}
++
++static int update_cpu_max_freq(struct cpufreq_policy *cpu_policy,
++                   int cpu, int max_freq)
++{
++    int ret = 0;
++
++    if (!cpu_policy)
++        return -EINVAL;
++
++    cpufreq_verify_within_limits(cpu_policy, cpu_policy->min, max_freq);
++    cpu_policy->user_policy.max = max_freq;
++
++    ret = cpufreq_update_policy(cpu);
++    if (!ret)
++        pr_debug("msm_thermal: Setting CPU%d max frequency to %d\n",
++                 cpu, max_freq);
++    return ret;
++}
++
++static void check_temp(struct work_struct *work)
++{
++    struct cpufreq_policy *cpu_policy = NULL;
++    struct tsens_device tsens_dev;
++    unsigned long temp = 0;
++    uint32_t max_freq = 0;
++    bool update_policy = false;
++    int i = 0, cpu = 0, ret = 0;
++
++    tsens_dev.sensor_num = msm_thermal_info.sensor_id;
++    ret = tsens_get_temp(&tsens_dev, &temp);
++    if (ret) {
++        pr_err("msm_thermal: FATAL: Unable to read TSENS sensor %d\n",
++               tsens_dev.sensor_num);
++        goto reschedule;
++    }
++
++    if (temp >= msm_thermal_info.shutdown_temp) {
++        mutex_lock(&emergency_shutdown_mutex);
++        pr_warn("################################\n");
++        pr_warn("################################\n");
++        pr_warn("- %u OVERTEMP! SHUTTING DOWN! -\n", msm_thermal_info.shutdown_temp);
++        pr_warn("- cur temp:%lu measured by:%u -\n", temp, msm_thermal_info.sensor_id);
++        pr_warn("################################\n");
++        pr_warn("################################\n");
++        /* orderly poweroff tries to power down gracefully
++           if it fails it will force it. */
++        orderly_poweroff(true);
++        for_each_possible_cpu(cpu) {
++            update_policy = true;
++            max_freq = msm_thermal_info.allowed_max_freq;
++            thermal_throttled = 3;
++            pr_warn("msm_thermal: Emergency throttled CPU%i to %u! temp:%lu\n",
++                    cpu, msm_thermal_info.allowed_max_freq, temp);
++        }
++        mutex_unlock(&emergency_shutdown_mutex);
++    }
++
++    for_each_possible_cpu(cpu) {
++        update_policy = false;
++        cpu_policy = cpufreq_cpu_get(cpu);
++        if (!cpu_policy) {
++            pr_debug("msm_thermal: NULL policy on cpu %d\n", cpu);
++            continue;
++        }
++
++        /* save pre-throttled max freq value */
++        if ((thermal_throttled == 0) && (cpu == 0))
++            pre_throttled_max = cpu_policy->max;
++
++        //low trip point
++        if ((temp >= msm_thermal_info.allowed_low_high) &&
++            (temp < msm_thermal_info.allowed_mid_high) &&
++            (thermal_throttled < 1)) {
++            update_policy = true;
++            max_freq = msm_thermal_info.allowed_low_freq;
++            if (cpu == (CONFIG_NR_CPUS-1)) {
++                thermal_throttled = 1;
++                pr_warn("msm_thermal: Thermal Throttled (low)! temp:%lu by:%u\n",
++                        temp, msm_thermal_info.sensor_id);
++            }
++        //low clr point
++        } else if ((temp < msm_thermal_info.allowed_low_low) &&
++               (thermal_throttled > 0)) {
++            if (pre_throttled_max != 0)
++                max_freq = pre_throttled_max;
++            else {
++                max_freq = CONFIG_MSM_CPU_FREQ_MAX;
++                pr_warn("msm_thermal: ERROR! pre_throttled_max=0, falling back to %u\n", max_freq);
++            }
++            update_policy = true;
++            for (i = 1; i < CONFIG_NR_CPUS; i++) {
++                if (cpu_online(i))
++                        continue;
++                cpu_up(i);
++            }
++            if (cpu == (CONFIG_NR_CPUS-1)) {
++                thermal_throttled = 0;
++                pr_warn("msm_thermal: Low thermal throttle ended! temp:%lu by:%u\n",
++                        temp, msm_thermal_info.sensor_id);
++            }
++        //mid trip point
++        } else if ((temp >= msm_thermal_info.allowed_mid_high) &&
++               (temp < msm_thermal_info.allowed_max_high) &&
++               (thermal_throttled < 2)) {
++            update_policy = true;
++            max_freq = msm_thermal_info.allowed_mid_freq;
++            if (cpu == (CONFIG_NR_CPUS-1)) {
++                thermal_throttled = 2;
++                pr_warn("msm_thermal: Thermal Throttled (mid)! temp:%lu by:%u\n",
++                        temp, msm_thermal_info.sensor_id);
++            }
++        //mid clr point
++        } else if ((temp < msm_thermal_info.allowed_mid_low) &&
++               (thermal_throttled > 1)) {
++            max_freq = msm_thermal_info.allowed_low_freq;
++            update_policy = true;
++            if (cpu == (CONFIG_NR_CPUS-1)) {
++                thermal_throttled = 1;
++                pr_warn("msm_thermal: Mid thermal throttle ended! temp:%lu by:%u\n",
++                        temp, msm_thermal_info.sensor_id);
++            }
++        //max trip point
++        } else if (temp >= msm_thermal_info.allowed_max_high) {
++            update_policy = true;
++            max_freq = msm_thermal_info.allowed_max_freq;
++            if (cpu == (CONFIG_NR_CPUS-1)) {
++                thermal_throttled = 3;
++                pr_warn("msm_thermal: Thermal Throttled (max)! temp:%lu by:%u\n",
++                        temp, msm_thermal_info.sensor_id);
++            }
++        //max clr point
++        } else if ((temp < msm_thermal_info.allowed_max_low) &&
++               (thermal_throttled > 2)) {
++            max_freq = msm_thermal_info.allowed_mid_freq;
++            update_policy = true;
++            if (cpu == (CONFIG_NR_CPUS-1)) {
++                thermal_throttled = 2;
++                pr_warn("msm_thermal: Max thermal throttle ended! temp:%lu by:%u\n",
++                        temp, msm_thermal_info.sensor_id);
++            }
++        }
++        update_stats();
++        start_stats(thermal_throttled);
++        if (update_policy)
++            update_cpu_max_freq(cpu_policy, cpu, max_freq);
++
++        cpufreq_cpu_put(cpu_policy);
++    }
++
++reschedule:
++    if (enabled)
++        queue_delayed_work(check_temp_workq, &check_temp_work,
++                           msecs_to_jiffies(msm_thermal_info.poll_ms));
++
++    return;
++}
++
++static void disable_msm_thermal(void)
++{
++    int cpu = 0;
++    struct cpufreq_policy *cpu_policy = NULL;
++
++     enabled = 0;
++    /* make sure check_temp is no longer running */
++    cancel_delayed_work(&check_temp_work);
++    flush_scheduled_work();
++
++    if (pre_throttled_max != 0) {
++        for_each_possible_cpu(cpu) {
++            cpu_policy = cpufreq_cpu_get(cpu);
++            if (cpu_policy) {
++                if (cpu_policy->max < cpu_policy->cpuinfo.max_freq)
++                    update_cpu_max_freq(cpu_policy, cpu, pre_throttled_max);
++                cpufreq_cpu_put(cpu_policy);
++            }
++        }
++    }
++
++   pr_warn("msm_thermal: Warning! Thermal guard disabled!");
++}
++
++static void enable_msm_thermal(void)
++{
++    enabled = 1;
++    /* make sure check_temp is running */
++    queue_delayed_work(check_temp_workq, &check_temp_work,
++                       msecs_to_jiffies(msm_thermal_info.poll_ms));
++
++    pr_info("msm_thermal: Thermal guard enabled.");
++}
++
++static int set_enabled(const char *val, const struct kernel_param *kp)
++{
++    int ret = 0;
++
++    ret = param_set_bool(val, kp);
++    if (!enabled)
++        disable_msm_thermal();
++    else if (enabled == 1)
++        enable_msm_thermal();
++    else
++        pr_info("msm_thermal: no action for enabled = %d\n", enabled);
++
++    pr_info("msm_thermal: enabled = %d\n", enabled);
++
++    return ret;
++}
++
++static struct kernel_param_ops module_ops = {
++    .set = set_enabled,
++    .get = param_get_bool,
++};
++
++module_param_cb(enabled, &module_ops, &enabled, 0644);
++MODULE_PARM_DESC(enabled, "enforce thermal limit on cpu");
++
++/**************************** SYSFS START ****************************/
++struct kobject *msm_thermal_kobject;
++
++#define show_one(file_name, object)                             \
++static ssize_t show_##file_name                                 \
++(struct kobject *kobj, struct attribute *attr, char *buf)       \
++{                                                               \
++    return sprintf(buf, "%u\n", msm_thermal_info.object);       \
++}
++
++show_one(shutdown_temp, shutdown_temp);
++show_one(allowed_max_high, allowed_max_high);
++show_one(allowed_max_low, allowed_max_low);
++show_one(allowed_max_freq, allowed_max_freq);
++show_one(allowed_mid_high, allowed_mid_high);
++show_one(allowed_mid_low, allowed_mid_low);
++show_one(allowed_mid_freq, allowed_mid_freq);
++show_one(allowed_low_high, allowed_low_high);
++show_one(allowed_low_low, allowed_low_low);
++show_one(allowed_low_freq, allowed_low_freq);
++show_one(poll_ms, poll_ms);
++
++static ssize_t store_shutdown_temp(struct kobject *a, struct attribute *b,
++                                   const char *buf, size_t count)
++{
++    unsigned int input;
++    int ret;
++    ret = sscanf(buf, "%u", &input);
++    if (ret != 1)
++        return -EINVAL;
++
++    msm_thermal_info.shutdown_temp = input;
++
++    return count;
++}
++
++static ssize_t store_allowed_max_high(struct kobject *a, struct attribute *b,
++                                      const char *buf, size_t count)
++{
++    unsigned int input;
++    int ret;
++    ret = sscanf(buf, "%u", &input);
++    if (ret != 1)
++        return -EINVAL;
++
++    msm_thermal_info.allowed_max_high = input;
++
++    return count;
++}
++
++static ssize_t store_allowed_max_low(struct kobject *a, struct attribute *b,
++                                     const char *buf, size_t count)
++{
++    unsigned int input;
++    int ret;
++    ret = sscanf(buf, "%u", &input);
++    if (ret != 1)
++        return -EINVAL;
++
++    msm_thermal_info.allowed_max_low = input;
++
++    return count;
++}
++
++static ssize_t store_allowed_max_freq(struct kobject *a, struct attribute *b,
++                                      const char *buf, size_t count)
++{
++    unsigned int input;
++    int ret;
++    ret = sscanf(buf, "%u", &input);
++    if (ret != 1)
++        return -EINVAL;
++
++    msm_thermal_info.allowed_max_freq = input;
++
++    return count;
++}
++
++static ssize_t store_allowed_mid_high(struct kobject *a, struct attribute *b,
++                                      const char *buf, size_t count)
++{
++    unsigned int input;
++    int ret;
++    ret = sscanf(buf, "%u", &input);
++    if (ret != 1)
++        return -EINVAL;
++
++    msm_thermal_info.allowed_mid_high = input;
++
++    return count;
++}
++
++static ssize_t store_allowed_mid_low(struct kobject *a, struct attribute *b,
++                                     const char *buf, size_t count)
++{
++    unsigned int input;
++    int ret;
++    ret = sscanf(buf, "%u", &input);
++    if (ret != 1)
++        return -EINVAL;
++
++    msm_thermal_info.allowed_mid_low = input;
++
++    return count;
++}
++
++static ssize_t store_allowed_mid_freq(struct kobject *a, struct attribute *b,
++                                      const char *buf, size_t count)
++{
++    unsigned int input;
++    int ret;
++    ret = sscanf(buf, "%u", &input);
++    if (ret != 1)
++        return -EINVAL;
++
++    msm_thermal_info.allowed_mid_freq = input;
++
++    return count;
++}
++
++static ssize_t store_allowed_low_high(struct kobject *a, struct attribute *b,
++                                      const char *buf, size_t count)
++{
++    unsigned int input;
++    int ret;
++    ret = sscanf(buf, "%u", &input);
++    if (ret != 1)
++        return -EINVAL;
++
++    msm_thermal_info.allowed_low_high = input;
++
++    return count;
++}
++
++static ssize_t store_allowed_low_low(struct kobject *a, struct attribute *b,
++                                     const char *buf, size_t count)
++{
++    unsigned int input;
++    int ret;
++    ret = sscanf(buf, "%u", &input);
++    if (ret != 1)
++        return -EINVAL;
++
++    msm_thermal_info.allowed_low_low = input;
++
++    return count;
++}
++
++static ssize_t store_allowed_low_freq(struct kobject *a, struct attribute *b,
++                                      const char *buf, size_t count)
++{
++    unsigned int input;
++    int ret;
++    ret = sscanf(buf, "%u", &input);
++    if (ret != 1)
++        return -EINVAL;
++
++    msm_thermal_info.allowed_low_freq = input;
++
++    return count;
++}
++
++static ssize_t store_poll_ms(struct kobject *a, struct attribute *b,
++                             const char *buf, size_t count)
++{
++    unsigned int input;
++    int ret;
++    ret = sscanf(buf, "%u", &input);
++    if (ret != 1)
++        return -EINVAL;
++
++    msm_thermal_info.poll_ms = input;
++
++    return count;
++}
++
++define_one_global_rw(shutdown_temp);
++define_one_global_rw(allowed_max_high);
++define_one_global_rw(allowed_max_low);
++define_one_global_rw(allowed_max_freq);
++define_one_global_rw(allowed_mid_high);
++define_one_global_rw(allowed_mid_low);
++define_one_global_rw(allowed_mid_freq);
++define_one_global_rw(allowed_low_high);
++define_one_global_rw(allowed_low_low);
++define_one_global_rw(allowed_low_freq);
++define_one_global_rw(poll_ms);
++
++static struct attribute *msm_thermal_attributes[] = {
++    &shutdown_temp.attr,
++    &allowed_max_high.attr,
++    &allowed_max_low.attr,
++    &allowed_max_freq.attr,
++    &allowed_mid_high.attr,
++    &allowed_mid_low.attr,
++    &allowed_mid_freq.attr,
++    &allowed_low_high.attr,
++    &allowed_low_low.attr,
++    &allowed_low_freq.attr,
++    &poll_ms.attr,
++    NULL
++};
++
++
++static struct attribute_group msm_thermal_attr_group = {
++    .attrs = msm_thermal_attributes,
++    .name = "conf",
++};
++
++/********* STATS START *********/
++
++static ssize_t show_throttle_times(struct kobject *a, struct attribute *b,
++                                 char *buf)
++{
++    ssize_t len = 0;
++
++    if (thermal_throttled == 1) {
++        len += sprintf(buf + len, "%s %llu\n", "low",
++                       (msm_thermal_stats.time_low +
++                        (ktime_to_ms(ktime_get()) -
++                         msm_thermal_stats.time_low_start)));
++    } else
++        len += sprintf(buf + len, "%s %llu\n", "low", msm_thermal_stats.time_low);
++
++    if (thermal_throttled == 2) {
++        len += sprintf(buf + len, "%s %llu\n", "mid",
++                       (msm_thermal_stats.time_mid +
++                        (ktime_to_ms(ktime_get()) -
++                         msm_thermal_stats.time_mid_start)));
++    } else
++        len += sprintf(buf + len, "%s %llu\n", "mid", msm_thermal_stats.time_mid);
++
++    if (thermal_throttled == 3) {
++        len += sprintf(buf + len, "%s %llu\n", "max",
++                       (msm_thermal_stats.time_max +
++                        (ktime_to_ms(ktime_get()) -
++                         msm_thermal_stats.time_max_start)));
++    } else
++        len += sprintf(buf + len, "%s %llu\n", "max", msm_thermal_stats.time_max);
++
++    return len;
++}
++define_one_global_ro(throttle_times);
++
++static ssize_t show_is_throttled(struct kobject *a, struct attribute *b,
++                                 char *buf)
++{
++    return sprintf(buf, "%u\n", thermal_throttled);
++}
++define_one_global_ro(is_throttled);
++
++static struct attribute *msm_thermal_stats_attributes[] = {
++    &is_throttled.attr,
++    &throttle_times.attr,
++    NULL
++};
++
++
++static struct attribute_group msm_thermal_stats_attr_group = {
++    .attrs = msm_thermal_stats_attributes,
++    .name = "stats",
++};
++/**************************** SYSFS END ****************************/
++
++int __init msm_thermal_init(struct msm_thermal_data *pdata)
++{
++    int ret = 0, rc = 0;
++
++    BUG_ON(!pdata);
++    BUG_ON(pdata->sensor_id >= TSENS_MAX_SENSORS);
++    memcpy(&msm_thermal_info, pdata, sizeof(struct msm_thermal_data));
++
++    enabled = 1;
++    check_temp_workq=alloc_workqueue("msm_thermal", WQ_UNBOUND | WQ_RESCUER, 1);
++    if (!check_temp_workq)
++        BUG_ON(ENOMEM);
++    INIT_DELAYED_WORK(&check_temp_work, check_temp);
++    queue_delayed_work(check_temp_workq, &check_temp_work, 0);
++
++    msm_thermal_kobject = kobject_create_and_add("msm_thermal", kernel_kobj);
++    if (msm_thermal_kobject) {
++        rc = sysfs_create_group(msm_thermal_kobject, &msm_thermal_attr_group);
++        if (rc) {
++            pr_warn("msm_thermal: sysfs: ERROR, could not create sysfs group");
++        }
++        rc = sysfs_create_group(msm_thermal_kobject,
++                                &msm_thermal_stats_attr_group);
++        if (rc) {
++            pr_warn("msm_thermal: sysfs: ERROR, could not create sysfs stats group");
++        }
++    } else
++        pr_warn("msm_thermal: sysfs: ERROR, could not create sysfs kobj");
++
++    pr_info("%s complete.", __func__);
++
++    return ret;
++}
++
+diff --git a/drivers/thermal/msm_thermal.c b/drivers/thermal/msm_thermal.c
+index 03c58a2..da76ee3 100644
+--- a/drivers/thermal/msm_thermal.c
++++ b/drivers/thermal/msm_thermal.c
+@@ -915,6 +915,18 @@ static void __ref disable_msm_thermal(void)
+ 	for_each_possible_cpu(cpu) {
+ 		update_cpu_max_freq(cpu, MSM_CPUFREQ_NO_LIMIT);
+ 	}
++
++	pr_warn("msm_thermal: Warning! Thermal guard disabled!");
++}
++
++static void enable_msm_thermal(void)
++{
++	enabled = 1;
++	/* make sure check_temp is running */
++	queue_delayed_work(check_temp_workq, &check_temp_work,
++			   msecs_to_jiffies(msm_thermal_info.poll_ms));
++
++	pr_info("msm_thermal: Thermal guard enabled.");
+ }
+ 
+ static int __ref set_enabled(const char *val, const struct kernel_param *kp)
+@@ -924,6 +936,8 @@ static int __ref set_enabled(const char *val, const struct kernel_param *kp)
+ 	ret = param_set_bool(val, kp);
+ 	if (!enabled)
+ 		disable_msm_thermal();
++	else if (enabled == 1)
++		enable_msm_thermal();
+ 	else
+ 		pr_info("%s: no action for enabled = %d\n",
+ 				KBUILD_MODNAME, enabled);
+diff --git a/include/linux/msm_thermal.h b/include/linux/msm_thermal.h
+index 2c1fa11..dec683e 100644
+--- a/include/linux/msm_thermal.h
++++ b/include/linux/msm_thermal.h
+@@ -14,9 +14,39 @@
+ #ifndef __MSM_THERMAL_H
+ #define __MSM_THERMAL_H
+ 
++#ifdef CONFIG_BRICKED_THERMAL
++#include <asm/cputime.h>
++#endif
++
++
+ struct msm_thermal_data {
+ 	uint32_t sensor_id;
+ 	uint32_t poll_ms;
++#ifdef CONFIG_BRICKED_THERMAL
++	uint32_t shutdown_temp;
++
++	uint32_t allowed_max_high;
++	uint32_t allowed_max_low;
++	uint32_t allowed_max_freq;
++
++	uint32_t allowed_mid_high;
++	uint32_t allowed_mid_low;
++	uint32_t allowed_mid_freq;
++
++	uint32_t allowed_low_high;
++	uint32_t allowed_low_low;
++	uint32_t allowed_low_freq;
++};
++
++struct msm_thermal_stat {
++    cputime64_t time_low_start;
++    cputime64_t time_mid_start;
++    cputime64_t time_max_start;
++    cputime64_t time_low;
++    cputime64_t time_mid;
++    cputime64_t time_max;
++};
++#else
+ 	int32_t limit_temp_degC;
+ 	int32_t temp_hysteresis_degC;
+ 	uint32_t freq_step;
+@@ -29,19 +59,24 @@ struct msm_thermal_data {
+ 	int32_t psm_temp_degC;
+ 	int32_t psm_temp_hyst_degC;
+ };
++#endif
+ 
+ #ifdef CONFIG_THERMAL_MONITOR
+ extern int msm_thermal_init(struct msm_thermal_data *pdata);
++#ifndef CONFIG_BRICKED_THERMAL
+ extern int msm_thermal_device_init(void);
++#endif
+ #else
+ static inline int msm_thermal_init(struct msm_thermal_data *pdata)
+ {
+ 	return -ENOSYS;
+ }
++#ifndef CONFIG_BRICKED_THERMAL
+ static inline int msm_thermal_device_init(void)
+ {
+ 	return -ENOSYS;
+ }
+ #endif
++#endif
+ 
+ #endif /*__MSM_THERMAL_H*/
+-- 
+1.7.9.5
+

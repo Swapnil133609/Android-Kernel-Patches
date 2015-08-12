@@ -1,0 +1,29 @@
+From dbeefbb5565b9f0b6ad4459474b7aea06d5bd70c Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 06:54:05 +0100
+Subject: [PATCH 122/338] msm_mpdecision: don't let msm_mpdec_work_thread()
+ run if we are still booting
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 675a3bd..5186d69 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -193,6 +193,9 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 	cputime64_t on_time = 0;
+         bool suspended = false;
+ 
++        if (ktime_to_ms(ktime_get()) <= msm_mpdec_tuners_ins.startdelay)
++                goto out;
++
+         for_each_possible_cpu(cpu) {
+                 if ((per_cpu(msm_mpdec_cpudata, cpu).device_suspended == true)) {
+                         suspended = true;
+-- 
+1.7.9.5
+

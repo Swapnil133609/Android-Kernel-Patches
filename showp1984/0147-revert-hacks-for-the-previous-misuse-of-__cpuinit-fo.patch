@@ -1,0 +1,42 @@
+From 0ed5e790f29b18c66b079658c9c9c81985fa2081 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 13:10:29 +0100
+Subject: [PATCH 147/338] revert hacks for the previous misuse of __cpuinit
+ for hotplug only functions
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/workqueue.c |    2 +-
+ mm/vmscan.c        |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/workqueue.c b/kernel/workqueue.c
+index 3e5d847..9f62372 100644
+--- a/kernel/workqueue.c
++++ b/kernel/workqueue.c
+@@ -3524,7 +3524,7 @@ __acquires(&gcwq->lock)
+ 	}
+ }
+ 
+-static int __devinit workqueue_cpu_callback(struct notifier_block *nfb,
++static int workqueue_cpu_callback(struct notifier_block *nfb,
+ 						unsigned long action,
+ 						void *hcpu)
+ {
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 33dc256..fd8ef66 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -3236,7 +3236,7 @@ unsigned long shrink_all_memory(unsigned long nr_to_reclaim)
+    not required for correctness.  So if the last cpu in a node goes
+    away, we get changed to run anywhere: as the first one comes back,
+    restore their cpu bindings. */
+-static int __devinit cpu_callback(struct notifier_block *nfb,
++static int cpu_callback(struct notifier_block *nfb,
+ 				  unsigned long action, void *hcpu)
+ {
+ 	int nid;
+-- 
+1.7.9.5
+

@@ -1,0 +1,28 @@
+From ef245c12a7151963675811ae7545e9089ddc6223 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 03:33:45 +0100
+Subject: [PATCH 049/338] kernel/sysctl: fix: 'warning: 'kbuf' may be used
+ uninitialized in this function' #2
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/sysctl.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/sysctl.c b/kernel/sysctl.c
+index 4b0ffe7..6d0410d 100644
+--- a/kernel/sysctl.c
++++ b/kernel/sysctl.c
+@@ -1829,7 +1829,7 @@ static int __do_proc_dointvec(void *tbl_data, struct ctl_table *table,
+ 	int *i, vleft, first = 1, err = 0;
+ 	unsigned long page = 0;
+ 	size_t left;
+-	char *kbuf;
++	char *kbuf = 0;
+ 	
+ 	if (!tbl_data || !table->maxlen || !*lenp || (*ppos && !write)) {
+ 		*lenp = 0;
+-- 
+1.7.9.5
+

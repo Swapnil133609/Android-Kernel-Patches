@@ -1,0 +1,64 @@
+From fdcf8b466f208107ffc4d128f68b9bc5502375a9 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sun, 28 Jul 2013 00:24:21 +0200
+Subject: [PATCH 154/338] acpu: fix krait variant export This was a classic
+ example for a clean cherry pick, but broken code.
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+
+Conflicts:
+	arch/arm/mach-msm/acpuclock-krait.c
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/acpuclock-krait.c |   21 ++++++++-------------
+ 1 file changed, 8 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/mach-msm/acpuclock-krait.c b/arch/arm/mach-msm/acpuclock-krait.c
+index b1d54ef..37f15d2 100644
+--- a/arch/arm/mach-msm/acpuclock-krait.c
++++ b/arch/arm/mach-msm/acpuclock-krait.c
+@@ -1188,6 +1188,9 @@ static struct pvs_table * __init select_freq_plan(
+ 			 drv.pvs_bin);
+ 	}
+ 
++#ifdef CONFIG_DEBUG_FS
++        krait_chip_variant = drv.pvs_bin;
++#endif
+ 	return &params->pvs_tables[drv.speed_bin][drv.pvs_bin];
+ }
+ 
+@@ -1224,10 +1227,6 @@ static void __init drv_data_init(struct device *dev,
+ 	BUG_ON(!drv.acpu_freq_tbl);
+ 	drv.boost_uv = pvs->boost_uv;
+ 
+-#ifdef CONFIG_DEBUG_FS
+-        krait_chip_variant = tbl_idx;
+-#endif
+-
+ 	acpuclk_krait_data.power_collapse_khz = params->stby_khz;
+ 	acpuclk_krait_data.wait_for_irq_khz = params->stby_khz;
+ }
+@@ -1275,15 +1274,11 @@ static void __init hw_init(void)
+ #ifdef CONFIG_DEBUG_FS
+ static int krait_variant_debugfs_show(struct seq_file *s, void *data)
+ {
+-        if (krait_chip_variant == PVS_UNKNOWN) {
+-                seq_printf(s, "Your krait chip variant is UNKNOWN!\n");
+-        } else {
+-                seq_printf(s, "Your krait chip variant is: \n");
+-                seq_printf(s, "[%s] SLOW \n", ((krait_chip_variant == PVS_SLOW) ? "X" : " "));
+-                seq_printf(s, "[%s] NOMINAL \n", ((krait_chip_variant == PVS_NOMINAL) ? "X" : " "));
+-                seq_printf(s, "[%s] FAST \n", ((krait_chip_variant == PVS_FAST) ? "X" : " "));
+-                seq_printf(s, "[%s] FASTER \n", ((krait_chip_variant == PVS_FASTER) ? "X" : " "));
+-        }
++	seq_printf(s, "Your krait chip variant is: \n");
++	seq_printf(s, "[%s] SLOW \n", ((krait_chip_variant == PVS_SLOW) ? "X" : " "));
++	seq_printf(s, "[%s] NOMINAL \n", ((krait_chip_variant == PVS_NOMINAL) ? "X" : " "));
++	seq_printf(s, "[%s] FAST \n", ((krait_chip_variant == PVS_FAST) ? "X" : " "));
++	seq_printf(s, "[%s] FASTER \n", ((krait_chip_variant == PVS_FASTER) ? "X" : " "));
+ 
+ 	return 0;
+ }
+-- 
+1.7.9.5
+

@@ -1,0 +1,27 @@
+From 1d2cf27f5b5f8eb0526b59ced0600fdfcea549fa Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 8 May 2013 01:58:02 +0200
+Subject: [PATCH 181/338] msm_mpdecision: tune hotplug values
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 5ef2d04..d25cbdb 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -124,7 +124,7 @@ static struct msm_mpdec_tuners {
+ #endif
+ };
+ 
+-static unsigned int NwNs_Threshold[8] = {12, 0, 25, 20, 32, 28, 0, 35};
++static unsigned int NwNs_Threshold[8] = {12, 0, 20, 7, 25, 10, 0, 18};
+ static unsigned int TwTs_Threshold[8] = {140, 0, 140, 190, 140, 190, 0, 190};
+ 
+ extern unsigned int get_rq_info(void);
+-- 
+1.7.9.5
+

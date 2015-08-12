@@ -1,0 +1,40 @@
+From 4271cfc190a3d5449afe0b1fd8d06ff11590cec7 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 6 Nov 2013 18:54:02 +0100
+Subject: [PATCH 204/338] defconfig: make ondemand default
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index 0626ef9..3b5dc69 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -696,10 +696,10 @@ CONFIG_CPU_FREQ=y
+ CONFIG_CPU_FREQ_TABLE=y
+ CONFIG_CPU_FREQ_STAT=y
+ # CONFIG_CPU_FREQ_STAT_DETAILS is not set
+-CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y
++# CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE is not set
+ # CONFIG_CPU_FREQ_DEFAULT_GOV_POWERSAVE is not set
+ # CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE is not set
+-# CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND is not set
++CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+ # CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE is not set
+ # CONFIG_CPU_FREQ_DEFAULT_GOV_INTERACTIVE is not set
+ CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
+@@ -1508,7 +1508,7 @@ CONFIG_WLAN=y
+ # CONFIG_WCNSS_CORE is not set
+ # CONFIG_ATH_COMMON is not set
+ CONFIG_BCMDHD=m
+-CONFIG_BCM4339=y
++CONFIG_BCM4339=m
+ CONFIG_BCMDHD_FW_PATH="/vendor/firmware/fw_bcmdhd.bin"
+ CONFIG_BCMDHD_NVRAM_PATH="/etc/wifi/bcmdhd.cal"
+ # CONFIG_DHD_USE_STATIC_BUF is not set
+-- 
+1.7.9.5
+

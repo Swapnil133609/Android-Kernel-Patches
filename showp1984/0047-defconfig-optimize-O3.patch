@@ -1,0 +1,30 @@
+From 924ece21ae38335729c766285850f1370dfb6e54 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 03:20:50 +0100
+Subject: [PATCH 047/338] defconfig: optimize -O3
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+
+Conflicts:
+	arch/arm/configs/bricked_defconfig
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index 4f1a1d9..7b16c7d 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -120,6 +120,8 @@ CONFIG_RD_LZMA=y
+ # CONFIG_RD_XZ is not set
+ # CONFIG_RD_LZO is not set
+ # CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
++# CONFIG_CC_OPTIMIZE_DEFAULT is not set
++CONFIG_CC_OPTIMIZE_ALOT=y
+ CONFIG_SYSCTL=y
+ CONFIG_ANON_INODES=y
+ CONFIG_PANIC_TIMEOUT=5
+-- 
+1.7.9.5
+

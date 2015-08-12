@@ -1,0 +1,27 @@
+From 1d6f114c390b7278bdeb5640160d7eb90ba7d075 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 18 Nov 2013 09:00:48 +0100
+Subject: [PATCH 302/338] defconfig: compile with s2w
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index 5f6eb50..bedc353 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -1618,6 +1618,8 @@ CONFIG_INPUT_TOUCHSCREEN=y
+ # CONFIG_TOUCHSCREEN_GEN_VKEYS is not set
+ CONFIG_TOUCHSCREEN_LGE_SYNAPTICS=y
+ CONFIG_TOUCHSCREEN_CHARGER_NOTIFY=y
++CONFIG_TOUCHSCREEN_SWEEP2WAKE=y
++CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP=y
+ CONFIG_INPUT_MISC=y
+ # CONFIG_INPUT_AD714X is not set
+ # CONFIG_INPUT_BMA150 is not set
+-- 
+1.7.9.5
+

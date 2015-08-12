@@ -1,0 +1,27 @@
+From 0a1f6b2fc7ab80b8d0daf1ed77779c2d2b62e414 Mon Sep 17 00:00:00 2001
+From: Iliyan Malchev <malchev@google.com>
+Date: Tue, 22 Oct 2013 14:28:23 -0700
+Subject: [PATCH 003/338] mdss: use a nonthreaded interrupt
+
+Signed-off-by: Iliyan Malchev <malchev@google.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_mdp.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_mdp.c b/drivers/video/msm/mdss/mdss_mdp.c
+index d35bddc..4cf788b 100644
+--- a/drivers/video/msm/mdss/mdss_mdp.c
++++ b/drivers/video/msm/mdss/mdss_mdp.c
+@@ -726,7 +726,7 @@ static int mdss_mdp_irq_clk_setup(struct mdss_data_type *mdata)
+ 
+ 	pr_debug("max mdp clk rate=%d\n", mdata->max_mdp_clk_rate);
+ 
+-	ret = devm_request_irq(&mdata->pdev->dev, mdata->irq, mdss_irq_handler,
++	ret = request_irq(mdata->irq, mdss_irq_handler,
+ 			 IRQF_DISABLED,	"MDSS", mdata);
+ 	if (ret) {
+ 		pr_err("mdp request_irq() failed!\n");
+-- 
+1.7.9.5
+

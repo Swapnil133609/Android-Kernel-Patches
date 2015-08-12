@@ -1,0 +1,360 @@
+From 028988c02cb9507b8cfffb75594daafc261312e4 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 20 Nov 2013 00:46:54 +0100
+Subject: [PATCH 311/338] sweep2wake/doubletap2wake/touchscreen: Prepare for
+ dt2w
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/Kconfig               |   18 ++++++----
+ drivers/input/touchscreen/Makefile              |    4 ++-
+ drivers/input/touchscreen/sweep2wake.c          |    3 ++
+ drivers/input/touchscreen/touch_synaptics.c     |   43 ++++++++++++++++++-----
+ drivers/input/touchscreen/touch_synaptics_ds5.c |   36 +++++++++++++------
+ drivers/video/msm/mdss/mdss_dsi_panel.c         |   43 ++++++++++++++++++-----
+ 6 files changed, 112 insertions(+), 35 deletions(-)
+
+diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+index 5423c51..9c2c9de 100644
+--- a/drivers/input/touchscreen/Kconfig
++++ b/drivers/input/touchscreen/Kconfig
+@@ -1033,15 +1033,19 @@ config TOUCHSCREEN_CHARGER_NOTIFY
+ 	  or not.
+ 
+ config TOUCHSCREEN_SWEEP2WAKE
+-        tristate "Sweep2Wake for touchscreens"
+-	select TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+-        default n
++	tristate "Sweep2Wake for touchscreens"
++	select TOUCHSCREEN_PREVENT_SLEEP
++	default n
++
++config TOUCHSCREEN_DOUBLETAP2WAKE
++	tristate "DoubleTap2Wake for touchscreens"
++	select TOUCHSCREEN_PREVENT_SLEEP
++	default n
+ 
+-config TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+-        bool "Inihibit sleep on modified touchscreen drivers"
++config TOUCHSCREEN_PREVENT_SLEEP
++	bool "Inihibit sleep on modified touchscreen drivers"
+ 	default n
+ 	help
+-	  This allows sweep2wake to disable the sleep function of modified
+-	  touchscreen drivers.
++	  This disables the sleep function of modified touchscreen drivers.
+ 
+ endif
+diff --git a/drivers/input/touchscreen/Makefile b/drivers/input/touchscreen/Makefile
+index f0a2ac4..9ed1857 100644
+--- a/drivers/input/touchscreen/Makefile
++++ b/drivers/input/touchscreen/Makefile
+@@ -7,7 +7,9 @@
+ wm97xx-ts-y := wm97xx-core.o
+ 
+ # for sweep2wake, leave 1st to avoid merge issues at the end of the file
+-obj-$(CONFIG_TOUCHSCREEN_SWEEP2WAKE)	+= sweep2wake.o
++obj-$(CONFIG_TOUCHSCREEN_SWEEP2WAKE)		+= sweep2wake.o
++# for doubletap2wake, leave 1st to avoid merge issues at the end of the file
++obj-$(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)	+= doubletap2wake.o
+ 
+ obj-$(CONFIG_TOUCHSCREEN_88PM860X)	+= 88pm860x-ts.o
+ obj-$(CONFIG_TOUCHSCREEN_AD7877)	+= ad7877.o
+diff --git a/drivers/input/touchscreen/sweep2wake.c b/drivers/input/touchscreen/sweep2wake.c
+index 6f7e8f2..03638b6 100644
+--- a/drivers/input/touchscreen/sweep2wake.c
++++ b/drivers/input/touchscreen/sweep2wake.c
+@@ -381,6 +381,9 @@ extern struct kobject *android_touch_kobj;
+ #else
+ static struct kobject *android_touch_kobj;
+ EXPORT_SYMBOL_GPL(android_touch_kobj);
++#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
++#define DT2W_ANDROID_TOUCH_DECLARED
++#endif
+ #endif
+ static int __init sweep2wake_init(void)
+ {
+diff --git a/drivers/input/touchscreen/touch_synaptics.c b/drivers/input/touchscreen/touch_synaptics.c
+index a99e1c2..8590569 100644
+--- a/drivers/input/touchscreen/touch_synaptics.c
++++ b/drivers/input/touchscreen/touch_synaptics.c
+@@ -38,9 +38,14 @@
+ 
+ #include "SynaImage.h"
+ 
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+ #include <linux/input/sweep2wake.h>
+ #endif
++#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
++#include <linux/input/doubletap2wake.h>
++#endif
++#endif
+ 
+ static struct workqueue_struct *synaptics_wq;
+ 
+@@ -1598,6 +1603,17 @@ static int synaptics_parse_dt(struct device *dev, struct touch_platform_data *pd
+ 
+ static int synaptics_ts_start(struct synaptics_ts_data *ts)
+ {
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++#if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE) || defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
++	bool prevent_sleep = false;
++#endif
++#if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE)
++	prevent_sleep = (s2w_switch > 0);
++#endif
++#if defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
++	prevent_sleep = prevent_sleep || (dt2w_switch > 0);
++#endif
++#endif
+ 	TOUCH_DEBUG_TRACE("%s\n", __func__);
+ 
+ 	if (ts->curr_resume_state)
+@@ -1615,8 +1631,8 @@ static int synaptics_ts_start(struct synaptics_ts_data *ts)
+ 	queue_delayed_work(synaptics_wq,
+ 			&ts->work_init, msecs_to_jiffies(BOOTING_DELAY));
+ 
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+-	if (s2w_switch > 0)
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++	if (prevent_sleep)
+ 		disable_irq_wake(ts->client->irq);
+ #endif
+ 
+@@ -1625,6 +1641,17 @@ static int synaptics_ts_start(struct synaptics_ts_data *ts)
+ 
+ static int synaptics_ts_stop(struct synaptics_ts_data *ts)
+ {
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++#if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE) || defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
++	bool prevent_sleep = false;
++#endif
++#if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE)
++	prevent_sleep = (s2w_switch > 0);
++#endif
++#if defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
++	prevent_sleep = prevent_sleep || (dt2w_switch > 0);
++#endif
++#endif
+ 	TOUCH_DEBUG_TRACE("%s\n", __func__);
+ 
+ 	if (!ts->curr_resume_state) {
+@@ -1638,8 +1665,8 @@ static int synaptics_ts_stop(struct synaptics_ts_data *ts)
+ 		return 0;
+ 	}
+ 
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+-	if (s2w_switch == 0)
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++	if (!prevent_sleep)
+ #endif
+ 	{
+ 		disable_irq_nosync(ts->client->irq);
+@@ -1648,8 +1675,8 @@ static int synaptics_ts_stop(struct synaptics_ts_data *ts)
+ 		release_all_ts_event(ts);
+ 		touch_power_cntl(ts, POWER_OFF);
+ 	}
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+-	if (s2w_switch > 0)
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++	if (prevent_sleep)
+ 		enable_irq_wake(ts->client->irq);
+ #endif
+ 	return 0;
+@@ -1801,7 +1828,7 @@ static int synaptics_ts_probe(
+ 	gpio_direction_input(ts->pdata->irq_gpio);
+ 
+ 	ret = request_threaded_irq(client->irq, NULL, touch_irq_handler,
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
+ 			IRQF_TRIGGER_FALLING | IRQF_ONESHOT | IRQF_NO_SUSPEND, client->name, ts);
+ #else
+ 			IRQF_TRIGGER_FALLING | IRQF_ONESHOT, client->name, ts);
+diff --git a/drivers/input/touchscreen/touch_synaptics_ds5.c b/drivers/input/touchscreen/touch_synaptics_ds5.c
+index a04f9b8..4a2044b 100644
+--- a/drivers/input/touchscreen/touch_synaptics_ds5.c
++++ b/drivers/input/touchscreen/touch_synaptics_ds5.c
+@@ -38,9 +38,14 @@
+ 
+ #include "SynaImage_ds5.h"
+ 
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+ #include <linux/input/sweep2wake.h>
+ #endif
++#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
++#include <linux/input/doubletap2wake.h>
++#endif
++#endif
+ 
+ static struct workqueue_struct *synaptics_wq;
+ 
+@@ -1667,6 +1672,17 @@ static int lcd_notifier_callback(struct notifier_block *this,
+ {
+ 	struct synaptics_ts_data *ts =
+ 		container_of(this, struct synaptics_ts_data, notif);
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++#if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE) || defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
++	bool prevent_sleep = false;
++#endif
++#if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE)
++	prevent_sleep = (s2w_switch > 0);
++#endif
++#if defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
++	prevent_sleep = prevent_sleep || (dt2w_switch > 0);
++#endif
++#endif
+ 
+ 	TOUCH_DEBUG_TRACE("%s: event = %lu\n", __func__, event);
+ 
+@@ -1683,14 +1699,14 @@ static int lcd_notifier_callback(struct notifier_block *this,
+ 				msecs_to_jiffies(70));
+ 		}
+ 		mutex_unlock(&ts->input_dev->mutex);
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+-		if (s2w_switch > 0)
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++		if (prevent_sleep)
+ 			disable_irq_wake(ts->client->irq);
+ #endif
+ 		break;
+ 	case LCD_EVENT_OFF_START:
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+-		if (s2w_switch == 0)
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++		if (!prevent_sleep)
+ #endif
+ 		{
+ 			mutex_lock(&ts->input_dev->mutex);
+@@ -1699,15 +1715,15 @@ static int lcd_notifier_callback(struct notifier_block *this,
+ 		}
+ 		break;
+ 	case LCD_EVENT_OFF_END:
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+-		if (s2w_switch == 0)
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++		if (!prevent_sleep)
+ #endif
+ 		{
+ 			synaptics_ts_stop(ts);
+ 			mutex_unlock(&ts->input_dev->mutex);
+ 		}
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+-		if (s2w_switch > 0)
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++		if (prevent_sleep)
+ 			enable_irq_wake(ts->client->irq);
+ #endif
+ 		break;
+@@ -1843,7 +1859,7 @@ static int synaptics_ts_probe(
+ 	gpio_direction_input(ts->pdata->irq_gpio);
+ 
+ 	ret = request_threaded_irq(client->irq, NULL, touch_irq_handler,
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
+ 			IRQF_TRIGGER_FALLING | IRQF_ONESHOT | IRQF_NO_SUSPEND, client->name, ts);
+ #else
+ 			IRQF_TRIGGER_FALLING | IRQF_ONESHOT, client->name, ts);
+diff --git a/drivers/video/msm/mdss/mdss_dsi_panel.c b/drivers/video/msm/mdss/mdss_dsi_panel.c
+index 9eabaec..3eb78c1 100644
+--- a/drivers/video/msm/mdss/mdss_dsi_panel.c
++++ b/drivers/video/msm/mdss/mdss_dsi_panel.c
+@@ -25,9 +25,14 @@
+ #include <linux/debugfs.h>
+ #include <linux/ctype.h>
+ #endif
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
+ #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+ #include <linux/input/sweep2wake.h>
+ #endif
++#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
++#include <linux/input/doubletap2wake.h>
++#endif
++#endif
+ 
+ #include "mdss_dsi.h"
+ 
+@@ -172,7 +177,17 @@ static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
+ void mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
+ {
+ 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+-
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++#if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE) || defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
++	bool prevent_sleep = false;
++#endif
++#if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE)
++	prevent_sleep = (s2w_switch > 0);
++#endif
++#if defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
++	prevent_sleep = prevent_sleep || (dt2w_switch > 0);
++#endif
++#endif
+ 	if (pdata == NULL) {
+ 		pr_err("%s: Invalid input data\n", __func__);
+ 		return;
+@@ -229,8 +244,8 @@ void mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
+ 			mdss_panel_id == PANEL_LGE_JDI_ORISE_CMD ||
+ 			mdss_panel_id == PANEL_LGE_JDI_NOVATEK_VIDEO ||
+ 			mdss_panel_id == PANEL_LGE_JDI_NOVATEK_CMD) {
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-			if (s2w_switch == 0)
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++			if (!prevent_sleep)
+ #endif
+ 			{
+ 				if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
+@@ -239,8 +254,8 @@ void mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
+ 				gpio_set_value((ctrl_pdata->rst_gpio), 0);
+ 			}
+ 		} else {
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-			if (s2w_switch == 0)
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++			if (!prevent_sleep)
+ #endif
+ 			{
+ 				gpio_set_value((ctrl_pdata->rst_gpio), 0);
+@@ -312,7 +327,17 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
+ {
+ 	struct mipi_panel_info *mipi;
+ 	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
+-
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++#if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE) || defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
++	bool prevent_sleep = false;
++#endif
++#if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE)
++	prevent_sleep = (s2w_switch > 0);
++#endif
++#if defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
++	prevent_sleep = prevent_sleep || (dt2w_switch > 0);
++#endif
++#endif
+ 	if (pdata == NULL) {
+ 		pr_err("%s: Invalid input data\n", __func__);
+ 		return -EINVAL;
+@@ -328,13 +353,13 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
+ 	if (!gpio_get_value(ctrl->disp_en_gpio))
+ 		return 0;
+ 
+-#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+-	if (s2w_switch) {
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++	if (prevent_sleep) {
+ 		ctrl->off_cmds.cmds[1].payload[0] = 0x11;
+ 	} else {
+ 		ctrl->off_cmds.cmds[1].payload[0] = 0x10;
+ 	}
+-	pr_info("[sweep2wake] payload = %x \n", ctrl->off_cmds.cmds[1].payload[0]);
++	pr_info("[prevent_touchscreen_sleep]: payload = %x \n", ctrl->off_cmds.cmds[1].payload[0]);
+ #endif
+ 
+ 	if (ctrl->off_cmds.cmd_cnt)
+-- 
+1.7.9.5
+

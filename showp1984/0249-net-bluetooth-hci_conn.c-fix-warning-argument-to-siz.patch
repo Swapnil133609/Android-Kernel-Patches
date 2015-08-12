@@ -1,0 +1,29 @@
+From f595f32f25c58bfec27b9ea6c40aea3fc9fc7e2e Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 11 Nov 2013 01:36:03 +0100
+Subject: [PATCH 249/338] net/bluetooth/hci_conn.c: fix: warning: argument to
+ 'sizeof' in 'memcpy' call is the same pointer type
+ '__u8 *' as the destination
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ net/bluetooth/hci_conn.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/net/bluetooth/hci_conn.c b/net/bluetooth/hci_conn.c
+index 7a9fcd4..cbb8d0e 100644
+--- a/net/bluetooth/hci_conn.c
++++ b/net/bluetooth/hci_conn.c
+@@ -403,7 +403,7 @@ void hci_le_ltk_reply(struct hci_conn *conn, u8 ltk[16])
+ 	memset(&cp, 0, sizeof(cp));
+ 
+ 	cp.handle = cpu_to_le16(conn->handle);
+-	memcpy(cp.ltk, ltk, sizeof(ltk));
++	memcpy(cp.ltk, ltk, sizeof(*ltk));
+ 
+ 	hci_send_cmd(hdev, HCI_OP_LE_LTK_REPLY, sizeof(cp), &cp);
+ }
+-- 
+1.7.9.5
+

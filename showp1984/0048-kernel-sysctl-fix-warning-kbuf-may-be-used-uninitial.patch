@@ -1,0 +1,28 @@
+From 20a03715d5aa11c3f6a527f896aa06c52f4a4502 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 03:32:54 +0100
+Subject: [PATCH 048/338] kernel/sysctl: fix: 'warning: 'kbuf' may be used
+ uninitialized in this function'
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/sysctl.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/sysctl.c b/kernel/sysctl.c
+index b390dad..4b0ffe7 100644
+--- a/kernel/sysctl.c
++++ b/kernel/sysctl.c
+@@ -2047,7 +2047,7 @@ static int __do_proc_doulongvec_minmax(void *data, struct ctl_table *table, int
+ 	int vleft, first = 1, err = 0;
+ 	unsigned long page = 0;
+ 	size_t left;
+-	char *kbuf;
++	char *kbuf = NULL;
+ 
+ 	if (!data || !table->maxlen || !*lenp || (*ppos && !write)) {
+ 		*lenp = 0;
+-- 
+1.7.9.5
+

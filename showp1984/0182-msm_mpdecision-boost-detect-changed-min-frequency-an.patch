@@ -1,0 +1,32 @@
+From e1b36b201125b3f673cb7efd62d45bbcb895d01b Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 8 May 2013 16:46:08 +0200
+Subject: [PATCH 182/338] msm_mpdecision: boost: detect changed min frequency
+ and update accordingly
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index d25cbdb..b22a797 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -378,6 +378,12 @@ static void unboost_cpu(int cpu) {
+ #endif
+                 per_cpu(msm_mpdec_cpudata, cpu).is_boosted = false;
+                 per_cpu(msm_mpdec_cpudata, cpu).revib_wq_running = false;
++                if ((cpu_policy->min != per_cpu(msm_mpdec_cpudata, cpu).boost_freq) &&
++                    (cpu_policy->min != per_cpu(msm_mpdec_cpudata, cpu).norm_min_freq)) {
++                    pr_info(MPDEC_TAG"cpu%u min was changed while boosted (%lu->%u), using new min",
++                            cpu, per_cpu(msm_mpdec_cpudata, cpu).norm_min_freq, cpu_policy->min);
++                    per_cpu(msm_mpdec_cpudata, cpu).norm_min_freq = cpu_policy->min;
++                }
+                 update_cpu_min_freq(cpu_policy, cpu, per_cpu(msm_mpdec_cpudata, cpu).norm_min_freq);
+                 cpufreq_cpu_put(cpu_policy);
+                 mutex_unlock(&per_cpu(msm_mpdec_cpudata, cpu).unboost_mutex);
+-- 
+1.7.9.5
+

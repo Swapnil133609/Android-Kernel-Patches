@@ -1,0 +1,32 @@
+From f0c69d5180ee45099df31d69421284d2cf87549d Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 07:19:32 +0100
+Subject: [PATCH 124/338] msm_mpdecision: update header to include full
+ feature list
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index b0fe0f8..e806cfb 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -1,8 +1,10 @@
+ /*
+  * arch/arm/mach-msm/msm_mpdecision.c
+  *
+- * cpu auto-hotplug/unplug based on system load for MSM dualcore cpus
+- * single core while screen is off
++ * This program features:
++ * -cpu auto-hotplug/unplug based on system load for MSM multicore cpus
++ * -single core while screen is off
++ * -extensive sysfs tuneables
+  *
+  * Copyright (c) 2012, Dennis Rassmann <showp1984@gmail.com>
+  *
+-- 
+1.7.9.5
+

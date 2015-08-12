@@ -1,0 +1,37 @@
+From 94b4af655c9bac4afa59c5dd0af91f6a9062d7ba Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 13 Nov 2013 03:17:27 +0100
+Subject: [PATCH 265/338] msm_mpdecision: add locking to early_suspend related
+ code, even if we do not use it
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index a967171..5e17faf 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -618,11 +618,15 @@ static int msm_mpdec_lcd_notifier_callback(struct notifier_block *this,
+ }
+ #else
+ static void msm_mpdec_early_suspend(struct early_suspend *h) {
+-	   schedule_work(&msm_mpdec_suspend_work);
++	mutex_lock(&mpdec_msm_susres_lock);
++	schedule_work(&msm_mpdec_suspend_work);
++	mutex_unlock(&mpdec_msm_susres_lock);
+ }
+ 
+ static void msm_mpdec_late_resume(struct early_suspend *h) {
+-	   schedule_work(&msm_mpdec_resume_work);
++	mutex_lock(&mpdec_msm_susres_lock);
++	schedule_work(&msm_mpdec_resume_work);
++	mutex_unlock(&mpdec_msm_susres_lock);
+ }
+ 
+ static struct early_suspend msm_mpdec_early_suspend_handler = {
+-- 
+1.7.9.5
+

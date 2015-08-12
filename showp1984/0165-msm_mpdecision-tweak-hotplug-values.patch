@@ -1,0 +1,27 @@
+From 8f939fdcd0611883ad3eee00d2ea97b0a94779bf Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Fri, 21 Dec 2012 06:25:18 +0100
+Subject: [PATCH 165/338] msm_mpdecision: tweak hotplug values
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 25a7ac7..ab829a9 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -85,7 +85,7 @@ static struct msm_mpdec_tuners {
+         .min_cpus = 1,
+ };
+ 
+-static unsigned int NwNs_Threshold[8] = {14, 0, 28, 30, 32, 30, 0, 35};
++static unsigned int NwNs_Threshold[8] = {12, 0, 25, 20, 32, 28, 0, 35};
+ static unsigned int TwTs_Threshold[8] = {140, 0, 140, 190, 140, 190, 0, 190};
+ 
+ extern unsigned int get_rq_info(void);
+-- 
+1.7.9.5
+

@@ -1,0 +1,35 @@
+From 8197fe789d966a8cc1ecc26cb5e310cd7718df16 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 7 May 2013 05:56:01 +0200
+Subject: [PATCH 180/338] msm_mpdecision: input event boost: fix not resetting
+ boost if cpu was unplugged before
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index fc28e05..5ef2d04 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -377,6 +377,7 @@ static void unboost_cpu(int cpu) {
+                 pr_info(MPDEC_TAG"un boosted cpu%i to %lu", cpu, per_cpu(msm_mpdec_cpudata, cpu).norm_min_freq);
+ #endif
+                 per_cpu(msm_mpdec_cpudata, cpu).is_boosted = false;
++                per_cpu(msm_mpdec_cpudata, cpu).revib_wq_running = false;
+                 update_cpu_min_freq(cpu_policy, cpu, per_cpu(msm_mpdec_cpudata, cpu).norm_min_freq);
+                 cpufreq_cpu_put(cpu_policy);
+                 mutex_unlock(&per_cpu(msm_mpdec_cpudata, cpu).unboost_mutex);
+@@ -391,7 +392,6 @@ static void msm_mpdec_revib_work_thread(struct work_struct *work) {
+     int cpu = smp_processor_id();
+ 
+     if (ktime_to_ms(ktime_get()) > per_cpu(msm_mpdec_cpudata, cpu).boost_until) {
+-        per_cpu(msm_mpdec_cpudata, cpu).revib_wq_running = false;
+         unboost_cpu(cpu);
+     } else {
+         queue_delayed_work_on(cpu,
+-- 
+1.7.9.5
+

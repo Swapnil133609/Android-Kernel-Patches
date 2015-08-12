@@ -1,0 +1,44 @@
+From 9584068693f5ed60fb89291bc84a9542c40ce2db Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 18 Nov 2013 03:48:12 +0100
+Subject: [PATCH 295/338] sweep2wake: we no longer need irq_wake. remove it.
+ Also clean up variable declariation to save some
+ space
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/sweep2wake.c |    4 +---
+ include/linux/input/sweep2wake.h       |    1 -
+ 2 files changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/drivers/input/touchscreen/sweep2wake.c b/drivers/input/touchscreen/sweep2wake.c
+index 269dee0..1268fd3 100644
+--- a/drivers/input/touchscreen/sweep2wake.c
++++ b/drivers/input/touchscreen/sweep2wake.c
+@@ -65,9 +65,7 @@ MODULE_LICENSE("GPLv2");
+ 
+ /* Resources */
+ int s2w_switch = 1;
+-bool irq_wake = false;
+-static int touch_x = 0;
+-static int touch_y = 0;
++static int touch_x = 0, touch_y = 0;
+ static bool touch_x_called = false, touch_y_called = false;
+ static bool scr_suspended = false, exec_count = true;
+ static bool scr_on_touch = false, barrier[2] = {false, false};
+diff --git a/include/linux/input/sweep2wake.h b/include/linux/input/sweep2wake.h
+index c540bb3..25c9821 100644
+--- a/include/linux/input/sweep2wake.h
++++ b/include/linux/input/sweep2wake.h
+@@ -28,7 +28,6 @@
+ #define SWEEP2WAKE_I2C_SLEEP 40
+ 
+ extern int s2w_switch;
+-extern bool irq_wake;
+ 
+ /* PowerKey setter */
+ extern void sweep2wake_setdev(struct input_dev *);
+-- 
+1.7.9.5
+

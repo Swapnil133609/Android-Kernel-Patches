@@ -1,0 +1,164 @@
+From a3c45c7254e8e6cf8c2de9632f3997b2bd77c8e8 Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Fri, 22 Jun 2012 08:51:55 +0200
+Subject: [PATCH 100/338] mach-msm: mpdecision: rename msm_mpdec_suspend to
+ msm_mpdec_cpudata
+
+Since this is being used for more than suspend stuff the old name
+just isn't accurate anymore.
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |   52 ++++++++++++++++++------------------
+ 1 file changed, 26 insertions(+), 26 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 0dcf38e..cdd36c6 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -44,23 +44,23 @@ enum {
+ 	MSM_MPDEC_UP,
+ };
+ 
+-struct msm_mpdec_suspend_t {
++struct msm_mpdec_cpudata_t {
+ 	struct mutex suspend_mutex;
+ 	int online;
+ 	int device_suspended;
+ 	cputime64_t on_time;
+ };
+-static DEFINE_PER_CPU(struct msm_mpdec_suspend_t, msm_mpdec_suspend);
++static DEFINE_PER_CPU(struct msm_mpdec_cpudata_t, msm_mpdec_cpudata);
+ 
+ static struct delayed_work msm_mpdec_work;
+ static DEFINE_MUTEX(msm_cpu_lock);
+ 
+ bool scroff_single_core = true;
+-bool was_paused = false;
+ 
+ static unsigned int NwNs_Threshold[4] = {20, 0, 0, 5};
+ static unsigned int TwTs_Threshold[4] = {250, 0, 0, 250};
+ extern unsigned int get_rq_info(void);
++bool was_paused = false;
+ 
+ static int mp_decision(void)
+ {
+@@ -121,7 +121,7 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 	unsigned int cpu = nr_cpu_ids;
+ 	cputime64_t on_time = 0;
+ 
+-	if (per_cpu(msm_mpdec_suspend, (CONFIG_NR_CPUS - 1)).device_suspended == true)
++	if (per_cpu(msm_mpdec_cpudata, (CONFIG_NR_CPUS - 1)).device_suspended == true)
+ 		goto out;
+ 
+ 
+@@ -132,9 +132,9 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 	if (was_paused) {
+ 		for_each_possible_cpu(cpu) {
+ 			if (cpu_online(cpu))
+-				per_cpu(msm_mpdec_suspend, cpu).online = true;
++				per_cpu(msm_mpdec_cpudata, cpu).online = true;
+ 			else if (!cpu_online(cpu))
+-				per_cpu(msm_mpdec_suspend, cpu).online = false;
++				per_cpu(msm_mpdec_cpudata, cpu).online = false;
+ 		}
+ 		was_paused = false;
+ 	}
+@@ -147,13 +147,13 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 	case MSM_MPDEC_DOWN:
+ 		cpu = (CONFIG_NR_CPUS - 1);
+ 		if (cpu < nr_cpu_ids) {
+-			if ((per_cpu(msm_mpdec_suspend, cpu).online == true) && (cpu_online(cpu))) {
++			if ((per_cpu(msm_mpdec_cpudata, cpu).online == true) && (cpu_online(cpu))) {
+ 				cpu_down(cpu);
+-				per_cpu(msm_mpdec_suspend, cpu).online = false;
+-				on_time = ktime_to_ms(ktime_get()) - per_cpu(msm_mpdec_suspend, cpu).on_time;
++				per_cpu(msm_mpdec_cpudata, cpu).online = false;
++				on_time = ktime_to_ms(ktime_get()) - per_cpu(msm_mpdec_cpudata, cpu).on_time;
+ 				pr_info(MPDEC_TAG"CPU[%d] on->off | Mask=[%d%d] | time online: %llu\n",
+ 						cpu, cpu_online(0), cpu_online(1), on_time);
+-			} else if ((per_cpu(msm_mpdec_suspend, cpu).online == true) && (!cpu_online(cpu))) {
++			} else if ((per_cpu(msm_mpdec_cpudata, cpu).online == true) && (!cpu_online(cpu))) {
+ 				pr_info(MPDEC_TAG"CPU[%d] was unplugged outside of mpdecision! | pausing [%d]ms\n",
+ 						cpu, MSM_MPDEC_PAUSE);
+ 				msleep(MSM_MPDEC_PAUSE);
+@@ -164,13 +164,13 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 	case MSM_MPDEC_UP:
+ 		cpu = (CONFIG_NR_CPUS - 1);
+ 		if (cpu < nr_cpu_ids) {
+-			if ((per_cpu(msm_mpdec_suspend, cpu).online == false) && (!cpu_online(cpu))) {
++			if ((per_cpu(msm_mpdec_cpudata, cpu).online == false) && (!cpu_online(cpu))) {
+ 				cpu_up(cpu);
+-				per_cpu(msm_mpdec_suspend, cpu).online = true;
+-				per_cpu(msm_mpdec_suspend, cpu).on_time = ktime_to_ms(ktime_get());
++				per_cpu(msm_mpdec_cpudata, cpu).online = true;
++				per_cpu(msm_mpdec_cpudata, cpu).on_time = ktime_to_ms(ktime_get());
+ 				pr_info(MPDEC_TAG"CPU[%d] off->on | Mask=[%d%d]\n",
+ 						cpu, cpu_online(0), cpu_online(1));
+-			} else if ((per_cpu(msm_mpdec_suspend, cpu).online == false) && (cpu_online(cpu))) {
++			} else if ((per_cpu(msm_mpdec_cpudata, cpu).online == false) && (cpu_online(cpu))) {
+ 				pr_info(MPDEC_TAG"CPU[%d] was hotplugged outside of mpdecision! | pausing [%d]ms\n",
+ 						cpu, MSM_MPDEC_PAUSE);
+ 				msleep(MSM_MPDEC_PAUSE);
+@@ -194,15 +194,15 @@ static void msm_mpdec_early_suspend(struct early_suspend *h)
+ {
+ 	int cpu = 0;
+ 	for_each_possible_cpu(cpu) {
+-		mutex_lock(&per_cpu(msm_mpdec_suspend, cpu).suspend_mutex);
++		mutex_lock(&per_cpu(msm_mpdec_cpudata, cpu).suspend_mutex);
+ 		if (((cpu >= (CONFIG_NR_CPUS - 1)) && (num_online_cpus() > 1)) && (scroff_single_core)) {
+ 			cpu_down(cpu);
+ 			pr_info(MPDEC_TAG"Screen -> off. Suspended CPU%d | Mask=[%d%d]\n",
+ 					cpu, cpu_online(0), cpu_online(1));
+-			per_cpu(msm_mpdec_suspend, cpu).online = false;
++			per_cpu(msm_mpdec_cpudata, cpu).online = false;
+ 		}
+-		per_cpu(msm_mpdec_suspend, cpu).device_suspended = true;
+-		mutex_unlock(&per_cpu(msm_mpdec_suspend, cpu).suspend_mutex);
++		per_cpu(msm_mpdec_cpudata, cpu).device_suspended = true;
++		mutex_unlock(&per_cpu(msm_mpdec_cpudata, cpu).suspend_mutex);
+ 	}
+ }
+ 
+@@ -210,19 +210,19 @@ static void msm_mpdec_late_resume(struct early_suspend *h)
+ {
+ 	int cpu = 0;
+ 	for_each_possible_cpu(cpu) {
+-		mutex_lock(&per_cpu(msm_mpdec_suspend, cpu).suspend_mutex);
++		mutex_lock(&per_cpu(msm_mpdec_cpudata, cpu).suspend_mutex);
+ 		if ((cpu >= (CONFIG_NR_CPUS - 1)) && (num_online_cpus() < CONFIG_NR_CPUS)) {
+ 			/* Always enable cpus when screen comes online.
+ 			 * This boosts the wakeup process.
+ 			 */
+ 			cpu_up(cpu);
+-			per_cpu(msm_mpdec_suspend, cpu).on_time = ktime_to_ms(ktime_get());
+-			per_cpu(msm_mpdec_suspend, cpu).online = true;
++			per_cpu(msm_mpdec_cpudata, cpu).on_time = ktime_to_ms(ktime_get());
++			per_cpu(msm_mpdec_cpudata, cpu).online = true;
+ 			pr_info(MPDEC_TAG"Screen -> on. Hot plugged CPU%d | Mask=[%d%d]\n",
+ 					cpu, cpu_online(0), cpu_online(1));
+ 		}
+-		per_cpu(msm_mpdec_suspend, cpu).device_suspended = false;
+-		mutex_unlock(&per_cpu(msm_mpdec_suspend, cpu).suspend_mutex);
++		per_cpu(msm_mpdec_cpudata, cpu).device_suspended = false;
++		mutex_unlock(&per_cpu(msm_mpdec_cpudata, cpu).suspend_mutex);
+ 	}
+ }
+ 
+@@ -236,9 +236,9 @@ static int __init msm_mpdec(void)
+ {
+ 	int cpu, err = 0;
+ 	for_each_possible_cpu(cpu) {
+-		mutex_init(&(per_cpu(msm_mpdec_suspend, cpu).suspend_mutex));
+-		per_cpu(msm_mpdec_suspend, cpu).device_suspended = false;
+-		per_cpu(msm_mpdec_suspend, cpu).online = true;
++		mutex_init(&(per_cpu(msm_mpdec_cpudata, cpu).suspend_mutex));
++		per_cpu(msm_mpdec_cpudata, cpu).device_suspended = false;
++		per_cpu(msm_mpdec_cpudata, cpu).online = true;
+ 	}
+ 
+ 	INIT_DELAYED_WORK(&msm_mpdec_work, msm_mpdec_work_thread);
+-- 
+1.7.9.5
+

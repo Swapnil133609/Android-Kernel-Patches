@@ -1,0 +1,28 @@
+From 1e50bcd636f960419ea1ebbaa1c8b3e8de55fcce Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 25 Nov 2013 03:29:57 +0100
+Subject: [PATCH 319/338] defconfig: allow module unloading
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index a87cbea..e5bea66 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -184,7 +184,8 @@ CONFIG_RT_MUTEXES=y
+ CONFIG_BASE_SMALL=0
+ CONFIG_MODULES=y
+ # CONFIG_MODULE_FORCE_LOAD is not set
+-# CONFIG_MODULE_UNLOAD is not set
++CONFIG_MODULE_UNLOAD=y
++# CONFIG_MODULE_FORCE_UNLOAD is not set
+ CONFIG_MODVERSIONS=y
+ # CONFIG_MODULE_SRCVERSION_ALL is not set
+ CONFIG_STOP_MACHINE=y
+-- 
+1.7.9.5
+

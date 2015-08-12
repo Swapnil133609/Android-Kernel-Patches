@@ -1,0 +1,607 @@
+From 9eeb5595b5150957a6d5e5fd76c6f993e260b9a4 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 11:50:58 +0100
+Subject: [PATCH 145/338] cpuinit: get rid of __cpuinit, manual fixups
+
+a few final fixups that haven't been caught by regexps
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/powerpc/kernel/cacheinfo.c       |   14 +++++++-------
+ arch/x86/kernel/apic/apic.c           |    2 +-
+ arch/x86/kernel/cpu/amd.c             |    2 +-
+ arch/x86/kernel/cpu/centaur.c         |    2 +-
+ arch/x86/kernel/cpu/common.c          |   10 +++++-----
+ arch/x86/kernel/cpu/cyrix.c           |   16 ++++++++--------
+ arch/x86/kernel/cpu/intel.c           |    2 +-
+ arch/x86/kernel/cpu/intel_cacheinfo.c |    8 ++++----
+ arch/x86/kernel/cpu/mcheck/mce.c      |    1 -
+ arch/x86/kernel/cpu/scattered.c       |    2 +-
+ arch/x86/kernel/cpu/transmeta.c       |    2 +-
+ arch/x86/kernel/cpu/umc.c             |    2 +-
+ arch/x86/platform/mrst/mrst.c         |    2 +-
+ drivers/acpi/processor_core.c         |    2 +-
+ drivers/cpufreq/longhaul.h            |   26 +++++++++++++-------------
+ include/linux/cpu.h                   |    2 +-
+ include/linux/perf_event.h            |    2 +-
+ kernel/rcutree.h                      |    6 +++---
+ kernel/rcutree_plugin.h               |   14 +++++++-------
+ 19 files changed, 58 insertions(+), 59 deletions(-)
+
+diff --git a/arch/powerpc/kernel/cacheinfo.c b/arch/powerpc/kernel/cacheinfo.c
+index b33fb1d..eea4c3a 100644
+--- a/arch/powerpc/kernel/cacheinfo.c
++++ b/arch/powerpc/kernel/cacheinfo.c
+@@ -140,7 +140,7 @@ static void cache_init(struct cache *cache, int type, int level, struct device_n
+ 	list_add(&cache->list, &cache_list);
+ }
+ 
+-static struct cache *__cpuinit new_cache(int type, int level, struct device_node *ofnode)
++static struct cache *new_cache(int type, int level, struct device_node *ofnode)
+ {
+ 	struct cache *cache;
+ 
+@@ -324,7 +324,7 @@ static bool cache_node_is_unified(const struct device_node *np)
+ 	return of_get_property(np, "cache-unified", NULL);
+ }
+ 
+-static struct cache *__cpuinit cache_do_one_devnode_unified(struct device_node *node, int level)
++static struct cache *cache_do_one_devnode_unified(struct device_node *node, int level)
+ {
+ 	struct cache *cache;
+ 
+@@ -335,7 +335,7 @@ static struct cache *__cpuinit cache_do_one_devnode_unified(struct device_node *
+ 	return cache;
+ }
+ 
+-static struct cache *__cpuinit cache_do_one_devnode_split(struct device_node *node, int level)
++static struct cache *cache_do_one_devnode_split(struct device_node *node, int level)
+ {
+ 	struct cache *dcache, *icache;
+ 
+@@ -357,7 +357,7 @@ err:
+ 	return NULL;
+ }
+ 
+-static struct cache *__cpuinit cache_do_one_devnode(struct device_node *node, int level)
++static struct cache *cache_do_one_devnode(struct device_node *node, int level)
+ {
+ 	struct cache *cache;
+ 
+@@ -369,7 +369,7 @@ static struct cache *__cpuinit cache_do_one_devnode(struct device_node *node, in
+ 	return cache;
+ }
+ 
+-static struct cache *__cpuinit cache_lookup_or_instantiate(struct device_node *node, int level)
++static struct cache *cache_lookup_or_instantiate(struct device_node *node, int level)
+ {
+ 	struct cache *cache;
+ 
+@@ -423,7 +423,7 @@ static void do_subsidiary_caches(struct cache *cache)
+ 	}
+ }
+ 
+-static struct cache *__cpuinit cache_chain_instantiate(unsigned int cpu_id)
++static struct cache *cache_chain_instantiate(unsigned int cpu_id)
+ {
+ 	struct device_node *cpu_node;
+ 	struct cache *cpu_cache = NULL;
+@@ -448,7 +448,7 @@ out:
+ 	return cpu_cache;
+ }
+ 
+-static struct cache_dir *__cpuinit cacheinfo_create_cache_dir(unsigned int cpu_id)
++static struct cache_dir *cacheinfo_create_cache_dir(unsigned int cpu_id)
+ {
+ 	struct cache_dir *cache_dir;
+ 	struct device *dev;
+diff --git a/arch/x86/kernel/apic/apic.c b/arch/x86/kernel/apic/apic.c
+index d28b9f0..aaab124 100644
+--- a/arch/x86/kernel/apic/apic.c
++++ b/arch/x86/kernel/apic/apic.c
+@@ -2343,7 +2343,7 @@ static int set_multi(const struct dmi_system_id *d)
+ 	return 0;
+ }
+ 
+-static const __cpuinitconst struct dmi_system_id multi_dmi_table[] = {
++static const struct dmi_system_id multi_dmi_table[] = {
+ 	{
+ 		.callback = set_multi,
+ 		.ident = "IBM System Summit2",
+diff --git a/arch/x86/kernel/cpu/amd.c b/arch/x86/kernel/cpu/amd.c
+index 8a1e8cd..d40b9ca 100644
+--- a/arch/x86/kernel/cpu/amd.c
++++ b/arch/x86/kernel/cpu/amd.c
+@@ -704,7 +704,7 @@ static unsigned int amd_size_cache(struct cpuinfo_x86 *c,
+ }
+ #endif
+ 
+-static const struct cpu_dev __cpuinitconst amd_cpu_dev = {
++static const struct cpu_dev amd_cpu_dev = {
+ 	.c_vendor	= "AMD",
+ 	.c_ident	= { "AuthenticAMD" },
+ #ifdef CONFIG_X86_32
+diff --git a/arch/x86/kernel/cpu/centaur.c b/arch/x86/kernel/cpu/centaur.c
+index 1867e75..fbf6c3b 100644
+--- a/arch/x86/kernel/cpu/centaur.c
++++ b/arch/x86/kernel/cpu/centaur.c
+@@ -488,7 +488,7 @@ centaur_size_cache(struct cpuinfo_x86 *c, unsigned int size)
+ 	return size;
+ }
+ 
+-static const struct cpu_dev __cpuinitconst centaur_cpu_dev = {
++static const struct cpu_dev centaur_cpu_dev = {
+ 	.c_vendor	= "Centaur",
+ 	.c_ident	= { "CentaurHauls" },
+ 	.c_early_init	= early_init_centaur,
+diff --git a/arch/x86/kernel/cpu/common.c b/arch/x86/kernel/cpu/common.c
+index d15885a..34f4060 100644
+--- a/arch/x86/kernel/cpu/common.c
++++ b/arch/x86/kernel/cpu/common.c
+@@ -78,7 +78,7 @@ static void default_init(struct cpuinfo_x86 *c)
+ #endif
+ }
+ 
+-static const struct cpu_dev __cpuinitconst default_cpu = {
++static const struct cpu_dev default_cpu = {
+ 	.c_init		= default_init,
+ 	.c_vendor	= "Unknown",
+ 	.c_x86_vendor	= X86_VENDOR_UNKNOWN,
+@@ -286,7 +286,7 @@ struct cpuid_dependent_feature {
+ 	u32 level;
+ };
+ 
+-static const struct cpuid_dependent_feature __cpuinitconst
++static const struct cpuid_dependent_feature
+ cpuid_dependent_features[] = {
+ 	{ X86_FEATURE_MWAIT,		0x00000005 },
+ 	{ X86_FEATURE_DCA,		0x00000009 },
+@@ -332,7 +332,7 @@ static void filter_cpuid_features(struct cpuinfo_x86 *c, bool warn)
+  */
+ 
+ /* Look up CPU names by table lookup. */
+-static const char *__cpuinit table_lookup_model(struct cpuinfo_x86 *c)
++static const char *table_lookup_model(struct cpuinfo_x86 *c)
+ {
+ 	const struct cpu_model_info *info;
+ 
+@@ -382,7 +382,7 @@ void switch_to_new_gdt(int cpu)
+ 	load_percpu_segment(cpu);
+ }
+ 
+-static const struct cpu_dev *__cpuinitdata cpu_devs[X86_VENDOR_NUM] = {};
++static const struct cpu_dev *cpu_devs[X86_VENDOR_NUM] = {};
+ 
+ static void get_model_name(struct cpuinfo_x86 *c)
+ {
+@@ -928,7 +928,7 @@ struct msr_range {
+ 	unsigned	max;
+ };
+ 
+-static const struct msr_range msr_range_array[] __cpuinitconst = {
++static const struct msr_range msr_range_array[] = {
+ 	{ 0x00000000, 0x00000418},
+ 	{ 0xc0000000, 0xc000040b},
+ 	{ 0xc0010000, 0xc0010142},
+diff --git a/arch/x86/kernel/cpu/cyrix.c b/arch/x86/kernel/cpu/cyrix.c
+index b613a7e..af33c4e 100644
+--- a/arch/x86/kernel/cpu/cyrix.c
++++ b/arch/x86/kernel/cpu/cyrix.c
+@@ -61,23 +61,23 @@ static void do_cyrix_devid(unsigned char *dir0, unsigned char *dir1)
+  */
+ static unsigned char Cx86_dir0_msb = 0;
+ 
+-static const char __cpuinitconst Cx86_model[][9] = {
++static const char Cx86_model[][9] = {
+ 	"Cx486", "Cx486", "5x86 ", "6x86", "MediaGX ", "6x86MX ",
+ 	"M II ", "Unknown"
+ };
+-static const char __cpuinitconst Cx486_name[][5] = {
++static const char Cx486_name[][5] = {
+ 	"SLC", "DLC", "SLC2", "DLC2", "SRx", "DRx",
+ 	"SRx2", "DRx2"
+ };
+-static const char __cpuinitconst Cx486S_name[][4] = {
++static const char Cx486S_name[][4] = {
+ 	"S", "S2", "Se", "S2e"
+ };
+-static const char __cpuinitconst Cx486D_name[][4] = {
++static const char Cx486D_name[][4] = {
+ 	"DX", "DX2", "?", "?", "?", "DX4"
+ };
+ static char Cx86_cb[] = "?.5x Core/Bus Clock";
+-static const char __cpuinitconst cyrix_model_mult1[] = "12??43";
+-static const char __cpuinitconst cyrix_model_mult2[] = "12233445";
++static const char cyrix_model_mult1[] = "12??43";
++static const char cyrix_model_mult2[] = "12233445";
+ 
+ /*
+  * Reset the slow-loop (SLOP) bit on the 686(L) which is set by some old
+@@ -440,7 +440,7 @@ static void cyrix_identify(struct cpuinfo_x86 *c)
+ 	}
+ }
+ 
+-static const struct cpu_dev __cpuinitconst cyrix_cpu_dev = {
++static const struct cpu_dev cyrix_cpu_dev = {
+ 	.c_vendor	= "Cyrix",
+ 	.c_ident	= { "CyrixInstead" },
+ 	.c_early_init	= early_init_cyrix,
+@@ -451,7 +451,7 @@ static const struct cpu_dev __cpuinitconst cyrix_cpu_dev = {
+ 
+ cpu_dev_register(cyrix_cpu_dev);
+ 
+-static const struct cpu_dev __cpuinitconst nsc_cpu_dev = {
++static const struct cpu_dev nsc_cpu_dev = {
+ 	.c_vendor	= "NSC",
+ 	.c_ident	= { "Geode by NSC" },
+ 	.c_init		= init_nsc,
+diff --git a/arch/x86/kernel/cpu/intel.c b/arch/x86/kernel/cpu/intel.c
+index 1e99ec4..0474e62 100644
+--- a/arch/x86/kernel/cpu/intel.c
++++ b/arch/x86/kernel/cpu/intel.c
+@@ -491,7 +491,7 @@ static unsigned int intel_size_cache(struct cpuinfo_x86 *c, unsigned int size)
+ }
+ #endif
+ 
+-static const struct cpu_dev __cpuinitconst intel_cpu_dev = {
++static const struct cpu_dev intel_cpu_dev = {
+ 	.c_vendor	= "Intel",
+ 	.c_ident	= { "GenuineIntel" },
+ #ifdef CONFIG_X86_32
+diff --git a/arch/x86/kernel/cpu/intel_cacheinfo.c b/arch/x86/kernel/cpu/intel_cacheinfo.c
+index a70ccce..687e62b 100644
+--- a/arch/x86/kernel/cpu/intel_cacheinfo.c
++++ b/arch/x86/kernel/cpu/intel_cacheinfo.c
+@@ -37,7 +37,7 @@ struct _cache_table {
+ /* All the cache descriptor types we care about (no TLB or
+    trace cache entries) */
+ 
+-static const struct _cache_table __cpuinitconst cache_table[] =
++static const struct _cache_table cache_table[] =
+ {
+ 	{ 0x06, LVL_1_INST, 8 },	/* 4-way set assoc, 32 byte line size */
+ 	{ 0x08, LVL_1_INST, 16 },	/* 4-way set assoc, 32 byte line size */
+@@ -203,7 +203,7 @@ union l3_cache {
+ 	unsigned val;
+ };
+ 
+-static const unsigned short __cpuinitconst assocs[] = {
++static const unsigned short assocs[] = {
+ 	[1] = 1,
+ 	[2] = 2,
+ 	[4] = 4,
+@@ -217,8 +217,8 @@ static const unsigned short __cpuinitconst assocs[] = {
+ 	[0xf] = 0xffff /* fully associative - no way to show this currently */
+ };
+ 
+-static const unsigned char __cpuinitconst levels[] = { 1, 1, 2, 3 };
+-static const unsigned char __cpuinitconst types[] = { 1, 2, 3, 3 };
++static const unsigned char levels[] = { 1, 1, 2, 3 };
++static const unsigned char types[] = { 1, 2, 3, 3 };
+ 
+ static void
+ amd_cpuid4(int leaf, union _cpuid4_leaf_eax *eax,
+diff --git a/arch/x86/kernel/cpu/mcheck/mce.c b/arch/x86/kernel/cpu/mcheck/mce.c
+index 2890911..6befe02 100644
+--- a/arch/x86/kernel/cpu/mcheck/mce.c
++++ b/arch/x86/kernel/cpu/mcheck/mce.c
+@@ -1948,7 +1948,6 @@ static struct bus_type mce_subsys = {
+ 
+ DEFINE_PER_CPU(struct device *, mce_device);
+ 
+-__cpuinitdata
+ void (*threshold_cpu_callback)(unsigned long action, unsigned int cpu);
+ 
+ static inline struct mce_bank *attr_to_bank(struct device_attribute *attr)
+diff --git a/arch/x86/kernel/cpu/scattered.c b/arch/x86/kernel/cpu/scattered.c
+index cb42c2b..354c4e0 100644
+--- a/arch/x86/kernel/cpu/scattered.c
++++ b/arch/x86/kernel/cpu/scattered.c
+@@ -30,7 +30,7 @@ void init_scattered_cpuid_features(struct cpuinfo_x86 *c)
+ 	u32 regs[4];
+ 	const struct cpuid_bit *cb;
+ 
+-	static const struct cpuid_bit __cpuinitconst cpuid_bits[] = {
++	static const struct cpuid_bit cpuid_bits[] = {
+ 		{ X86_FEATURE_DTS,		CR_EAX, 0, 0x00000006, 0 },
+ 		{ X86_FEATURE_IDA,		CR_EAX, 1, 0x00000006, 0 },
+ 		{ X86_FEATURE_ARAT,		CR_EAX, 2, 0x00000006, 0 },
+diff --git a/arch/x86/kernel/cpu/transmeta.c b/arch/x86/kernel/cpu/transmeta.c
+index 0314e48..aa0430d 100644
+--- a/arch/x86/kernel/cpu/transmeta.c
++++ b/arch/x86/kernel/cpu/transmeta.c
+@@ -98,7 +98,7 @@ static void init_transmeta(struct cpuinfo_x86 *c)
+ #endif
+ }
+ 
+-static const struct cpu_dev __cpuinitconst transmeta_cpu_dev = {
++static const struct cpu_dev transmeta_cpu_dev = {
+ 	.c_vendor	= "Transmeta",
+ 	.c_ident	= { "GenuineTMx86", "TransmetaCPU" },
+ 	.c_early_init	= early_init_transmeta,
+diff --git a/arch/x86/kernel/cpu/umc.c b/arch/x86/kernel/cpu/umc.c
+index fd2c37b..202759a 100644
+--- a/arch/x86/kernel/cpu/umc.c
++++ b/arch/x86/kernel/cpu/umc.c
+@@ -8,7 +8,7 @@
+  * so no special init takes place.
+  */
+ 
+-static const struct cpu_dev __cpuinitconst umc_cpu_dev = {
++static const struct cpu_dev umc_cpu_dev = {
+ 	.c_vendor	= "UMC",
+ 	.c_ident	= { "UMC UMC UMC" },
+ 	.c_models = {
+diff --git a/arch/x86/platform/mrst/mrst.c b/arch/x86/platform/mrst/mrst.c
+index 0ca032a..789a9af 100644
+--- a/arch/x86/platform/mrst/mrst.c
++++ b/arch/x86/platform/mrst/mrst.c
+@@ -65,7 +65,7 @@
+  * lapic (always-on,ARAT) ------ 150
+  */
+ 
+-__cpuinitdata enum mrst_timer_options mrst_timer_options;
++enum mrst_timer_options mrst_timer_options;
+ 
+ static u32 sfi_mtimer_usage[SFI_MTMR_MAX_NUM];
+ static struct sfi_timer_table_entry sfi_mtimer_array[SFI_MTMR_MAX_NUM];
+diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
+index 8ba9c28..f9f09d1 100644
+--- a/drivers/acpi/processor_core.c
++++ b/drivers/acpi/processor_core.c
+@@ -264,7 +264,7 @@ static void acpi_set_pdc_bits(u32 *buf)
+ 	arch_acpi_set_pdc_bits(buf);
+ }
+ 
+-static struct acpi_object_list *__cpuinit acpi_processor_alloc_pdc(void)
++static struct acpi_object_list *acpi_processor_alloc_pdc(void)
+ {
+ 	struct acpi_object_list *obj_list;
+ 	union acpi_object *obj;
+diff --git a/drivers/cpufreq/longhaul.h b/drivers/cpufreq/longhaul.h
+index cbf48fb..1928b92 100644
+--- a/drivers/cpufreq/longhaul.h
++++ b/drivers/cpufreq/longhaul.h
+@@ -56,7 +56,7 @@ union msr_longhaul {
+ /*
+  * VIA C3 Samuel 1  & Samuel 2 (stepping 0)
+  */
+-static const int __cpuinitdata samuel1_mults[16] = {
++static const int samuel1_mults[16] = {
+ 	-1, /* 0000 -> RESERVED */
+ 	30, /* 0001 ->  3.0x */
+ 	40, /* 0010 ->  4.0x */
+@@ -75,7 +75,7 @@ static const int __cpuinitdata samuel1_mults[16] = {
+ 	-1, /* 1111 -> RESERVED */
+ };
+ 
+-static const int __cpuinitdata samuel1_eblcr[16] = {
++static const int samuel1_eblcr[16] = {
+ 	50, /* 0000 -> RESERVED */
+ 	30, /* 0001 ->  3.0x */
+ 	40, /* 0010 ->  4.0x */
+@@ -97,7 +97,7 @@ static const int __cpuinitdata samuel1_eblcr[16] = {
+ /*
+  * VIA C3 Samuel2 Stepping 1->15
+  */
+-static const int __cpuinitdata samuel2_eblcr[16] = {
++static const int samuel2_eblcr[16] = {
+ 	50,  /* 0000 ->  5.0x */
+ 	30,  /* 0001 ->  3.0x */
+ 	40,  /* 0010 ->  4.0x */
+@@ -119,7 +119,7 @@ static const int __cpuinitdata samuel2_eblcr[16] = {
+ /*
+  * VIA C3 Ezra
+  */
+-static const int __cpuinitdata ezra_mults[16] = {
++static const int ezra_mults[16] = {
+ 	100, /* 0000 -> 10.0x */
+ 	30,  /* 0001 ->  3.0x */
+ 	40,  /* 0010 ->  4.0x */
+@@ -138,7 +138,7 @@ static const int __cpuinitdata ezra_mults[16] = {
+ 	120, /* 1111 -> 12.0x */
+ };
+ 
+-static const int __cpuinitdata ezra_eblcr[16] = {
++static const int ezra_eblcr[16] = {
+ 	50,  /* 0000 ->  5.0x */
+ 	30,  /* 0001 ->  3.0x */
+ 	40,  /* 0010 ->  4.0x */
+@@ -160,7 +160,7 @@ static const int __cpuinitdata ezra_eblcr[16] = {
+ /*
+  * VIA C3 (Ezra-T) [C5M].
+  */
+-static const int __cpuinitdata ezrat_mults[32] = {
++static const int ezrat_mults[32] = {
+ 	100, /* 0000 -> 10.0x */
+ 	30,  /* 0001 ->  3.0x */
+ 	40,  /* 0010 ->  4.0x */
+@@ -196,7 +196,7 @@ static const int __cpuinitdata ezrat_mults[32] = {
+ 	-1,  /* 1111 -> RESERVED (12.0x) */
+ };
+ 
+-static const int __cpuinitdata ezrat_eblcr[32] = {
++static const int ezrat_eblcr[32] = {
+ 	50,  /* 0000 ->  5.0x */
+ 	30,  /* 0001 ->  3.0x */
+ 	40,  /* 0010 ->  4.0x */
+@@ -235,7 +235,7 @@ static const int __cpuinitdata ezrat_eblcr[32] = {
+ /*
+  * VIA C3 Nehemiah */
+ 
+-static const int __cpuinitdata nehemiah_mults[32] = {
++static const int nehemiah_mults[32] = {
+ 	100, /* 0000 -> 10.0x */
+ 	-1, /* 0001 -> 16.0x */
+ 	40,  /* 0010 ->  4.0x */
+@@ -270,7 +270,7 @@ static const int __cpuinitdata nehemiah_mults[32] = {
+ 	-1, /* 1111 -> 12.0x */
+ };
+ 
+-static const int __cpuinitdata nehemiah_eblcr[32] = {
++static const int nehemiah_eblcr[32] = {
+ 	50,  /* 0000 ->  5.0x */
+ 	160, /* 0001 -> 16.0x */
+ 	40,  /* 0010 ->  4.0x */
+@@ -315,7 +315,7 @@ struct mV_pos {
+ 	unsigned short pos;
+ };
+ 
+-static const struct mV_pos __cpuinitdata vrm85_mV[32] = {
++static const struct mV_pos vrm85_mV[32] = {
+ 	{1250, 8},	{1200, 6},	{1150, 4},	{1100, 2},
+ 	{1050, 0},	{1800, 30},	{1750, 28},	{1700, 26},
+ 	{1650, 24},	{1600, 22},	{1550, 20},	{1500, 18},
+@@ -326,14 +326,14 @@ static const struct mV_pos __cpuinitdata vrm85_mV[32] = {
+ 	{1475, 17},	{1425, 15},	{1375, 13},	{1325, 11}
+ };
+ 
+-static const unsigned char __cpuinitdata mV_vrm85[32] = {
++static const unsigned char mV_vrm85[32] = {
+ 	0x04,	0x14,	0x03,	0x13,	0x02,	0x12,	0x01,	0x11,
+ 	0x00,	0x10,	0x0f,	0x1f,	0x0e,	0x1e,	0x0d,	0x1d,
+ 	0x0c,	0x1c,	0x0b,	0x1b,	0x0a,	0x1a,	0x09,	0x19,
+ 	0x08,	0x18,	0x07,	0x17,	0x06,	0x16,	0x05,	0x15
+ };
+ 
+-static const struct mV_pos __cpuinitdata mobilevrm_mV[32] = {
++static const struct mV_pos mobilevrm_mV[32] = {
+ 	{1750, 31},	{1700, 30},	{1650, 29},	{1600, 28},
+ 	{1550, 27},	{1500, 26},	{1450, 25},	{1400, 24},
+ 	{1350, 23},	{1300, 22},	{1250, 21},	{1200, 20},
+@@ -344,7 +344,7 @@ static const struct mV_pos __cpuinitdata mobilevrm_mV[32] = {
+ 	{675, 3},	{650, 2},	{625, 1},	{600, 0}
+ };
+ 
+-static const unsigned char __cpuinitdata mV_mobilevrm[32] = {
++static const unsigned char mV_mobilevrm[32] = {
+ 	0x1f,	0x1e,	0x1d,	0x1c,	0x1b,	0x1a,	0x19,	0x18,
+ 	0x17,	0x16,	0x15,	0x14,	0x13,	0x12,	0x11,	0x10,
+ 	0x0f,	0x0e,	0x0d,	0x0c,	0x0b,	0x0a,	0x09,	0x08,
+diff --git a/include/linux/cpu.h b/include/linux/cpu.h
+index 11dd01b..1743b63 100644
+--- a/include/linux/cpu.h
++++ b/include/linux/cpu.h
+@@ -116,7 +116,7 @@ enum {
+ /* Need to know about CPUs going up/down? */
+ #if defined(CONFIG_HOTPLUG_CPU) || !defined(MODULE)
+ #define cpu_notifier(fn, pri) {					\
+-	static struct notifier_block fn##_nb __cpuinitdata =	\
++	static struct notifier_block fn##_nb =	\
+ 		{ .notifier_call = fn, .priority = pri };	\
+ 	register_cpu_notifier(&fn##_nb);			\
+ }
+diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+index ddbb6a9..bacc751 100644
+--- a/include/linux/perf_event.h
++++ b/include/linux/perf_event.h
+@@ -1337,7 +1337,7 @@ static inline void perf_event_task_tick(void)				{ }
+  */
+ #define perf_cpu_notifier(fn)						\
+ do {									\
+-	static struct notifier_block fn##_nb __cpuinitdata =		\
++	static struct notifier_block fn##_nb =		\
+ 		{ .notifier_call = fn, .priority = CPU_PRI_PERF };	\
+ 	fn(&fn##_nb, (unsigned long)CPU_UP_PREPARE,			\
+ 		(void *)(unsigned long)smp_processor_id());		\
+diff --git a/kernel/rcutree.h b/kernel/rcutree.h
+index cdd1be0..1d7ee6b 100644
+--- a/kernel/rcutree.h
++++ b/kernel/rcutree.h
+@@ -449,7 +449,7 @@ static void rcu_report_exp_rnp(struct rcu_state *rsp, struct rcu_node *rnp,
+ #endif /* #if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_TREE_PREEMPT_RCU) */
+ static int rcu_preempt_pending(int cpu);
+ static int rcu_preempt_cpu_has_callbacks(int cpu);
+-static void __cpuinit rcu_preempt_init_percpu_data(int cpu);
++static void rcu_preempt_init_percpu_data(int cpu);
+ static void rcu_preempt_cleanup_dying_cpu(void);
+ static void __init __rcu_init_preempt(void);
+ static void rcu_initiate_boost(struct rcu_node *rnp, unsigned long flags);
+@@ -460,14 +460,14 @@ static bool rcu_is_callbacks_kthread(void);
+ static void rcu_preempt_do_callbacks(void);
+ static void rcu_boost_kthread_setaffinity(struct rcu_node *rnp,
+ 					  cpumask_var_t cm);
+-static int __cpuinit rcu_spawn_one_boost_kthread(struct rcu_state *rsp,
++static int rcu_spawn_one_boost_kthread(struct rcu_state *rsp,
+ 						 struct rcu_node *rnp,
+ 						 int rnp_index);
+ static void invoke_rcu_node_kthread(struct rcu_node *rnp);
+ static void rcu_yield(void (*f)(unsigned long), unsigned long arg);
+ #endif /* #ifdef CONFIG_RCU_BOOST */
+ static void rcu_cpu_kthread_setrt(int cpu, int to_rt);
+-static void __cpuinit rcu_prepare_kthreads(int cpu);
++static void rcu_prepare_kthreads(int cpu);
+ static void rcu_prepare_for_idle_init(int cpu);
+ static void rcu_cleanup_after_idle(int cpu);
+ static void rcu_prepare_for_idle(int cpu);
+diff --git a/kernel/rcutree_plugin.h b/kernel/rcutree_plugin.h
+index c023464..d968f0c 100644
+--- a/kernel/rcutree_plugin.h
++++ b/kernel/rcutree_plugin.h
+@@ -947,7 +947,7 @@ EXPORT_SYMBOL_GPL(rcu_barrier);
+ /*
+  * Initialize preemptible RCU's per-CPU data.
+  */
+-static void __cpuinit rcu_preempt_init_percpu_data(int cpu)
++static void rcu_preempt_init_percpu_data(int cpu)
+ {
+ 	rcu_init_percpu_data(cpu, &rcu_preempt_state, 1);
+ }
+@@ -1190,7 +1190,7 @@ EXPORT_SYMBOL_GPL(rcu_barrier);
+  * Because preemptible RCU does not exist, there is no per-CPU
+  * data to initialize.
+  */
+-static void __cpuinit rcu_preempt_init_percpu_data(int cpu)
++static void rcu_preempt_init_percpu_data(int cpu)
+ {
+ }
+ 
+@@ -1447,7 +1447,7 @@ static void rcu_preempt_boost_start_gp(struct rcu_node *rnp)
+  * already exist.  We only create this kthread for preemptible RCU.
+  * Returns zero if all is well, a negated errno otherwise.
+  */
+-static int __cpuinit rcu_spawn_one_boost_kthread(struct rcu_state *rsp,
++static int rcu_spawn_one_boost_kthread(struct rcu_state *rsp,
+ 						 struct rcu_node *rnp,
+ 						 int rnp_index)
+ {
+@@ -1679,7 +1679,7 @@ static int rcu_cpu_kthread(void *arg)
+  * rcu_cpu_kthread() will wait until it is fully online, and then do
+  * the binding.
+  */
+-static int __cpuinit rcu_spawn_one_cpu_kthread(int cpu)
++static int rcu_spawn_one_cpu_kthread(int cpu)
+ {
+ 	struct sched_param sp;
+ 	struct task_struct *t;
+@@ -1786,7 +1786,7 @@ static void rcu_node_kthread_setaffinity(struct rcu_node *rnp, int outgoingcpu)
+  * during runtime, with the main CPU-hotplug locks held.  So only
+  * one of these can be executing at a time.
+  */
+-static int __cpuinit rcu_spawn_one_node_kthread(struct rcu_state *rsp,
++static int rcu_spawn_one_node_kthread(struct rcu_state *rsp,
+ 						struct rcu_node *rnp)
+ {
+ 	unsigned long flags;
+@@ -1836,7 +1836,7 @@ static int __init rcu_spawn_kthreads(void)
+ }
+ early_initcall(rcu_spawn_kthreads);
+ 
+-static void __cpuinit rcu_prepare_kthreads(int cpu)
++static void rcu_prepare_kthreads(int cpu)
+ {
+ 	struct rcu_data *rdp = per_cpu_ptr(rcu_state->rda, cpu);
+ 	struct rcu_node *rnp = rdp->mynode;
+@@ -1893,7 +1893,7 @@ static int __init rcu_scheduler_really_started(void)
+ }
+ early_initcall(rcu_scheduler_really_started);
+ 
+-static void __cpuinit rcu_prepare_kthreads(int cpu)
++static void rcu_prepare_kthreads(int cpu)
+ {
+ }
+ 
+-- 
+1.7.9.5
+

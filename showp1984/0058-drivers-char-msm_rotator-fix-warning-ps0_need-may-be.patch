@@ -1,0 +1,28 @@
+From 7601031abbb75ee8395359d495da8bd0213cd389 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 04:10:28 +0100
+Subject: [PATCH 058/338] drivers/char/msm_rotator: fix: 'warning: 'ps0_need'
+ may be used uninitialized in this function'
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/char/msm_rotator.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/char/msm_rotator.c b/drivers/char/msm_rotator.c
+index 156a2a5..6fd7b67 100644
+--- a/drivers/char/msm_rotator.c
++++ b/drivers/char/msm_rotator.c
+@@ -921,7 +921,7 @@ static int msm_rotator_do_rotate(unsigned long arg)
+ 	struct file *srcp1_file = NULL, *dstp1_file = NULL;
+ 	struct ion_handle *srcp0_ihdl = NULL, *dstp0_ihdl = NULL;
+ 	struct ion_handle *srcp1_ihdl = NULL, *dstp1_ihdl = NULL;
+-	int ps0_need, p_need;
++	int ps0_need = 0, p_need;
+ 	unsigned int in_chroma_paddr = 0, out_chroma_paddr = 0;
+ 	unsigned int in_chroma2_paddr = 0;
+ 	struct msm_rotator_img_info *img_info;
+-- 
+1.7.9.5
+

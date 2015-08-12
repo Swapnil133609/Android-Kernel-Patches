@@ -1,0 +1,41 @@
+From cd2c1e18f69dd90f6b809e2c87b2d7dc133729f2 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Thu, 5 Dec 2013 07:34:18 +0100
+Subject: [PATCH 322/338] msm_mpdecision: boost freqs are arch dependent too
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.h |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.h b/arch/arm/mach-msm/msm_mpdecision.h
+index d96fc61..a8c246f 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.h
++++ b/arch/arm/mach-msm/msm_mpdecision.h
+@@ -39,10 +39,22 @@
+ 
+ #ifdef CONFIG_MSM_MPDEC_INPUTBOOST_CPUMIN
+ #define MSM_MPDEC_BOOSTTIME			1000
++#ifdef CONFIG_ARCH_MSM8974
+ #define MSM_MPDEC_BOOSTFREQ_CPU0		960000
+ #define MSM_MPDEC_BOOSTFREQ_CPU1		960000
+ #define MSM_MPDEC_BOOSTFREQ_CPU2		729600
+ #define MSM_MPDEC_BOOSTFREQ_CPU3		576000
++#elif defined CONFIG_ARCH_MSM8X60 || defined CONFIG_ARCH_MSM8960 || defined CONFIG_ARCH_MSM8930
++#define MSM_MPDEC_BOOSTFREQ_CPU0		918000
++#define MSM_MPDEC_BOOSTFREQ_CPU1		918000
++#define MSM_MPDEC_BOOSTFREQ_CPU2		702000
++#define MSM_MPDEC_BOOSTFREQ_CPU3		594000
++#else
++#define MSM_MPDEC_BOOSTFREQ_CPU0		918000
++#define MSM_MPDEC_BOOSTFREQ_CPU1		918000
++#define MSM_MPDEC_BOOSTFREQ_CPU2		702000
++#define MSM_MPDEC_BOOSTFREQ_CPU3		594000
++#endif
+ #endif
+ 
+ enum {
+-- 
+1.7.9.5
+

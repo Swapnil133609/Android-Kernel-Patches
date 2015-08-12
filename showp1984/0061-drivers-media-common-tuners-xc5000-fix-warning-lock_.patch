@@ -1,0 +1,29 @@
+From 0bd449a276d3ba936cc58105e1467e28a1b9cfdd Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 04:15:32 +0100
+Subject: [PATCH 061/338] drivers/media/common/tuners/xc5000: fix 'warning:
+ 'lock_status' may be used uninitialized in this
+ function'
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/media/common/tuners/xc5000.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/media/common/tuners/xc5000.c b/drivers/media/common/tuners/xc5000.c
+index b59a6f1..5745dc5 100644
+--- a/drivers/media/common/tuners/xc5000.c
++++ b/drivers/media/common/tuners/xc5000.c
+@@ -643,7 +643,7 @@ static void xc_debug_dump(struct xc5000_priv *priv)
+ {
+ 	u16 adc_envelope;
+ 	u32 freq_error_hz = 0;
+-	u16 lock_status;
++	u16 lock_status = 0;
+ 	u32 hsync_freq_hz = 0;
+ 	u16 frame_lines = 0;
+ 	u16 quality = 0;
+-- 
+1.7.9.5
+

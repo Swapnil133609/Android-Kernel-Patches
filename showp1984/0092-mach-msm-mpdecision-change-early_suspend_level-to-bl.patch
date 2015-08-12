@@ -1,0 +1,28 @@
+From 3af4069f3c69c8fc4212c1637dcfc4ef56373a3f Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Fri, 22 Jun 2012 05:50:23 +0200
+Subject: [PATCH 092/338] mach-msm: mpdecision: change early_suspend_level to
+ blank_screen
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 2d3e664..5103fe0 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -222,7 +222,7 @@ static void msm_mpdec_late_resume(struct early_suspend *h)
+ }
+ 
+ static struct early_suspend msm_mpdec_early_suspend_handler = {
+-	.level = EARLY_SUSPEND_LEVEL_DISABLE_FB,
++	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN,
+ 	.suspend = msm_mpdec_early_suspend,
+ 	.resume = msm_mpdec_late_resume,
+ };
+-- 
+1.7.9.5
+

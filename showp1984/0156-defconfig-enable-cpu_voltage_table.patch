@@ -1,0 +1,26 @@
+From d1797e309365a640de474029dfa8e3d536539a12 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 5 Nov 2013 19:50:29 +0100
+Subject: [PATCH 156/338] defconfig: enable cpu_voltage_table
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index 0d66a05..818e336 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -434,6 +434,7 @@ CONFIG_MSM_MPDEC=y
+ CONFIG_MSM_CPU_FREQ_SET_MIN_MAX=y
+ CONFIG_MSM_CPU_FREQ_MAX=2265600
+ CONFIG_MSM_CPU_FREQ_MIN=300000
++CONFIG_CPU_VOLTAGE_TABLE=y
+ # CONFIG_MSM_AVS_HW is not set
+ # CONFIG_MSM_HW3D is not set
+ CONFIG_AMSS_7X25_VERSION_2009=y
+-- 
+1.7.9.5
+

@@ -1,0 +1,28 @@
+From cd46e7ecccc7f956eabd0e258cd88642a45d0dbb Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Sat, 23 Jun 2012 22:42:54 +0200
+Subject: [PATCH 108/338] mach-msm: mpdecision: increase up threshold for
+ Sense
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index f66d4b5..e5031d8 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -67,7 +67,7 @@ static struct msm_mpdec_tuners {
+ 	.scroff_single_core = true,
+ };
+ 
+-static unsigned int NwNs_Threshold[4] = {25, 0, 0, 5};
++static unsigned int NwNs_Threshold[4] = {35, 0, 0, 5};
+ static unsigned int TwTs_Threshold[4] = {250, 0, 0, 250};
+ 
+ extern unsigned int get_rq_info(void);
+-- 
+1.7.9.5
+

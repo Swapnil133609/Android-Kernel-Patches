@@ -1,0 +1,54 @@
+From ffda80a790f87bcd27d347aede4c7bc071396d2b Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sun, 28 Jul 2013 01:08:29 +0200
+Subject: [PATCH 172/338] Revert "mpdecision: don't use sleep, cancel/resume
+ wq instead"
+
+This reverts commit 4b6f8555481d2c5049eb7cb496283749ed7cd7ca.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |   11 ++---------
+ 1 file changed, 2 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 088d8b4..556fc71 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -256,9 +256,8 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 			} else if (per_cpu(msm_mpdec_cpudata, cpu).online != cpu_online(cpu)) {
+ 				pr_info(MPDEC_TAG"CPU[%d] was controlled outside of mpdecision! | pausing [%d]ms\n",
+ 						cpu, msm_mpdec_tuners_ins.pause);
+-                                cancel_delayed_work_sync(&msm_mpdec_work);
++				msleep(msm_mpdec_tuners_ins.pause);
+ 				was_paused = true;
+-                                goto out2;
+ 			}
+ 		}
+ 		break;
+@@ -274,9 +273,8 @@ static void msm_mpdec_work_thread(struct work_struct *work)
+ 			} else if (per_cpu(msm_mpdec_cpudata, cpu).online != cpu_online(cpu)) {
+ 				pr_info(MPDEC_TAG"CPU[%d] was controlled outside of mpdecision! | pausing [%d]ms\n",
+ 						cpu, msm_mpdec_tuners_ins.pause);
+-                                cancel_delayed_work_sync(&msm_mpdec_work);
++				msleep(msm_mpdec_tuners_ins.pause);
+ 				was_paused = true;
+-                                goto out2;
+ 			}
+ 		}
+ 		break;
+@@ -291,11 +289,6 @@ out:
+ 		queue_delayed_work(msm_mpdec_workq, &msm_mpdec_work,
+ 				msecs_to_jiffies(msm_mpdec_tuners_ins.delay));
+ 	return;
+-out2:
+-	if (state != MSM_MPDEC_DISABLED)
+-		queue_delayed_work(msm_mpdec_workq, &msm_mpdec_work,
+-				msecs_to_jiffies(msm_mpdec_tuners_ins.pause));
+-	return;
+ }
+ 
+ static void msm_mpdec_suspend(void)
+-- 
+1.7.9.5
+

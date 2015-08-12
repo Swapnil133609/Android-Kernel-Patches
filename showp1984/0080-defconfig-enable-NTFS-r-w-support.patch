@@ -1,0 +1,29 @@
+From e58552241778f737ec883ec577fd8035398c211b Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 07:17:01 +0100
+Subject: [PATCH 080/338] defconfig: enable NTFS r/w support
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/bricked_defconfig |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/bricked_defconfig b/arch/arm/configs/bricked_defconfig
+index 15deb05..20c9251 100644
+--- a/arch/arm/configs/bricked_defconfig
++++ b/arch/arm/configs/bricked_defconfig
+@@ -3116,7 +3116,9 @@ CONFIG_FAT_FS=y
+ CONFIG_VFAT_FS=y
+ CONFIG_FAT_DEFAULT_CODEPAGE=437
+ CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1"
+-# CONFIG_NTFS_FS is not set
++CONFIG_NTFS_FS=y
++# CONFIG_NTFS_DEBUG is not set
++CONFIG_NTFS_RW=y
+ 
+ #
+ # Pseudo filesystems
+-- 
+1.7.9.5
+

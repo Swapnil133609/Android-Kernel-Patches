@@ -1,0 +1,231 @@
+From 84323c0c525c1fb1dc6fc04d815a77e4f66d5209 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 07:24:35 +0100
+Subject: [PATCH 125/338] msm_mpdecision: export the new, larger nwns/twts
+ arrays to sysfs
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |  178 ++++++++++++++++++------------------
+ 1 file changed, 90 insertions(+), 88 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index e806cfb..80d25cc 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -323,6 +323,80 @@ show_one(delay, delay);
+ show_one(pause, pause);
+ show_one(scroff_single_core, scroff_single_core);
+ 
++#define show_one_twts(file_name, arraypos)                              \
++static ssize_t show_##file_name                                         \
++(struct kobject *kobj, struct attribute *attr, char *buf)               \
++{                                                                       \
++	return sprintf(buf, "%u\n", TwTs_Threshold[arraypos]);          \
++}
++show_one_twts(twts_threshold_0, 0);
++show_one_twts(twts_threshold_1, 1);
++show_one_twts(twts_threshold_2, 2);
++show_one_twts(twts_threshold_3, 3);
++show_one_twts(twts_threshold_4, 4);
++show_one_twts(twts_threshold_5, 5);
++show_one_twts(twts_threshold_6, 6);
++show_one_twts(twts_threshold_7, 7);
++
++#define store_one_twts(file_name, arraypos)                             \
++static ssize_t store_##file_name                                        \
++(struct kobject *a, struct attribute *b, const char *buf, size_t count) \
++{                                                                       \
++	unsigned int input;                                             \
++	int ret;                                                        \
++	ret = sscanf(buf, "%u", &input);                                \
++	if (ret != 1)                                                   \
++		return -EINVAL;                                         \
++	TwTs_Threshold[arraypos] = input;                               \
++	return count;                                                   \
++}                                                                       \
++define_one_global_rw(file_name);
++store_one_twts(twts_threshold_0, 0);
++store_one_twts(twts_threshold_1, 1);
++store_one_twts(twts_threshold_2, 2);
++store_one_twts(twts_threshold_3, 3);
++store_one_twts(twts_threshold_4, 4);
++store_one_twts(twts_threshold_5, 5);
++store_one_twts(twts_threshold_6, 6);
++store_one_twts(twts_threshold_7, 7);
++
++#define show_one_nwns(file_name, arraypos)                              \
++static ssize_t show_##file_name                                         \
++(struct kobject *kobj, struct attribute *attr, char *buf)               \
++{                                                                       \
++	return sprintf(buf, "%u\n", NwNs_Threshold[arraypos]);          \
++}
++show_one_nwns(nwns_threshold_0, 0);
++show_one_nwns(nwns_threshold_1, 1);
++show_one_nwns(nwns_threshold_2, 2);
++show_one_nwns(nwns_threshold_3, 3);
++show_one_nwns(nwns_threshold_4, 4);
++show_one_nwns(nwns_threshold_5, 5);
++show_one_nwns(nwns_threshold_6, 6);
++show_one_nwns(nwns_threshold_7, 7);
++
++#define store_one_nwns(file_name, arraypos)                             \
++static ssize_t store_##file_name                                        \
++(struct kobject *a, struct attribute *b, const char *buf, size_t count) \
++{                                                                       \
++	unsigned int input;                                             \
++	int ret;                                                        \
++	ret = sscanf(buf, "%u", &input);                                \
++	if (ret != 1)                                                   \
++		return -EINVAL;                                         \
++	NwNs_Threshold[arraypos] = input;                               \
++	return count;                                                   \
++}                                                                       \
++define_one_global_rw(file_name);
++store_one_nwns(nwns_threshold_0, 0);
++store_one_nwns(nwns_threshold_1, 1);
++store_one_nwns(nwns_threshold_2, 2);
++store_one_nwns(nwns_threshold_3, 3);
++store_one_nwns(nwns_threshold_4, 4);
++store_one_nwns(nwns_threshold_5, 5);
++store_one_nwns(nwns_threshold_6, 6);
++store_one_nwns(nwns_threshold_7, 7);
++
+ static ssize_t show_idle_freq (struct kobject *kobj, struct attribute *attr,
+                                    char *buf)
+ {
+@@ -348,30 +422,6 @@ static ssize_t show_enabled(struct kobject *a, struct attribute *b,
+ 	return sprintf(buf, "%u\n", enabled);
+ }
+ 
+-static ssize_t show_nwns_threshold_up(struct kobject *kobj, struct attribute *attr,
+-					char *buf)
+-{
+-	return sprintf(buf, "%u\n", NwNs_Threshold[0]);
+-}
+-
+-static ssize_t show_nwns_threshold_down(struct kobject *kobj, struct attribute *attr,
+-					char *buf)
+-{
+-	return sprintf(buf, "%u\n", NwNs_Threshold[3]);
+-}
+-
+-static ssize_t show_twts_threshold_up(struct kobject *kobj, struct attribute *attr,
+-					char *buf)
+-{
+-	return sprintf(buf, "%u\n", TwTs_Threshold[0]);
+-}
+-
+-static ssize_t show_twts_threshold_down(struct kobject *kobj, struct attribute *attr,
+-					char *buf)
+-{
+-	return sprintf(buf, "%u\n", TwTs_Threshold[3]);
+-}
+-
+ static ssize_t store_startdelay(struct kobject *a, struct attribute *b,
+ 				   const char *buf, size_t count)
+ {
+@@ -510,72 +560,12 @@ static ssize_t store_enabled(struct kobject *a, struct attribute *b,
+ 	return count;
+ }
+ 
+-static ssize_t store_nwns_threshold_up(struct kobject *a, struct attribute *b,
+-				   const char *buf, size_t count)
+-{
+-	unsigned int input;
+-	int ret;
+-	ret = sscanf(buf, "%u", &input);
+-	if (ret != 1)
+-		return -EINVAL;
+-
+-	NwNs_Threshold[0] = input;
+-
+-	return count;
+-}
+-
+-static ssize_t store_nwns_threshold_down(struct kobject *a, struct attribute *b,
+-				   const char *buf, size_t count)
+-{
+-	unsigned int input;
+-	int ret;
+-	ret = sscanf(buf, "%u", &input);
+-	if (ret != 1)
+-		return -EINVAL;
+-
+-	NwNs_Threshold[3] = input;
+-
+-	return count;
+-}
+-
+-static ssize_t store_twts_threshold_up(struct kobject *a, struct attribute *b,
+-				   const char *buf, size_t count)
+-{
+-	unsigned int input;
+-	int ret;
+-	ret = sscanf(buf, "%u", &input);
+-	if (ret != 1)
+-		return -EINVAL;
+-
+-	TwTs_Threshold[0] = input;
+-
+-	return count;
+-}
+-
+-static ssize_t store_twts_threshold_down(struct kobject *a, struct attribute *b,
+-				   const char *buf, size_t count)
+-{
+-	unsigned int input;
+-	int ret;
+-	ret = sscanf(buf, "%u", &input);
+-	if (ret != 1)
+-		return -EINVAL;
+-
+-	TwTs_Threshold[3] = input;
+-
+-	return count;
+-}
+-
+ define_one_global_rw(startdelay);
+ define_one_global_rw(delay);
+ define_one_global_rw(pause);
+ define_one_global_rw(scroff_single_core);
+ define_one_global_rw(idle_freq);
+ define_one_global_rw(enabled);
+-define_one_global_rw(nwns_threshold_up);
+-define_one_global_rw(nwns_threshold_down);
+-define_one_global_rw(twts_threshold_up);
+-define_one_global_rw(twts_threshold_down);
+ 
+ static struct attribute *msm_mpdec_attributes[] = {
+ 	&startdelay.attr,
+@@ -584,10 +574,22 @@ static struct attribute *msm_mpdec_attributes[] = {
+ 	&scroff_single_core.attr,
+ 	&idle_freq.attr,
+ 	&enabled.attr,
+-	&nwns_threshold_up.attr,
+-	&nwns_threshold_down.attr,
+-	&twts_threshold_up.attr,
+-	&twts_threshold_down.attr,
++	&twts_threshold_0.attr,
++	&twts_threshold_1.attr,
++	&twts_threshold_2.attr,
++	&twts_threshold_3.attr,
++	&twts_threshold_4.attr,
++	&twts_threshold_5.attr,
++	&twts_threshold_6.attr,
++	&twts_threshold_7.attr,
++	&nwns_threshold_0.attr,
++	&nwns_threshold_1.attr,
++	&nwns_threshold_2.attr,
++	&nwns_threshold_3.attr,
++	&nwns_threshold_4.attr,
++	&nwns_threshold_5.attr,
++	&nwns_threshold_6.attr,
++	&nwns_threshold_7.attr,
+ 	NULL
+ };
+ 
+-- 
+1.7.9.5
+

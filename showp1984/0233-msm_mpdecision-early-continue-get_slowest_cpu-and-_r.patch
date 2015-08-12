@@ -1,0 +1,37 @@
+From 61a25d32f7a58cad8a9b0f0b085e69d1ab4af750 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 11 Nov 2013 00:27:32 +0100
+Subject: [PATCH 233/338] msm_mpdecision: early continue get_slowest_cpu() and
+ _rate() to save some cycles
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 7a3c560..8bdf3dc 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -125,7 +125,9 @@ static int get_slowest_cpu(void) {
+ 			continue;
+ 		rate = get_rate(i);
+ 		if (slow_rate == 0) {
++			cpu = i;
+ 			slow_rate = rate;
++			continue;
+ 		}
+ 		if ((rate <= slow_rate) && (slow_rate != 0)) {
+ 			cpu = i;
+@@ -146,6 +148,7 @@ static unsigned long get_slowest_cpu_rate(void) {
+ 		rate = get_rate(i);
+ 		if ((rate < slow_rate) && (slow_rate != 0)) {
+ 			slow_rate = rate;
++			continue;
+ 		}
+ 		if (slow_rate == 0) {
+ 			slow_rate = rate;
+-- 
+1.7.9.5
+

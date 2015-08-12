@@ -1,0 +1,36 @@
+From 3169b5b845ebb9faae4bad31444e468276f2c90b Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 11 Nov 2013 00:56:13 +0100
+Subject: [PATCH 239/338] msm_mpdecision: set idle_freq arch specific This
+ fixes issue #31 - idle frequency needs changing
+ when switching archs
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.h |    8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.h b/arch/arm/mach-msm/msm_mpdecision.h
+index e6c5134..d96fc61 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.h
++++ b/arch/arm/mach-msm/msm_mpdecision.h
+@@ -28,7 +28,15 @@
+ #define MSM_MPDEC_STARTDELAY			20000
+ #define MSM_MPDEC_DELAY				130
+ #define MSM_MPDEC_PAUSE				10000
++
++#ifdef CONFIG_ARCH_MSM8974
++#define MSM_MPDEC_IDLE_FREQ			499200
++#elif defined CONFIG_ARCH_MSM8X60 || defined CONFIG_ARCH_MSM8960 || defined CONFIG_ARCH_MSM8930
++#define MSM_MPDEC_IDLE_FREQ			486000
++#else
+ #define MSM_MPDEC_IDLE_FREQ			486000
++#endif
++
+ #ifdef CONFIG_MSM_MPDEC_INPUTBOOST_CPUMIN
+ #define MSM_MPDEC_BOOSTTIME			1000
+ #define MSM_MPDEC_BOOSTFREQ_CPU0		960000
+-- 
+1.7.9.5
+

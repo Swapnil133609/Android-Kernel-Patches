@@ -1,0 +1,31 @@
+From a626aed9f9b8fe0ca3dd076e4d2bf3d0ebb9a3eb Mon Sep 17 00:00:00 2001
+From: showp1984 <showp1984@gmail.com>
+Date: Thu, 28 Jun 2012 05:27:42 +0200
+Subject: [PATCH 112/338] mach-msm: mpdecision: don't turn on cpu1 if cpu0
+ freq is below idle_freq If the clock of cpu0 is
+ below the set idle_freq don't enable cpu1 and
+ disregard the runqueue value.
+
+Signed-off-by: showp1984 <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 85ec739..3da4754 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -113,6 +113,9 @@ static int mp_decision(void)
+ 		if ((nr_cpu_online < 2) && (rq_depth >= NwNs_Threshold[index])) {
+ 			if (total_time >= TwTs_Threshold[index]) {
+ 				new_state = MSM_MPDEC_UP;
++                                if (acpuclk_8x60_get_rate((CONFIG_NR_CPUS - 2)) <=
++                                    msm_mpdec_tuners_ins.idle_freq)
++                                        new_state = MSM_MPDEC_IDLE;
+ 			}
+ 		} else if (rq_depth <= NwNs_Threshold[index+1]) {
+ 			if (total_time >= TwTs_Threshold[index+1] ) {
+-- 
+1.7.9.5
+

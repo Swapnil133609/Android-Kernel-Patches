@@ -1,0 +1,27 @@
+From b8f0cd17e3e1e2af8e2bf2a63dd156eadf52ce78 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 19 Dec 2012 06:48:15 +0100
+Subject: [PATCH 121/338] msm_mpdecision: update core data on first call
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index d4a30e6..675a3bd 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -610,6 +610,8 @@ static int __init msm_mpdec(void)
+ 		per_cpu(msm_mpdec_cpudata, cpu).online = true;
+ 	}
+ 
++        was_paused = true;
++
+ 	INIT_DELAYED_WORK(&msm_mpdec_work, msm_mpdec_work_thread);
+ 	if (state != MSM_MPDEC_DISABLED)
+ 		schedule_delayed_work(&msm_mpdec_work, 0);
+-- 
+1.7.9.5
+

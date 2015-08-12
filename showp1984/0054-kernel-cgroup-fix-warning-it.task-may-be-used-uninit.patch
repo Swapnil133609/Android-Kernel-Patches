@@ -1,0 +1,35 @@
+From ef7f3694a50c47ea2a07f45adef175aa67ae97fc Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 03:56:22 +0100
+Subject: [PATCH 054/338] kernel/cgroup: fix: 'warning: 'it.task' may be used
+ uninitialized in this function'
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/cgroup.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/kernel/cgroup.c b/kernel/cgroup.c
+index 2f0d7542..5303ec8 100644
+--- a/kernel/cgroup.c
++++ b/kernel/cgroup.c
+@@ -2880,6 +2880,7 @@ int cgroup_scan_tasks(struct cgroup_scanner *scan)
+ 	struct ptr_heap tmp_heap;
+ 	struct ptr_heap *heap;
+ 	struct timespec latest_time = { 0, 0 };
++        it.task = NULL;
+ 
+ 	if (scan->heap) {
+ 		/* The caller supplied our heap and pre-allocated its memory */
+@@ -3216,6 +3217,7 @@ int cgroupstats_build(struct cgroupstats *stats, struct dentry *dentry)
+ 	struct cgroup *cgrp;
+ 	struct cgroup_iter it;
+ 	struct task_struct *tsk;
++        it.task = NULL;
+ 
+ 	/*
+ 	 * Validate dentry by checking the superblock operations,
+-- 
+1.7.9.5
+

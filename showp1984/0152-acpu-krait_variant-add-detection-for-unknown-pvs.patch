@@ -1,0 +1,39 @@
+From 3e94292172aa81d2cfdd14cd8e733062bc8a0456 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Thu, 20 Dec 2012 01:02:17 +0100
+Subject: [PATCH 152/338] acpu: krait_variant: add detection for unknown pvs
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/acpuclock-krait.c |   14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-msm/acpuclock-krait.c b/arch/arm/mach-msm/acpuclock-krait.c
+index 6d828ee..b1d54ef 100644
+--- a/arch/arm/mach-msm/acpuclock-krait.c
++++ b/arch/arm/mach-msm/acpuclock-krait.c
+@@ -1275,11 +1275,15 @@ static void __init hw_init(void)
+ #ifdef CONFIG_DEBUG_FS
+ static int krait_variant_debugfs_show(struct seq_file *s, void *data)
+ {
+-	seq_printf(s, "Your krait chip variant is: \n");
+-	seq_printf(s, "[%s] SLOW \n", ((krait_chip_variant == PVS_SLOW) ? "X" : " "));
+-	seq_printf(s, "[%s] NOMINAL \n", ((krait_chip_variant == PVS_NOMINAL) ? "X" : " "));
+-	seq_printf(s, "[%s] FAST \n", ((krait_chip_variant == PVS_FAST) ? "X" : " "));
+-	seq_printf(s, "[%s] FASTER \n", ((krait_chip_variant == PVS_FASTER) ? "X" : " "));
++        if (krait_chip_variant == PVS_UNKNOWN) {
++                seq_printf(s, "Your krait chip variant is UNKNOWN!\n");
++        } else {
++                seq_printf(s, "Your krait chip variant is: \n");
++                seq_printf(s, "[%s] SLOW \n", ((krait_chip_variant == PVS_SLOW) ? "X" : " "));
++                seq_printf(s, "[%s] NOMINAL \n", ((krait_chip_variant == PVS_NOMINAL) ? "X" : " "));
++                seq_printf(s, "[%s] FAST \n", ((krait_chip_variant == PVS_FAST) ? "X" : " "));
++                seq_printf(s, "[%s] FASTER \n", ((krait_chip_variant == PVS_FASTER) ? "X" : " "));
++        }
+ 
+ 	return 0;
+ }
+-- 
+1.7.9.5
+

@@ -1,0 +1,48 @@
+From 7c27aae23f9cc4e8b20e08aadd9a479060b64316 Mon Sep 17 00:00:00 2001
+From: Rom Lemarchand <romlem@google.com>
+Date: Fri, 6 Sep 2013 12:37:51 -0700
+Subject: [PATCH 071/338] msm: kgsl: inherit owner from kgsl/proc debug
+ directory
+
+Make all entries under kgsl/proc inherit its owner's uid/gid.
+
+[ccross]
+Reapplied after it was overwritten by another patch.
+
+Bug: 10550827
+Big: 10954149
+
+Signed-off-by: Rom Lemarchand <romlem@google.com>
+Signed-off-by: Colin Cross <ccross@google.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/msm/kgsl_debugfs.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/gpu/msm/kgsl_debugfs.c b/drivers/gpu/msm/kgsl_debugfs.c
+index 318b10d..d62a222 100644
+--- a/drivers/gpu/msm/kgsl_debugfs.c
++++ b/drivers/gpu/msm/kgsl_debugfs.c
+@@ -337,6 +337,9 @@ kgsl_process_init_debugfs(struct kgsl_process_private *private)
+ 	if (!private->debug_root)
+ 		return -EINVAL;
+ 
++	private->debug_root->d_inode->i_uid = proc_d_debugfs->d_inode->i_uid;
++	private->debug_root->d_inode->i_gid = proc_d_debugfs->d_inode->i_gid;
++
+ 	/*
+ 	 * debugfs_create_dir() and debugfs_create_file() both
+ 	 * return -ENODEV if debugfs is disabled in the kernel.
+@@ -355,6 +358,9 @@ kgsl_process_init_debugfs(struct kgsl_process_private *private)
+ 
+ 		if (ret == -ENODEV)
+ 			ret = 0;
++	} else if (dentry) {
++		dentry->d_inode->i_uid = proc_d_debugfs->d_inode->i_uid;
++		dentry->d_inode->i_gid = proc_d_debugfs->d_inode->i_gid;
+ 	}
+ 
+ 	return ret;
+-- 
+1.7.9.5
+

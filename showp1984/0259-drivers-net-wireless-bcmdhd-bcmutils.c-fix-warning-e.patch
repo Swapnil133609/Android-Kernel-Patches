@@ -1,0 +1,32 @@
+From 2a84a1ea8e8e26e8367e8c65dc46ac08128b02e5 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 11 Nov 2013 03:11:05 +0100
+Subject: [PATCH 259/338] =?UTF-8?q?drivers/net/wireless/bcmdhd/bcmutils.c:=20?=
+ =?UTF-8?q?fix:=20warning:=20=E2=80=98ep=E2=80=99=20may=20be=20used=20uninit?=
+ =?UTF-8?q?ialized=20in=20this=20function?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/net/wireless/bcmdhd/bcmutils.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/wireless/bcmdhd/bcmutils.c b/drivers/net/wireless/bcmdhd/bcmutils.c
+index 23fc03e..70d3897 100644
+--- a/drivers/net/wireless/bcmdhd/bcmutils.c
++++ b/drivers/net/wireless/bcmdhd/bcmutils.c
+@@ -1014,7 +1014,7 @@ int
+ bcm_ether_atoe(const char *p, struct ether_addr *ea)
+ {
+ 	int i = 0;
+-	char *ep;
++	char *ep = NULL;
+ 
+ 	for (;;) {
+ 		ea->octet[i++] = (char) bcm_strtoul(p, &ep, 16);
+-- 
+1.7.9.5
+

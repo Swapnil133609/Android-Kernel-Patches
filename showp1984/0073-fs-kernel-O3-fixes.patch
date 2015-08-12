@@ -1,0 +1,56 @@
+From 5e34039bb438dd85d696696adb3d2c7f3532ec7e Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 31 Jul 2013 02:04:25 +0200
+Subject: [PATCH 073/338] fs/kernel: -O3 fixes
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ fs/namei.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/fs/namei.c b/fs/namei.c
+index c427919..598ff36 100644
+--- a/fs/namei.c
++++ b/fs/namei.c
+@@ -2743,7 +2743,7 @@ out:
+ static long do_rmdir(int dfd, const char __user *pathname)
+ {
+ 	int error = 0;
+-	char * name;
++	char *name = NULL;
+ 	struct dentry *dentry;
+ 	struct nameidata nd;
+ 
+@@ -2839,7 +2839,7 @@ int vfs_unlink(struct inode *dir, struct dentry *dentry)
+ static long do_unlinkat(int dfd, const char __user *pathname)
+ {
+ 	int error;
+-	char *name;
++	char *name = NULL;
+ 	struct dentry *dentry;
+ 	struct nameidata nd;
+ 	struct inode *inode = NULL;
+@@ -2931,7 +2931,7 @@ SYSCALL_DEFINE3(symlinkat, const char __user *, oldname,
+ 		int, newdfd, const char __user *, newname)
+ {
+ 	int error;
+-	char *from;
++	char *from = NULL;
+ 	struct dentry *dentry;
+ 	struct path path;
+ 
+@@ -3239,8 +3239,8 @@ SYSCALL_DEFINE4(renameat, int, olddfd, const char __user *, oldname,
+ 	struct dentry *old_dentry, *new_dentry;
+ 	struct dentry *trap;
+ 	struct nameidata oldnd, newnd;
+-	char *from;
+-	char *to;
++	char *from = NULL;
++	char *to = NULL;
+ 	int error;
+ 
+ 	error = user_path_parent(olddfd, oldname, &oldnd, &from);
+-- 
+1.7.9.5
+

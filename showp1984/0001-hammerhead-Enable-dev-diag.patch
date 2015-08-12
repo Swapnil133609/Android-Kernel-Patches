@@ -1,0 +1,31 @@
+From 103e1f69925f03c72c9564cd114073da2475a1d5 Mon Sep 17 00:00:00 2001
+From: Patrick Tjin <pattjin@google.com>
+Date: Tue, 22 Oct 2013 09:10:44 -0700
+Subject: [PATCH 001/338] hammerhead: Enable /dev/diag
+
+Set CONFIG_DIAG_CHAR & CONFIG_DIAG_OVER_USB
+
+Bug: 11289030
+
+Signed-off-by: Patrick Tjin <pattjin@google.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/hammerhead_defconfig |    2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm/configs/hammerhead_defconfig b/arch/arm/configs/hammerhead_defconfig
+index b12688f..4a3d274 100644
+--- a/arch/arm/configs/hammerhead_defconfig
++++ b/arch/arm/configs/hammerhead_defconfig
+@@ -333,8 +333,6 @@ CONFIG_INPUT_UINPUT=y
+ CONFIG_SERIAL_MSM_HS=y
+ CONFIG_SERIAL_MSM_HSL=y
+ CONFIG_SERIAL_MSM_HSL_CONSOLE=y
+-# CONFIG_DIAG_CHAR is not set
+-# CONFIG_DIAG_OVER_USB is not set
+ CONFIG_HW_RANDOM_MSM=y
+ CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+-- 
+1.7.9.5
+

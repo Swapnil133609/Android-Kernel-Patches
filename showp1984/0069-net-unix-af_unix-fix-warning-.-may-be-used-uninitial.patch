@@ -1,0 +1,73 @@
+From b6c9bf28726b618c15efa386067910f71cb68dbd Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Tue, 18 Dec 2012 05:18:02 +0100
+Subject: [PATCH 069/338] net/unix/af_unix: fix: 'warning: '...' may be used
+ uninitialized in this function'
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ net/unix/af_unix.c |   24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/net/unix/af_unix.c b/net/unix/af_unix.c
+index 8d932a5..8f11f64 100644
+--- a/net/unix/af_unix.c
++++ b/net/unix/af_unix.c
+@@ -824,8 +824,8 @@ static int unix_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
+ 	char *sun_path = sunaddr->sun_path;
+ 	struct dentry *dentry = NULL;
+ 	struct path path;
+-	int err;
+-	unsigned hash;
++	int err = 0;
++	unsigned hash = 0;
+ 	struct unix_address *addr;
+ 	struct hlist_head *list;
+ 
+@@ -965,8 +965,8 @@ static int unix_dgram_connect(struct socket *sock, struct sockaddr *addr,
+ 	struct net *net = sock_net(sk);
+ 	struct sockaddr_un *sunaddr = (struct sockaddr_un *)addr;
+ 	struct sock *other;
+-	unsigned hash;
+-	int err;
++	unsigned hash = 0;
++	int err = 0;
+ 
+ 	if (addr->sa_family != AF_UNSPEC) {
+ 		err = unix_mkname(sunaddr, alen, &hash);
+@@ -1063,10 +1063,10 @@ static int unix_stream_connect(struct socket *sock, struct sockaddr *uaddr,
+ 	struct sock *newsk = NULL;
+ 	struct sock *other = NULL;
+ 	struct sk_buff *skb = NULL;
+-	unsigned hash;
+-	int st;
+-	int err;
+-	long timeo;
++	unsigned hash = 0;
++	int st = 0;
++	int err = 0;
++	long timeo = 0;
+ 
+ 	err = unix_mkname(sunaddr, addr_len, &hash);
+ 	if (err < 0)
+@@ -1437,12 +1437,12 @@ static int unix_dgram_sendmsg(struct kiocb *kiocb, struct socket *sock,
+ 	struct sockaddr_un *sunaddr = msg->msg_name;
+ 	struct sock *other = NULL;
+ 	int namelen = 0; /* fake GCC */
+-	int err;
+-	unsigned hash;
++	int err = 0;
++	unsigned hash = 0;
+ 	struct sk_buff *skb;
+-	long timeo;
++	long timeo = 0;
+ 	struct scm_cookie tmp_scm;
+-	int max_level;
++	int max_level = 0;
+ 
+ 	if (NULL == siocb->scm)
+ 		siocb->scm = &tmp_scm;
+-- 
+1.7.9.5
+

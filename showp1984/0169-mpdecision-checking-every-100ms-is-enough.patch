@@ -1,0 +1,27 @@
+From 63f28d9f243492d87f73bc13c57368eefc503c79 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sun, 6 Jan 2013 01:33:07 +0100
+Subject: [PATCH 169/338] mpdecision: checking every 100ms is enough
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index c91c317..7ad6ad8 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -43,7 +43,7 @@
+ 
+ #define MPDEC_TAG                       "[MPDEC]: "
+ #define MSM_MPDEC_STARTDELAY            20000
+-#define MSM_MPDEC_DELAY                 70
++#define MSM_MPDEC_DELAY                 100
+ #define MSM_MPDEC_PAUSE                 10000
+ #define MSM_MPDEC_IDLE_FREQ             486000
+ 
+-- 
+1.7.9.5
+

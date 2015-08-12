@@ -1,0 +1,36 @@
+From 3710da3fb44492701730117494f0420179abe9a9 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 8 May 2013 22:50:30 +0200
+Subject: [PATCH 185/338] msm_mpdecision: change frequencies for input boost
+ This should provide us with a more battery friendly
+ setup in light usage situations while it still
+ provides the obvious advantages the input boost
+ gives us (faster reaction).
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index b92506d..dfd111f 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -48,10 +48,10 @@
+ #define MSM_MPDEC_IDLE_FREQ             486000
+ #ifdef CONFIG_MSM_MPDEC_INPUTBOOST_CPUMIN
+ #define MSM_MPDEC_BOOSTTIME             1000
+-#define MSM_MPDEC_BOOSTFREQ_CPU0        1026000
++#define MSM_MPDEC_BOOSTFREQ_CPU0        918000
+ #define MSM_MPDEC_BOOSTFREQ_CPU1        918000
+-#define MSM_MPDEC_BOOSTFREQ_CPU2        810000
+-#define MSM_MPDEC_BOOSTFREQ_CPU3        702000
++#define MSM_MPDEC_BOOSTFREQ_CPU2        702000
++#define MSM_MPDEC_BOOSTFREQ_CPU3        594000
+ #endif
+ 
+ enum {
+-- 
+1.7.9.5
+

@@ -1,0 +1,33 @@
+From e350a65ca5528f322d37cf6329fa52405f1b7c33 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 6 Nov 2013 02:54:50 +0100
+Subject: [PATCH 201/338] msm_mpdecision: update inputboost frequencies
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/msm_mpdecision.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-msm/msm_mpdecision.c b/arch/arm/mach-msm/msm_mpdecision.c
+index 699e68c..dbae5ec 100644
+--- a/arch/arm/mach-msm/msm_mpdecision.c
++++ b/arch/arm/mach-msm/msm_mpdecision.c
+@@ -53,10 +53,10 @@
+ #define MSM_MPDEC_IDLE_FREQ             486000
+ #ifdef CONFIG_MSM_MPDEC_INPUTBOOST_CPUMIN
+ #define MSM_MPDEC_BOOSTTIME             1000
+-#define MSM_MPDEC_BOOSTFREQ_CPU0        918000
+-#define MSM_MPDEC_BOOSTFREQ_CPU1        918000
+-#define MSM_MPDEC_BOOSTFREQ_CPU2        702000
+-#define MSM_MPDEC_BOOSTFREQ_CPU3        594000
++#define MSM_MPDEC_BOOSTFREQ_CPU0        960000
++#define MSM_MPDEC_BOOSTFREQ_CPU1        960000
++#define MSM_MPDEC_BOOSTFREQ_CPU2        729600
++#define MSM_MPDEC_BOOSTFREQ_CPU3        576000
+ #endif
+ 
+ enum {
+-- 
+1.7.9.5
+

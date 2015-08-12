@@ -1,0 +1,39 @@
+From 936254405850e0724afd85ea9c8b182cea79fd67 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sun, 10 Nov 2013 00:50:56 +0100
+Subject: [PATCH 284/338] drivers/input/touchscreen/touch_synaptics_ds5: add
+ screen suspend indicator
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/touch_synaptics_ds5.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/input/touchscreen/touch_synaptics_ds5.c b/drivers/input/touchscreen/touch_synaptics_ds5.c
+index 118b7b4..b3ef89e 100644
+--- a/drivers/input/touchscreen/touch_synaptics_ds5.c
++++ b/drivers/input/touchscreen/touch_synaptics_ds5.c
+@@ -1708,6 +1708,9 @@ static int lcd_notifier_callback(struct notifier_block *this,
+ 				msecs_to_jiffies(70));
+ 		}
+ 		mutex_unlock(&ts->input_dev->mutex);
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++		scr_suspended = false;
++#endif
+ 		break;
+ 	case LCD_EVENT_OFF_START:
+ #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+@@ -1727,6 +1730,9 @@ static int lcd_notifier_callback(struct notifier_block *this,
+ 			synaptics_ts_stop(ts);
+ 			mutex_unlock(&ts->input_dev->mutex);
+ 		}
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++		scr_suspended = true;
++#endif
+ 		break;
+ 	default:
+ 		break;
+-- 
+1.7.9.5
+

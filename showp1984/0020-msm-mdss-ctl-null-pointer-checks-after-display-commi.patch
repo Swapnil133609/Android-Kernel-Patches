@@ -1,0 +1,54 @@
+From 8023d8625e063195410f3b5000e033074f8a70a8 Mon Sep 17 00:00:00 2001
+From: Naseer Ahmed <naseer@codeaurora.org>
+Date: Wed, 30 Oct 2013 15:36:43 -0400
+Subject: [PATCH 020/338] msm: mdss: ctl null pointer checks after display
+ commit waiting
+
+After display commit, display thread is waiting for the commit done,
+if shutdown happens during this waiting period, the ctl patch could be
+nulled. Adding ctl pointer null checks could avoid crashes.
+
+Signed-off-by: Huaibin Yang <huaibiny@codeaurora.org>
+Signed-off-by: Naseer Ahmed <naseer@codeaurora.org>
+Bug: 11429494
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_mdp_ctl.c     |    3 +++
+ drivers/video/msm/mdss/mdss_mdp_overlay.c |    5 +++--
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_mdp_ctl.c b/drivers/video/msm/mdss/mdss_mdp_ctl.c
+index 11dac47..1615332 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_ctl.c
++++ b/drivers/video/msm/mdss/mdss_mdp_ctl.c
+@@ -1731,6 +1731,9 @@ int mdss_mdp_display_wait4pingpong(struct mdss_mdp_ctl *ctl)
+ {
+ 	int ret;
+ 
++	if (!ctl)
++		return -ENODEV;
++
+ 	ret = mutex_lock_interruptible(&ctl->lock);
+ 	if (ret)
+ 		return ret;
+diff --git a/drivers/video/msm/mdss/mdss_mdp_overlay.c b/drivers/video/msm/mdss/mdss_mdp_overlay.c
+index 845c2c8..cc57dc7 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_overlay.c
++++ b/drivers/video/msm/mdss/mdss_mdp_overlay.c
+@@ -881,10 +881,11 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd)
+ commit_fail:
+ 	mdss_mdp_overlay_cleanup(mfd);
+ 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
+-	mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_FLUSHED);
++	if (ctl)
++		mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_FLUSHED);
+ 
+ 	mutex_unlock(&mdp5_data->ov_lock);
+-	if (ctl->shared_lock)
++	if (ctl && ctl->shared_lock)
+ 		mutex_unlock(ctl->shared_lock);
+ 
+ 	return ret;
+-- 
+1.7.9.5
+
