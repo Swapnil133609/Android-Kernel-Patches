@@ -1,0 +1,96 @@
+From 269abef198c37b639494067bd53b532a4c239bad Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Tue, 29 Oct 2013 15:05:24 -0500
+Subject: [PATCH 350/507] intellidemand: add new power_suspend PM driver
+
+bump version to 4.4
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_intellidemand.c |   40 ++++++++++++++++++++++++++++++-
+ 1 file changed, 39 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/cpufreq_intellidemand.c b/drivers/cpufreq/cpufreq_intellidemand.c
+index 7bd6950..c9d1c0b 100644
+--- a/drivers/cpufreq/cpufreq_intellidemand.c
++++ b/drivers/cpufreq/cpufreq_intellidemand.c
+@@ -32,8 +32,12 @@
+ #include <linux/syscalls.h>
+ #include <linux/highuid.h>
+ 
++#ifdef CONFIG_POWERSUSPEND
++#include <linux/powersuspend.h>
++#endif
++
+ #define INTELLIDEMAND_MAJOR_VERSION	4
+-#define INTELLIDEMAND_MINOR_VERSION	3
++#define INTELLIDEMAND_MINOR_VERSION	4
+ 
+ /*
+  * dbs is used in this file as a shortform for demandbased switching
+@@ -76,6 +80,9 @@ static u64 freq_boosted_time;
+ #define MIN_SAMPLING_RATE_RATIO			(2)
+ 
+ static unsigned int min_sampling_rate;
++#ifdef CONFIG_POWERSUSPEND
++static unsigned long stored_sampling_rate;
++#endif
+ 
+ #define LATENCY_MULTIPLIER			(1000)
+ #define MIN_LATENCY_MULTIPLIER			(20)
+@@ -1463,6 +1470,30 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_POWERSUSPEND
++static void cpufreq_intellidemand_power_suspend(struct power_suspend *h)
++{
++	mutex_lock(&dbs_mutex);
++	stored_sampling_rate = dbs_tuners_ins.sampling_rate;
++	dbs_tuners_ins.sampling_rate = DEF_SAMPLING_RATE * 6;
++	update_sampling_rate(dbs_tuners_ins.sampling_rate);
++	mutex_unlock(&dbs_mutex);
++}
++
++static void cpufreq_intellidemand_power_resume(struct power_suspend *h)
++{
++	mutex_lock(&dbs_mutex);
++	dbs_tuners_ins.sampling_rate = stored_sampling_rate;
++	update_sampling_rate(dbs_tuners_ins.sampling_rate);
++	mutex_unlock(&dbs_mutex);
++}
++
++static struct power_suspend cpufreq_intellidemand_power_suspend_info = {
++	.suspend = cpufreq_intellidemand_power_suspend,
++	.resume = cpufreq_intellidemand_power_resume,
++};
++#endif
++
+ static int __init cpufreq_gov_dbs_init(void)
+ {
+ 	u64 idle_time;
+@@ -1504,6 +1535,9 @@ static int __init cpufreq_gov_dbs_init(void)
+ 		dbs_work->cpu = i;
+ 	}
+ 
++#ifdef CONFIG_POWERSUSPEND
++	register_power_suspend(&cpufreq_intellidemand_power_suspend_info);
++#endif
+ 	return cpufreq_register_governor(&cpufreq_gov_intellidemand);
+ }
+ 
+@@ -1517,6 +1551,10 @@ static void __exit cpufreq_gov_dbs_exit(void)
+ 			&per_cpu(id_cpu_dbs_info, i);
+ 		mutex_destroy(&this_dbs_info->timer_mutex);
+ 	}
++
++#ifdef CONFIG_POWERSUSPEND
++	unregister_power_suspend(&cpufreq_intellidemand_power_suspend_info);
++#endif
+ 	destroy_workqueue(input_wq);
+ }
+ 
+-- 
+1.7.9.5
+

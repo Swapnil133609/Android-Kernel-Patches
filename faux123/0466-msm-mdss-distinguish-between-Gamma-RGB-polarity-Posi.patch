@@ -1,0 +1,83 @@
+From 3b8997078e3aa7b344d86eb28dd39e3dd01d2af1 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Mon, 25 Nov 2013 23:36:30 -0600
+Subject: [PATCH 466/507] msm: mdss: distinguish between Gamma RGB polarity
+ Positive/Negative
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_dsi_panel.c |   36 ++++++++++++++++++++-----------
+ 1 file changed, 24 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_dsi_panel.c b/drivers/video/msm/mdss/mdss_dsi_panel.c
+index 60d9a92e..f5354cb 100644
+--- a/drivers/video/msm/mdss/mdss_dsi_panel.c
++++ b/drivers/video/msm/mdss/mdss_dsi_panel.c
+@@ -1197,9 +1197,12 @@ static ssize_t read_##file_name					\
+ 	return read_local_on_cmds(buf, cmd);			\
+ }
+ 
+-read_one(kgamma_r,   7);
+-read_one(kgamma_g,  11);
+-read_one(kgamma_b,  15);
++read_one(kgamma_rp,  7);
++read_one(kgamma_rn,  9);
++read_one(kgamma_gp, 11);
++read_one(kgamma_gn, 13);
++read_one(kgamma_bp, 15);
++read_one(kgamma_bn, 17);
+ read_one(kgamma_1,   1);
+ read_one(kgamma_3,   3);
+ read_one(kgamma_5,   5);
+@@ -1216,9 +1219,12 @@ static ssize_t write_##file_name				\
+ 	return write_local_on_cmds(dev, buf, cmd);		\
+ }
+ 
+-write_one(kgamma_r,   7);
+-write_one(kgamma_g,  11);
+-write_one(kgamma_b,  15);
++write_one(kgamma_rp,  7);
++write_one(kgamma_rn,  9);
++write_one(kgamma_gp, 11);
++write_one(kgamma_gn, 13);
++write_one(kgamma_bp, 15);
++write_one(kgamma_bn, 17);
+ write_one(kgamma_1,   1);
+ write_one(kgamma_3,   3);
+ write_one(kgamma_5,   5);
+@@ -1230,9 +1236,12 @@ write_one(kgamma_31, 31);
+ #define define_one_rw(_name)					\
+ static DEVICE_ATTR(_name, 0644, read_##_name, write_##_name);
+ 
+-define_one_rw(kgamma_r);
+-define_one_rw(kgamma_g);
+-define_one_rw(kgamma_b);
++define_one_rw(kgamma_rp);
++define_one_rw(kgamma_rn);
++define_one_rw(kgamma_gp);
++define_one_rw(kgamma_gn);
++define_one_rw(kgamma_bp);
++define_one_rw(kgamma_bn);
+ define_one_rw(kgamma_1);
+ define_one_rw(kgamma_3);
+ define_one_rw(kgamma_5);
+@@ -1242,9 +1251,12 @@ define_one_rw(kgamma_28);
+ define_one_rw(kgamma_31);
+ 
+ static struct attribute *dsi_panel_attributes[] = {
+-	&dev_attr_kgamma_r.attr,
+-	&dev_attr_kgamma_g.attr,
+-	&dev_attr_kgamma_b.attr,
++	&dev_attr_kgamma_rp.attr,
++	&dev_attr_kgamma_rn.attr,
++	&dev_attr_kgamma_gp.attr,
++	&dev_attr_kgamma_gn.attr,
++	&dev_attr_kgamma_bp.attr,
++	&dev_attr_kgamma_bn.attr,
+ 	&dev_attr_kgamma_1.attr,
+ 	&dev_attr_kgamma_3.attr,
+ 	&dev_attr_kgamma_5.attr,
+-- 
+1.7.9.5
+

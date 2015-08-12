@@ -1,0 +1,34 @@
+From d73e0a1c70e1ccb81698fdb3dea0f167f0b98fc8 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sun, 8 Sep 2013 17:20:33 -0500
+Subject: [PATCH 179/338] sched: change find_busiest_queue to h_nr_running
+
+Date    Sun, 18 Aug 2013 16:25:20 +0800
+
+Since find_busiest_queue try to avoid do load balance for runqueue
+which has only one cfs task and its load is above the imbalance
+value calculated, we should use h_nr_running of cfs instead of
+nr_running of rq.
+
+Signed-off-by: Lei Wen <leiwen@marvell.com>
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ kernel/sched/fair.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index cba964b..e88c757 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -4353,7 +4353,7 @@ find_busiest_queue(struct sched_domain *sd, struct sched_group *group,
+ 		 * When comparing with imbalance, use weighted_cpuload()
+ 		 * which is not scaled with the cpu power.
+ 		 */
+-		if (capacity && rq->nr_running == 1 && wl > imbalance)
++		if (capacity && rq->cfs.h_nr_running == 1 && wl > imbalance)
+ 			continue;
+ 
+ 		/*
+-- 
+1.8.1.2
+

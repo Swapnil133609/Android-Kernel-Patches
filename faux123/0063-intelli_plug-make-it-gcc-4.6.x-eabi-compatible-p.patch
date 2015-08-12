@@ -1,0 +1,53 @@
+From 29aa07c136a1b08709e00df60f56d473e9f94015 Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Tue, 22 Jan 2013 12:47:23 -0600
+Subject: [PATCH 063/338] intelli_plug: make it gcc-4.6.x eabi compatible :p
+
+Signed-off-by: faux123 <reioux@gmail.com>
+---
+ arch/arm/mach-msm/intelli_plug.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-msm/intelli_plug.c b/arch/arm/mach-msm/intelli_plug.c
+index 9374ecb..6fd9cb5 100644
+--- a/arch/arm/mach-msm/intelli_plug.c
++++ b/arch/arm/mach-msm/intelli_plug.c
+@@ -98,7 +98,7 @@ static unsigned int calculate_thread_stats(void)
+ 	return nr_run;
+ }
+ 
+-static void intelli_plug_work_fn(struct work_struct *work)
++static void __cpuinit intelli_plug_work_fn(struct work_struct *work)
+ {
+ 	unsigned int nr_run_stat;
+ 
+@@ -173,7 +173,7 @@ static void intelli_plug_early_suspend(struct early_suspend *handler)
+ 	}
+ }
+ 
+-static void intelli_plug_late_resume(struct early_suspend *handler)
++static void __cpuinit intelli_plug_late_resume(struct early_suspend *handler)
+ {
+ 	int num_of_active_cores;
+ 	int i;
+@@ -199,7 +199,7 @@ static void intelli_plug_late_resume(struct early_suspend *handler)
+ 		msecs_to_jiffies(10));
+ }
+ 
+-static struct early_suspend intelli_plug_early_suspend_struct = {
++static struct early_suspend intelli_plug_early_suspend_struct_driver = {
+ 	.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 10,
+ 	.suspend = intelli_plug_early_suspend,
+ 	.resume = intelli_plug_late_resume,
+@@ -223,7 +223,7 @@ int __init intelli_plug_init(void)
+ 	schedule_delayed_work_on(0, &intelli_plug_work, delay);
+ 
+ #ifdef CONFIG_HAS_EARLYSUSPEND
+-	register_early_suspend(&intelli_plug_early_suspend_struct);
++	register_early_suspend(&intelli_plug_early_suspend_struct_driver);
+ #endif
+ 	return 0;
+ }
+-- 
+1.8.1.2
+

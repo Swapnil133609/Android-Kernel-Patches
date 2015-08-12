@@ -1,0 +1,136 @@
+From 4a2232735d4ad2a71ab401ef65631d4177b0e0c5 Mon Sep 17 00:00:00 2001
+From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+Date: Fri, 9 Aug 2013 12:41:29 -0500
+Subject: [PATCH 194/507] fs/sync: Make sync() satisfy many requests with one
+ invocation
+
+Dave Jones reported RCU stalls, overly long hrtimer interrupts, and
+amazingly long NMI handlers from a trinity-induced workload involving
+lots of concurrent sync() calls (https://lkml.org/lkml/2013/7/23/369).
+There are any number of things that one might do to make sync() behave
+better under high levels of contention, but it is also the case that
+multiple concurrent sync() system calls can be satisfied by a single
+sys_sync() invocation.
+
+Given that this situation is reminiscent of rcu_barrier(), this commit
+applies the rcu_barrier() approach to sys_sync().  This approach uses
+a global mutex and a sequence counter.  The mutex is held across the
+sync() operation, which eliminates contention between concurrent sync()
+operations.  The counter is incremented at the beginning and end of
+each sync() operation, so that it is odd while a sync() operation is in
+progress and even otherwise, just like sequence locks.
+
+The code that used to be in sys_sync() is now in do_sync(), and sys_sync()
+now handles the concurrency.  The sys_sync() function first takes a
+snapshot of the counter, then acquires the mutex, and then takes another
+snapshot of the counter.  If the values of the two snapshots indicate that
+a full do_sync() executed during the mutex acquisition, the sys_sync()
+function releases the mutex and returns ("Our work is done!").  Otherwise,
+sys_sync() increments the counter, invokes do_sync(), and increments
+the counter again.
+
+This approach allows a single call to do_sync() to satisfy an arbitrarily
+large number of sync() system calls, which should eliminate issues due
+to large numbers of concurrent invocations of the sync() system call.
+
+Changes since v1 (https://lkml.org/lkml/2013/7/24/683):
+
+o	Add a pair of memory barriers to keep the increments from
+	bleeding into the do_sync() code.  (The failure probability
+	is insanely low, but when you have several hundred million
+	devices running Linux, you can expect several hundred instances
+	of one-in-a-million failures.)
+
+o	Actually CC some people who have experience in this area.
+
+Reported-by: Dave Jones <davej@redhat.com>
+Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+Cc: Alexander Viro <viro@zeniv.linux.org.uk>
+Cc: Christoph Hellwig <hch@lst.de>
+Cc: Jan Kara <jack@suse.cz>
+Cc: Curt Wohlgemuth <curtw@google.com>
+Cc: Jens Axboe <jaxboe@fusionio.com>
+Cc: linux-fsdevel@vger.kernel.org
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ fs/sync.c |   56 +++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 55 insertions(+), 1 deletion(-)
+
+diff --git a/fs/sync.c b/fs/sync.c
+index 0e8db93..e4bcc06 100644
+--- a/fs/sync.c
++++ b/fs/sync.c
+@@ -95,13 +95,67 @@ static void sync_filesystems(int wait)
+  * sync everything.  Start out by waking pdflush, because that writes back
+  * all queues in parallel.
+  */
+-SYSCALL_DEFINE0(sync)
++static void do_sync(void)
+ {
+ 	wakeup_flusher_threads(0, WB_REASON_SYNC);
+ 	sync_filesystems(0);
+ 	sync_filesystems(1);
+ 	if (unlikely(laptop_mode))
+ 		laptop_sync_completion();
++	return;
++}
++
++static DEFINE_MUTEX(sync_mutex);	/* One do_sync() at a time. */
++static unsigned long sync_seq;		/* Many sync()s from one do_sync(). */
++					/*  Overflow harmless, extra wait. */
++
++/*
++ * Only allow one task to do sync() at a time, and further allow
++ * concurrent sync() calls to be satisfied by a single do_sync()
++ * invocation.
++ */
++SYSCALL_DEFINE0(sync)
++{
++	unsigned long snap;
++	unsigned long snap_done;
++
++	snap = ACCESS_ONCE(sync_seq);
++	smp_mb();  /* Prevent above from bleeding into critical section. */
++	mutex_lock(&sync_mutex);
++	snap_done = sync_seq;
++
++	/*
++	 * If the value in snap is odd, we need to wait for the current
++	 * do_sync() to complete, then wait for the next one, in other
++	 * words, we need the value of snap_done to be three larger than
++	 * the value of snap.  On the other hand, if the value in snap is
++	 * even, we only have to wait for the next request to complete,
++	 * in other words, we need the value of snap_done to be only two
++	 * greater than the value of snap.  The "(snap + 3) & 0x1" computes
++	 * this for us (thank you, Linus!).
++	 */
++	if (ULONG_CMP_GE(snap_done, (snap + 3) & ~0x1)) {
++		/*
++		 * A full do_sync() executed between our two fetches from
++		 * sync_seq, so our work is done!
++		 */
++		smp_mb(); /* Order test with caller's subsequent code. */
++		mutex_unlock(&sync_mutex);
++		return 0;
++	}
++
++	/* Record the start of do_sync(). */
++	ACCESS_ONCE(sync_seq)++;
++	WARN_ON_ONCE((sync_seq & 0x1) != 1);
++	smp_mb(); /* Keep prior increment out of do_sync(). */
++
++	do_sync();
++
++	/* Record the end of do_sync(). */
++	smp_mb(); /* Keep subsequent increment out of do_sync(). */
++	ACCESS_ONCE(sync_seq)++;
++	WARN_ON_ONCE((sync_seq & 0x1) != 0);
++	mutex_unlock(&sync_mutex);
+ 	return 0;
+ }
+ 
+-- 
+1.7.9.5
+

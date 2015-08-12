@@ -1,0 +1,34 @@
+From 00acb436fc948f9b58a28ef4923ea4cfd1d52c02 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sat, 2 Nov 2013 18:34:34 -0500
+Subject: [PATCH 001/338] gitignore: add user files
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ .gitignore | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/.gitignore b/.gitignore
+index 57af07c..d39c4d5 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -63,6 +63,7 @@ include/config
+ include/linux/version.h
+ include/generated
+ arch/*/include/generated
++arch/arm/mach-msm/smd_rpc_sym.c
+ 
+ # stgit generated dirs
+ patches-*
+@@ -84,3 +85,8 @@ GTAGS
+ *.orig
+ *~
+ \#*#
++
++#user ignores
++mkzip.sh
++out/
++ramfs/
+-- 
+1.8.1.2
+

@@ -1,0 +1,42 @@
+From e3eb8bb41710cdb8eda6e8ea7e806bcc409d62a0 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sun, 8 Sep 2013 17:16:42 -0500
+Subject: [PATCH 178/338] sched: change update_sg_lb_stats to h_nr_running
+
+Date    Sun, 18 Aug 2013 16:25:19 +0800
+
+Since update_sg_lb_stats is used to calculate sched_group load
+difference of cfs type task, it should use h_nr_running instead of
+nr_running of rq.
+Signed-off-by: Lei Wen <leiwen@marvell.com>
+bacported to Linux 3.4 by faux123
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ kernel/sched/fair.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 2ab3809..cba964b 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -3831,14 +3831,14 @@ static inline void update_sg_lb_stats(struct sched_domain *sd,
+ 					/ cpu_rq(i)->cpu_power;
+ 			if (scaled_load > max_cpu_load) {
+ 				max_cpu_load = scaled_load;
+-				max_nr_running = rq->nr_running;
++				max_nr_running = rq->cfs.h_nr_running;
+ 			}
+ 			if (min_cpu_load > scaled_load)
+ 				min_cpu_load = scaled_load;
+ 		}
+ 
+ 		sgs->group_load += load;
+-		sgs->sum_nr_running += rq->nr_running;
++		sgs->sum_nr_running += rq->cfs.h_nr_running;
+ 		sgs->sum_weighted_load += weighted_cpuload(i);
+ 		if (idle_cpu(i))
+ 			sgs->idle_cpus++;
+-- 
+1.8.1.2
+

@@ -1,0 +1,48 @@
+From b19eaef6af6b590aab78b8f8c1baf31948b2e38b Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Wed, 6 Mar 2013 19:41:34 -0600
+Subject: [PATCH 090/338] intelli_plug: slow down hotplug activity from 50ms to
+ 200ms
+
+this will reduce the hotplug chaos which may in turn save more power
+
+Signed-off-by: faux123 <reioux@gmail.com>
+
+Conflicts:
+	arch/arm/mach-msm/intelli_plug.c
+---
+ arch/arm/mach-msm/intelli_plug.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-msm/intelli_plug.c b/arch/arm/mach-msm/intelli_plug.c
+index d029e25..30d2c5f 100644
+--- a/arch/arm/mach-msm/intelli_plug.c
++++ b/arch/arm/mach-msm/intelli_plug.c
+@@ -22,18 +22,18 @@
+ #include <linux/rq_stats.h>
+ 
+ #define INTELLI_PLUG_MAJOR_VERSION	1
+-#define INTELLI_PLUG_MINOR_VERSION	4
++#define INTELLI_PLUG_MINOR_VERSION	5
+ 
+ #define DEF_SAMPLING_RATE		(50000)
+-#define DEF_SAMPLING_MS			(50)
++#define DEF_SAMPLING_MS			(200)
+ 
+-#define DUAL_CORE_PERSISTENCE		50
+-#define TRI_CORE_PERSISTENCE		40
+-#define QUAD_CORE_PERSISTENCE		30
++#define DUAL_CORE_PERSISTENCE		15
++#define TRI_CORE_PERSISTENCE		12
++#define QUAD_CORE_PERSISTENCE		10
+ 
+ #define RUN_QUEUE_THRESHOLD		38
+ 
+-#define CPU_DOWN_FACTOR			2
++#define CPU_DOWN_FACTOR			3
+ 
+ static DEFINE_MUTEX(intelli_plug_mutex);
+ 
+-- 
+1.8.1.2
+

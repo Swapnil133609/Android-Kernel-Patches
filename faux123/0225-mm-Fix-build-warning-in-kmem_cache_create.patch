@@ -1,0 +1,42 @@
+From d09d15031bb2028c3aa1ece68cf2af90617a7165 Mon Sep 17 00:00:00 2001
+From: Shuah Khan <shuah.khan@hp.com>
+Date: Fri, 13 Jul 2012 17:12:05 -0600
+Subject: [PATCH 225/338] mm: Fix build warning in kmem_cache_create()
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The label oops is used in CONFIG_DEBUG_VM ifdef block and is defined
+outside ifdef CONFIG_DEBUG_VM block. This results in the following
+build warning when built with CONFIG_DEBUG_VM disabled. Fix to move
+label oops definition to inside a CONFIG_DEBUG_VM block.
+
+mm/slab_common.c: In function ‘kmem_cache_create’:
+mm/slab_common.c:101:1: warning: label ‘oops’ defined but not used
+[-Wunused-label]
+
+Signed-off-by: Shuah Khan <shuah.khan@hp.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+
+Conflicts:
+	mm/slab_common.c
+---
+ mm/slab_common.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/mm/slab_common.c b/mm/slab_common.c
+index 639378f..aa3ca5b 100644
+--- a/mm/slab_common.c
++++ b/mm/slab_common.c
+@@ -97,6 +97,7 @@ struct kmem_cache *kmem_cache_create(const char *name, size_t size, size_t align
+ #endif
+ 
+ 	s = __kmem_cache_create(name, size, align, flags, ctor);
++
+ #ifdef CONFIG_DEBUG_VM
+ oops:
+ #endif
+-- 
+1.8.1.2
+

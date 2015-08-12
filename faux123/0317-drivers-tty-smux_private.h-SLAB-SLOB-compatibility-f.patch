@@ -1,0 +1,30 @@
+From ced362c0acfcefa0964d01f85dd025a1e70da8e9 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Mon, 2 Sep 2013 14:29:47 -0500
+Subject: [PATCH 317/507] drivers/tty/smux_private.h: SLAB/SLOB compatibility
+ fixup
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/tty/smux_private.h |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/tty/smux_private.h b/drivers/tty/smux_private.h
+index b9a2e89..2e538de 100644
+--- a/drivers/tty/smux_private.h
++++ b/drivers/tty/smux_private.h
+@@ -15,6 +15,10 @@
+ #ifndef SMUX_PRIVATE_H
+ #define SMUX_PRIVATE_H
+ 
++#if defined (CONFIG_SLAB) || defined (CONFIG_SLOB)
++#include <linux/workqueue.h>
++#endif
++
+ #define SMUX_MAX_PKT_SIZE   8192
+ #define SMUX_BROADCAST_LCID 0xFF
+ 
+-- 
+1.7.9.5
+

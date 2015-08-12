@@ -1,0 +1,38 @@
+From 56b94061a091995ec591994629b5b35898bd2808 Mon Sep 17 00:00:00 2001
+From: Ajay Dudani <adudani@codeaurora.org>
+Date: Sat, 12 Oct 2013 16:21:57 -0700
+Subject: [PATCH 380/507] msm: mdss: Validate mixer/ctl are not null
+
+mdss_mdp_wb_mixer_destroy could theoretically be
+called with null mixer or ctl, which would cause
+a null pointer dereference. Adding a check to
+prevent this from happening.
+
+Change-Id: I376c449daf05c8ca4ebb789d402575598ee59d86
+CRs-Fixed: 551787
+Signed-off-by: Casey Piper <cpiper@codeaurora.org>
+Signed-off-by: Ajay Dudani <adudani@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_mdp_ctl.c |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/video/msm/mdss/mdss_mdp_ctl.c b/drivers/video/msm/mdss/mdss_mdp_ctl.c
+index 236b919..f130867 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_ctl.c
++++ b/drivers/video/msm/mdss/mdss_mdp_ctl.c
+@@ -650,6 +650,11 @@ int mdss_mdp_wb_mixer_destroy(struct mdss_mdp_mixer *mixer)
+ {
+ 	struct mdss_mdp_ctl *ctl;
+ 
++	if (!mixer || !mixer->ctl) {
++		pr_err("invalid ctl handle\n");
++		return -ENODEV;
++	}
++
+ 	ctl = mixer->ctl;
+ 
+ 	pr_debug("destroy ctl=%d mixer=%d\n", ctl->num, mixer->num);
+-- 
+1.7.9.5
+

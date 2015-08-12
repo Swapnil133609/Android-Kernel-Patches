@@ -1,0 +1,134 @@
+From 77782b703349f4a60b754d176336f3e770a6f27d Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Sun, 21 Apr 2013 22:31:24 -0700
+Subject: [PATCH 047/338] overall_stats: make dual/quad core stats configurable
+ via meunconfig
+
+Signed-off-by: faux123 <reioux@gmail.com>
+---
+ drivers/cpufreq/Kconfig         |  8 ++++++++
+ drivers/cpufreq/cpufreq_stats.c | 22 ++++++++++++++++------
+ 2 files changed, 24 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+index 3d65c40..d77174c 100644
+--- a/drivers/cpufreq/Kconfig
++++ b/drivers/cpufreq/Kconfig
+@@ -42,6 +42,14 @@ config CPU_FREQ_STAT_DETAILS
+ 
+ 	  If in doubt, say N.
+ 
++config QUAD_CORES_SOC_STAT
++	bool "Overall statistic details for quadcore SOCs"
++	depends on CPU_FREQ_STAT
++	default n
++	help
++	  This will show overall CPU frequency statistics via sysfs.
++	  If this option is not set, it defaults to dual core stats
++
+ choice
+ 	prompt "Default CPUFreq governor"
+ 	default CPU_FREQ_DEFAULT_GOV_USERSPACE if CPU_FREQ_SA1100 || CPU_FREQ_SA1110
+diff --git a/drivers/cpufreq/cpufreq_stats.c b/drivers/cpufreq/cpufreq_stats.c
+index ef63fc6..effaeae 100644
+--- a/drivers/cpufreq/cpufreq_stats.c
++++ b/drivers/cpufreq/cpufreq_stats.c
+@@ -30,16 +30,18 @@ static struct freq_attr _attr_##_name = {\
+ 	.show = _show,\
+ };
+ 
+-#define CPU_FREQ_LEVEL_NUMBER 20
++#define CPU_FREQ_LEVEL_NUMBER	34
+ 
+ static cputime64_t cpu0_time_in_state[CPU_FREQ_LEVEL_NUMBER] = {0};
+ static unsigned int cpu0_total_trans = 0;
+ static cputime64_t cpu1_time_in_state[CPU_FREQ_LEVEL_NUMBER] = {0};
+ static unsigned int cpu1_total_trans = 0;
++#ifdef CONFIG_QUAD_CORES_SOC_STAT
+ static cputime64_t cpu2_time_in_state[CPU_FREQ_LEVEL_NUMBER] = {0};
+ static unsigned int cpu2_total_trans = 0;
+ static cputime64_t cpu3_time_in_state[CPU_FREQ_LEVEL_NUMBER] = {0};
+ static unsigned int cpu3_total_trans = 0;
++#endif
+ 
+ struct cpufreq_stats {
+ 	unsigned int cpu;
+@@ -87,6 +89,7 @@ static int cpufreq_stats_update(unsigned int cpu)
+ 		cpu1_time_in_state[stat->last_index] =
+ 			cputime64_add(cpu1_time_in_state[stat->last_index],
+ 			cputime_sub(cur_time, stat->last_time));
++#ifdef CONFIG_QUAD_CORES_SOC_STAT
+ 	else if (cpu == 2)
+ 		cpu2_time_in_state[stat->last_index] =
+ 			cputime64_add(cpu2_time_in_state[stat->last_index],
+@@ -95,7 +98,7 @@ static int cpufreq_stats_update(unsigned int cpu)
+ 		cpu3_time_in_state[stat->last_index] =
+ 			cputime64_add(cpu3_time_in_state[stat->last_index],
+ 			cputime_sub(cur_time, stat->last_time));
+-
++#endif
+ 	stat->last_time = cur_time;
+ 	spin_unlock(&cpufreq_stats_lock);
+ 	return 0;
+@@ -111,12 +114,17 @@ static ssize_t show_total_trans(struct cpufreq_policy *policy, char *buf)
+ }
+ 
+ static ssize_t show_overall_total_trans(struct kobject *kobj,
+-                                      struct attribute *attr, char *buf)
++						struct attribute *attr, char *buf)
+ {
++#ifndef CONFIG_QUAD_CORES_SOC_STAT
++        return sprintf(buf, "%d\n%d\n", cpu0_total_trans,
++					cpu1_total_trans);
++#else
+         return sprintf(buf, "%d\n%d\n%d\n%d\n", cpu0_total_trans,
+ 						cpu1_total_trans,
+ 						cpu2_total_trans,
+ 						cpu3_total_trans);
++#endif
+ }
+ 
+ static ssize_t show_time_in_state(struct cpufreq_policy *policy, char *buf)
+@@ -136,7 +144,7 @@ static ssize_t show_time_in_state(struct cpufreq_policy *policy, char *buf)
+ }
+ 
+ static ssize_t show_overall_time_in_state(struct kobject *kobj,
+-                                      struct attribute *attr, char *buf)
++						struct attribute *attr, char *buf)
+ {
+ 	ssize_t len = 0;
+ 	int i;
+@@ -157,6 +165,7 @@ static ssize_t show_overall_time_in_state(struct kobject *kobj,
+ 		cputime = cputime64_to_clock_t(cpu1_time_in_state[i]);
+ 		len += sprintf(buf + len, "%u %llu\n", stat->freq_table[i], cputime);
+ 	}
++#ifdef CONFIG_QUAD_CORES_SOC_STAT
+ 	for (i = 0; i < stat->state_num; i++) {
+ 		cputime = cputime64_to_clock_t(cpu2_time_in_state[i]);
+ 		len += sprintf(buf + len, "%u %llu\n", stat->freq_table[i], cputime);
+@@ -165,7 +174,7 @@ static ssize_t show_overall_time_in_state(struct kobject *kobj,
+ 		cputime = cputime64_to_clock_t(cpu3_time_in_state[i]);
+ 		len += sprintf(buf + len, "%u %llu\n", stat->freq_table[i], cputime);
+ 	}
+-
++#endif
+ 	return len;
+ }
+ 
+@@ -421,11 +430,12 @@ static int cpufreq_stat_notifier_trans(struct notifier_block *nb,
+ 		cpu0_total_trans++;
+ 	else if (freq->cpu == 1)
+ 		cpu1_total_trans++;
++#ifdef CONFIG_QUAD_CORES_SOC_STAT
+ 	else if (freq->cpu == 2)
+ 		cpu2_total_trans++;
+ 	else if (freq->cpu == 3)
+ 		cpu3_total_trans++;
+-
++#endif
+ 	spin_unlock(&cpufreq_stats_lock);
+ 	return 0;
+ }
+-- 
+1.8.1.2
+

@@ -1,0 +1,31 @@
+From 88cb00acaaad7079d4abb58fced5b1020e945703 Mon Sep 17 00:00:00 2001
+From: Dave Kleikamp <dave.kleikamp@oracle.com>
+Date: Sat, 2 Feb 2013 19:47:42 -0800
+Subject: [PATCH 136/338] iov_iter: move into its own file (bug fix)
+
+I found the problem. iov_iter_shorten() wasn't setting i->count to the new
+value.
+
+This fixes it. I'll fix the patchset tomorrow.
+
+Thanks,
+Shaggy
+---
+ fs/iov-iter.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/fs/iov-iter.c b/fs/iov-iter.c
+index ac2d96e..ade8c11 100644
+--- a/fs/iov-iter.c
++++ b/fs/iov-iter.c
+@@ -370,6 +370,7 @@ static int ii_iovec_shorten(struct iov_iter *i, size_t count)
+ {
+ 	struct iovec *iov = (struct iovec *)i->data;
+ 	i->nr_segs = iov_shorten(iov, i->nr_segs, count);
++	i->count = min(i->count, count);
+ 	return 0;
+ }
+ 
+-- 
+1.8.1.2
+

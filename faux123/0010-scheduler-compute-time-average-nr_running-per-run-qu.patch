@@ -1,0 +1,139 @@
+From a759fabe8b96a4f4f5e595ea51390cc64198a1cb Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sun, 20 Oct 2013 22:33:09 -0500
+Subject: [PATCH 010/338] scheduler: compute time-average nr_running per
+ run-queue
+
+Compute the time-average number of running tasks per run-queue for a
+trailing window of a fixed time period. The detla add/sub to the
+average value is weighted by the amount of time per nr_running value
+relative to the total measurement period.
+
+Change-Id: I076e24ff4ed65bed3b8dd8d2b279a503318071ff
+Signed-off-by: Diwakar Tundlam <dtundlam@nvidia.com>
+(cherry picked from commit 3a12d7499cee352e8a46eaf700259ba3c733f0e3)
+Reviewed-on: http://git-master/r/111635
+Reviewed-by: Automatic_Commit_Validation_User
+Reviewed-by: Sai Gurrappadi <sgurrappadi@nvidia.com>
+Tested-by: Sai Gurrappadi <sgurrappadi@nvidia.com>
+Reviewed-by: Peter Boonstoppel <pboonstoppel@nvidia.com>
+Reviewed-by: Yu-Huan Hsu <yhsu@nvidia.com>
+
+forward ported to Linux 3.4 for use on S-800
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ include/linux/sched.h |  1 +
+ kernel/sched/core.c   | 10 ++++++++++
+ kernel/sched/debug.c  |  3 +++
+ kernel/sched/sched.h  | 31 +++++++++++++++++++++++++++++++
+ 4 files changed, 45 insertions(+)
+
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index ab4e4f5..65bfa1e 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -139,6 +139,7 @@ extern int nr_processes(void);
+ extern unsigned long nr_running(void);
+ extern unsigned long nr_uninterruptible(void);
+ extern unsigned long nr_iowait(void);
++extern unsigned long avg_nr_running(void);
+ extern unsigned long nr_iowait_cpu(int cpu);
+ extern unsigned long this_cpu_load(void);
+ 
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 7236a1f..951b0fa 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -2166,6 +2166,16 @@ unsigned long nr_iowait(void)
+ 	return sum;
+ }
+ 
++unsigned long avg_nr_running(void)
++{
++	unsigned long i, sum = 0;
++
++	for_each_online_cpu(i)
++		sum += cpu_rq(i)->ave_nr_running;
++
++	return sum;
++}
++
+ unsigned long nr_iowait_cpu(int cpu)
+ {
+ 	struct rq *this = cpu_rq(cpu);
+diff --git a/kernel/sched/debug.c b/kernel/sched/debug.c
+index 09acaa1..06d172e 100644
+--- a/kernel/sched/debug.c
++++ b/kernel/sched/debug.c
+@@ -266,6 +266,9 @@ static void print_cpu(struct seq_file *m, int cpu)
+ 	SEQ_printf(m, "  .%-30s: %Ld.%06ld\n", #x, SPLIT_NS(rq->x))
+ 
+ 	P(nr_running);
++	SEQ_printf(m, "  .%-30s: %d.%03d   \n", "ave_nr_running",
++		   rq->ave_nr_running / FIXED_1,
++		   ((rq->ave_nr_running % FIXED_1) * 1000) / FIXED_1);
+ 	SEQ_printf(m, "  .%-30s: %lu\n", "load",
+ 		   rq->load.weight);
+ 	P(nr_switches);
+diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+index 55f6d9c..4bb4221 100644
+--- a/kernel/sched/sched.h
++++ b/kernel/sched/sched.h
+@@ -365,6 +365,10 @@ struct rq {
+ #endif
+ 	int skip_clock_update;
+ 
++	/* time-based average load */
++	u64 nr_last_stamp;
++	unsigned int ave_nr_running;
++
+ 	/* capture load from *all* tasks on this cpu: */
+ 	struct load_weight load;
+ 	unsigned long nr_load_updates;
+@@ -924,15 +928,42 @@ extern void cpuacct_charge(struct task_struct *tsk, u64 cputime);
+ static inline void cpuacct_charge(struct task_struct *tsk, u64 cputime) {}
+ #endif
+ 
++/* 27 ~= 134217728ns = 134.2ms
++ * 26 ~=  67108864ns =  67.1ms
++ * 25 ~=  33554432ns =  33.5ms
++ * 24 ~=  16777216ns =  16.8ms
++ */
++#define NR_AVE_PERIOD_EXP	27
++#define NR_AVE_SCALE(x)		((x) << FSHIFT)
++#define NR_AVE_PERIOD		(1 << NR_AVE_PERIOD_EXP)
++#define NR_AVE_DIV_PERIOD(x)	((x) >> NR_AVE_PERIOD_EXP)
++
++static inline void do_avg_nr_running(struct rq *rq)
++{
++	s64 nr, deltax;
++
++	deltax = rq->clock_task - rq->nr_last_stamp;
++	rq->nr_last_stamp = rq->clock_task;
++	nr = NR_AVE_SCALE(rq->nr_running);
++
++	if (deltax > NR_AVE_PERIOD)
++		rq->ave_nr_running = nr;
++	else
++		rq->ave_nr_running +=
++			NR_AVE_DIV_PERIOD(deltax * (nr - rq->ave_nr_running));
++}
++
+ static inline void inc_nr_running(struct rq *rq)
+ {
+ 	sched_update_nr_prod(cpu_of(rq), rq->nr_running, true);
++	do_avg_nr_running(rq);
+ 	rq->nr_running++;
+ }
+ 
+ static inline void dec_nr_running(struct rq *rq)
+ {
+ 	sched_update_nr_prod(cpu_of(rq), rq->nr_running, false);
++	do_avg_nr_running(rq);
+ 	rq->nr_running--;
+ }
+ 
+-- 
+1.8.1.2
+

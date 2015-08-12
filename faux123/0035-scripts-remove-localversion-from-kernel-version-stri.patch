@@ -1,0 +1,28 @@
+From 769b17e41d2999325c400c77ab488847def21577 Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Thu, 10 Jan 2013 14:18:34 -0600
+Subject: [PATCH 035/507] scripts: remove localversion "+" from kernel version
+ strings
+
+Signed-off-by: faux123 <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ scripts/setlocalversion |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/scripts/setlocalversion b/scripts/setlocalversion
+index 857ea4f..1313816 100755
+--- a/scripts/setlocalversion
++++ b/scripts/setlocalversion
+@@ -184,7 +184,7 @@ else
+ 	# LOCALVERSION= is not specified
+ 	if test "${LOCALVERSION+set}" != "set"; then
+ 		scm=$(scm_version --short)
+-		res="$res${scm:++}"
++		res="$res"
+ 	fi
+ fi
+ 
+-- 
+1.7.9.5
+

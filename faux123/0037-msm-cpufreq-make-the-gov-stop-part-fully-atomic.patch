@@ -1,0 +1,47 @@
+From c2d76a0ef5a2869c4999760bea02f94c331b087f Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Sun, 3 Mar 2013 10:21:27 -0600
+Subject: [PATCH 037/338] msm: cpufreq: make the gov stop part fully atomic
+
+In the function cpufreq_governor_dbs, the case CPUFREQ_GOV_STOP
+is not completely atomic. The removal of sysfs is outside the
+critical path. If a START/STOP done frequently from user space
+then there is chance of adding the sysfs interface before removal.
+This creates a warning from sysfs saying creating an already
+existing entry.
+
+Also once it fails to create, cpufreq_governor_dbs returns with
+error code. The dbs_enable value is incremented which is not
+rolled back and cpufreq core tries to set the old
+governor. This might create further problems.
+
+Hence the removal of sysfs entry should happen in the critical
+path.
+
+CRs-fixed: 440969
+Change-Id: I98891756caf2ce0b85e39e9b4f58034af1ed97ce
+Signed-off-by: Venkat Devarasetty <vdevaras@codeaurora.org>
+Signed-off-by: faux123 <reioux@gmail.com>
+---
+ drivers/cpufreq/cpufreq_intellidemand.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/cpufreq_intellidemand.c b/drivers/cpufreq/cpufreq_intellidemand.c
+index 39ee3e7..60ca231 100644
+--- a/drivers/cpufreq/cpufreq_intellidemand.c
++++ b/drivers/cpufreq/cpufreq_intellidemand.c
+@@ -1851,10 +1851,10 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
+ 		this_dbs_info->cur_policy = NULL;
+ 		if (!cpu)
+ 			input_unregister_handler(&dbs_input_handler);
+-		mutex_unlock(&dbs_mutex);
+ 		if (!dbs_enable)
+ 			sysfs_remove_group(cpufreq_global_kobject,
+ 					   &dbs_attr_group);
++		mutex_unlock(&dbs_mutex);
+ 
+ 		break;
+ 
+-- 
+1.8.1.2
+

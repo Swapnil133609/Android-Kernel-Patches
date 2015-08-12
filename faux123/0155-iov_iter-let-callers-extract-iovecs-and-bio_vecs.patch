@@ -1,0 +1,61 @@
+From 725b6a74fb321779c01aeb89e7014271a2197220 Mon Sep 17 00:00:00 2001
+From: Zach Brown <zab@zabbo.net>
+Date: Mon, 28 Jan 2013 11:23:10 -0600
+Subject: [PATCH 155/507] iov_iter: let callers extract iovecs and bio_vecs
+
+direct IO treats memory from user iovecs and memory from arrays of
+kernel pages very differently.  User memory is pinned and worked with in
+batches while kernel pages are always pinned and don't require
+additional processing.
+
+Rather than try and provide an abstraction that includes these
+different behaviours we let direct IO extract the memory structs and
+hand them to the existing code.
+
+Signed-off-by: Dave Kleikamp <dave.kleikamp@oracle.com>
+Cc: Zach Brown <zab@zabbo.net>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/fs.h |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/include/linux/fs.h b/include/linux/fs.h
+index 71ed761..d0206d0 100644
+--- a/include/linux/fs.h
++++ b/include/linux/fs.h
+@@ -611,6 +611,17 @@ static inline void iov_iter_init_bvec(struct iov_iter *i,
+ 
+ 	iov_iter_advance(i, written);
+ }
++
++static inline int iov_iter_has_bvec(struct iov_iter *i)
++{
++	return i->ops == &ii_bvec_ops;
++}
++
++static inline struct bio_vec *iov_iter_bvec(struct iov_iter *i)
++{
++	BUG_ON(!iov_iter_has_bvec(i));
++	return (struct bio_vec *)i->data;
++}
+ #endif
+ 
+ extern struct iov_iter_ops ii_iovec_ops;
+@@ -628,8 +639,14 @@ static inline void iov_iter_init(struct iov_iter *i,
+ 	iov_iter_advance(i, written);
+ }
+ 
++static inline int iov_iter_has_iovec(struct iov_iter *i)
++{
++	return i->ops == &ii_iovec_ops;
++}
++
+ static inline struct iovec *iov_iter_iovec(struct iov_iter *i)
+ {
++	BUG_ON(!iov_iter_has_iovec(i));
+ 	return (struct iovec *)i->data;
+ }
+ 
+-- 
+1.7.9.5
+

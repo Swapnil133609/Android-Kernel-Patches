@@ -1,0 +1,26 @@
+From 90f1342f5ecd57106dd4e755db1862cc6871f544 Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Sat, 2 Feb 2013 09:25:16 -0800
+Subject: [PATCH 080/338] decompress_unlzo: fix compilation error
+
+Signed-off-by: faux123 <reioux@gmail.com>
+---
+ lib/decompress_unlzo.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/decompress_unlzo.c b/lib/decompress_unlzo.c
+index 4531294..960183d 100644
+--- a/lib/decompress_unlzo.c
++++ b/lib/decompress_unlzo.c
+@@ -31,7 +31,7 @@
+  */
+ 
+ #ifdef STATIC
+-#include "lzo/lzo1x_decompress.c"
++#include "lzo/lzo1x_decompress_safe.c"
+ #else
+ #include <linux/decompress/unlzo.h>
+ #endif
+-- 
+1.8.1.2
+

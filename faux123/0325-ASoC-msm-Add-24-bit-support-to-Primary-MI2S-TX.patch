@@ -1,0 +1,258 @@
+From ecd2084c4e12e2342142a1a494282684d540fe98 Mon Sep 17 00:00:00 2001
+From: Damir Didjusto <damird@codeaurora.org>
+Date: Mon, 17 Jun 2013 20:55:53 -0700
+Subject: [PATCH 325/338] ASoC: msm: Add 24 bit support to Primary MI2S TX
+
+Add 24 bit support to Primary MI2S Tx. Add
+capability to specify bits per sample to DSP.
+
+Change-Id: I928f37c7b76ffea735365b164d52ceabd88e77e6
+Signed-off-by: Damir Didjusto <damird@codeaurora.org>
+---
+ include/sound/q6asm-v2.h              |  7 +++++++
+ sound/soc/codecs/msm_stub.c           |  5 +++--
+ sound/soc/msm/msm-dai-fe.c            |  3 ++-
+ sound/soc/msm/qdsp6v2/msm-dai-q6-v2.c | 19 +++++++++++++++---
+ sound/soc/msm/qdsp6v2/msm-pcm-q6-v2.c | 23 ++++++++++++++++++----
+ sound/soc/msm/qdsp6v2/q6asm.c         | 37 +++++++++++++++++++++++++++--------
+ 6 files changed, 76 insertions(+), 18 deletions(-)
+
+diff --git a/include/sound/q6asm-v2.h b/include/sound/q6asm-v2.h
+index 59cf47f..5b52a64 100644
+--- a/include/sound/q6asm-v2.h
++++ b/include/sound/q6asm-v2.h
+@@ -193,6 +193,9 @@ int q6asm_audio_client_buf_free_contiguous(unsigned int dir,
+ int q6asm_open_read(struct audio_client *ac, uint32_t format
+ 		/*, uint16_t bits_per_sample*/);
+ 
++int q6asm_open_read_v2(struct audio_client *ac, uint32_t format,
++			uint16_t bits_per_sample);
++
+ int q6asm_open_write(struct audio_client *ac, uint32_t format
+ 		/*, uint16_t bits_per_sample*/);
+ 
+@@ -256,6 +259,10 @@ int q6asm_enc_cfg_blk_aac(struct audio_client *ac,
+ int q6asm_enc_cfg_blk_pcm(struct audio_client *ac,
+ 			uint32_t rate, uint32_t channels);
+ 
++int q6asm_enc_cfg_blk_pcm_format_support(struct audio_client *ac,
++			uint32_t rate, uint32_t channels,
++			uint16_t bits_per_sample);
++
+ int q6asm_set_encdec_chan_map(struct audio_client *ac,
+ 		uint32_t num_channels);
+ 
+diff --git a/sound/soc/codecs/msm_stub.c b/sound/soc/codecs/msm_stub.c
+index 0cbcaf3..bdf1eb4 100644
+--- a/sound/soc/codecs/msm_stub.c
++++ b/sound/soc/codecs/msm_stub.c
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
++/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -36,7 +36,8 @@ static struct snd_soc_dai_driver msm_stub_dais[] = {
+ 			.channels_min = 1,
+ 			.channels_max = 8,
+ 			.rates = SNDRV_PCM_RATE_8000_48000,
+-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
++			.formats = (SNDRV_PCM_FMTBIT_S16_LE |
++				    SNDRV_PCM_FMTBIT_S24_LE),
+ 		},
+ 	},
+ };
+diff --git a/sound/soc/msm/msm-dai-fe.c b/sound/soc/msm/msm-dai-fe.c
+index 5bdefd7..41edb45 100644
+--- a/sound/soc/msm/msm-dai-fe.c
++++ b/sound/soc/msm/msm-dai-fe.c
+@@ -67,7 +67,8 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
+ 			.aif_name = "MM_UL1",
+ 			.rates = (SNDRV_PCM_RATE_8000_48000|
+ 					SNDRV_PCM_RATE_KNOT),
+-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
++			.formats = (SNDRV_PCM_FMTBIT_S16_LE |
++				    SNDRV_PCM_FMTBIT_S24_LE),
+ 			.channels_min = 1,
+ 			.channels_max = 4,
+ 			.rate_min =     8000,
+diff --git a/sound/soc/msm/qdsp6v2/msm-dai-q6-v2.c b/sound/soc/msm/qdsp6v2/msm-dai-q6-v2.c
+index 5c3f9c5..145548e 100644
+--- a/sound/soc/msm/qdsp6v2/msm-dai-q6-v2.c
++++ b/sound/soc/msm/qdsp6v2/msm-dai-q6-v2.c
+@@ -1600,8 +1600,21 @@ static int msm_dai_q6_mi2s_hw_params(struct snd_pcm_substream *substream,
+ 		goto error_invalid_data;
+ 	}
+ 	dai_data->rate = params_rate(params);
+-	dai_data->port_config.i2s.bit_width = 16;
+-	dai_data->bitwidth = 16;
++
++	switch (params_format(params)) {
++	case SNDRV_PCM_FORMAT_S16_LE:
++	case SNDRV_PCM_FORMAT_SPECIAL:
++		dai_data->port_config.i2s.bit_width = 16;
++		dai_data->bitwidth = 16;
++		break;
++	case SNDRV_PCM_FORMAT_S24_LE:
++		dai_data->port_config.i2s.bit_width = 24;
++		dai_data->bitwidth = 24;
++		break;
++	default:
++		return -EINVAL;
++	}
++
+ 	dai_data->port_config.i2s.i2s_cfg_minor_version =
+ 			AFE_API_VERSION_I2S_CONFIG;
+ 	dai_data->port_config.i2s.sample_rate = dai_data->rate;
+@@ -1715,7 +1728,7 @@ static struct snd_soc_dai_driver msm_dai_q6_mi2s_dai = {
+ 	.capture = {
+ 		.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
+ 		SNDRV_PCM_RATE_16000,
+-		.formats = SNDRV_PCM_FMTBIT_S16_LE,
++		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE,
+ 		.rate_min =     8000,
+ 		.rate_max =     48000,
+ 	},
+diff --git a/sound/soc/msm/qdsp6v2/msm-pcm-q6-v2.c b/sound/soc/msm/qdsp6v2/msm-pcm-q6-v2.c
+index 50e8be7..11326f6 100644
+--- a/sound/soc/msm/qdsp6v2/msm-pcm-q6-v2.c
++++ b/sound/soc/msm/qdsp6v2/msm-pcm-q6-v2.c
+@@ -57,7 +57,8 @@ static struct snd_pcm_hardware msm_pcm_hardware_capture = {
+ 				SNDRV_PCM_INFO_MMAP_VALID |
+ 				SNDRV_PCM_INFO_INTERLEAVED |
+ 				SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_RESUME),
+-	.formats =              SNDRV_PCM_FMTBIT_S16_LE,
++	.formats =              (SNDRV_PCM_FMTBIT_S16_LE |
++				SNDRV_PCM_FMTBIT_S24_LE),
+ 	.rates =                SNDRV_PCM_RATE_8000_48000,
+ 	.rate_min =             8000,
+ 	.rate_max =             48000,
+@@ -254,6 +255,8 @@ static int msm_pcm_capture_prepare(struct snd_pcm_substream *substream)
+ 	struct msm_audio *prtd = runtime->private_data;
+ 	int ret = 0;
+ 	int i = 0;
++	uint16_t bits_per_sample = 16;
++
+ 	pr_debug("%s\n", __func__);
+ 	prtd->pcm_size = snd_pcm_lib_buffer_bytes(substream);
+ 	prtd->pcm_count = snd_pcm_lib_period_bytes(substream);
+@@ -266,10 +269,19 @@ static int msm_pcm_capture_prepare(struct snd_pcm_substream *substream)
+ 	if (prtd->enabled)
+ 		return 0;
+ 
++	switch (runtime->format) {
++	case SNDRV_PCM_FORMAT_S16_LE:
++		bits_per_sample = 16;
++		break;
++	case SNDRV_PCM_FORMAT_S24_LE:
++		bits_per_sample = 24;
++		break;
++	}
+ 	pr_debug("Samp_rate = %d\n", prtd->samp_rate);
+ 	pr_debug("Channel = %d\n", prtd->channel_mode);
+-	ret = q6asm_enc_cfg_blk_pcm(prtd->audio_client, prtd->samp_rate,
+-					prtd->channel_mode);
++	ret = q6asm_enc_cfg_blk_pcm_format_support(prtd->audio_client,
++					prtd->samp_rate, prtd->channel_mode,
++					bits_per_sample);
+ 	if (ret < 0)
+ 		pr_debug("%s: cmd cfg pcm was block failed", __func__);
+ 
+@@ -699,10 +711,13 @@ static int msm_pcm_hw_params(struct snd_pcm_substream *substream,
+ 
+ 	/* Capture Path */
+ 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
++		if (params_format(params) == SNDRV_PCM_FORMAT_S24_LE)
++			bits_per_sample = 24;
+ 
+ 		pr_debug("%s Opening %d-ch PCM read stream\n",
+ 			__func__, params_channels(params));
+-		ret = q6asm_open_read(prtd->audio_client, FORMAT_LINEAR_PCM);
++		ret = q6asm_open_read_v2(prtd->audio_client, FORMAT_LINEAR_PCM,
++				bits_per_sample);
+ 		if (ret < 0) {
+ 			pr_err("%s: q6asm_open_read failed\n", __func__);
+ 			q6asm_audio_client_free(prtd->audio_client);
+diff --git a/sound/soc/msm/qdsp6v2/q6asm.c b/sound/soc/msm/qdsp6v2/q6asm.c
+index 6a9ed54..46c7c33 100644
+--- a/sound/soc/msm/qdsp6v2/q6asm.c
++++ b/sound/soc/msm/qdsp6v2/q6asm.c
+@@ -1425,15 +1425,12 @@ static void q6asm_add_mmaphdr(struct audio_client *ac, struct apr_hdr *hdr,
+ 	hdr->pkt_size  = pkt_size;
+ 	return;
+ }
+-int q6asm_open_read(struct audio_client *ac,
+-		uint32_t format)
++static int __q6asm_open_read(struct audio_client *ac,
++		uint32_t format, uint16_t bits_per_sample)
+ {
+ 	int rc = 0x00;
+ 	struct asm_stream_cmd_open_read_v3 open;
+ 
+-	uint16_t bits_per_sample = 16;
+-
+-
+ 	config_debug_fs_reset_index();
+ 
+ 	if ((ac == NULL) || (ac->apr == NULL)) {
+@@ -1508,6 +1505,18 @@ fail_cmd:
+ 	return -EINVAL;
+ }
+ 
++int q6asm_open_read(struct audio_client *ac,
++		uint32_t format)
++{
++	return __q6asm_open_read(ac, format, 16);
++}
++
++int q6asm_open_read_v2(struct audio_client *ac, uint32_t format,
++			uint16_t bits_per_sample)
++{
++	return __q6asm_open_read(ac, format, bits_per_sample);
++}
++
+ static int __q6asm_open_write(struct audio_client *ac, uint32_t format,
+ 		uint16_t bits_per_sample)
+ {
+@@ -1862,8 +1871,8 @@ fail_cmd:
+ 		return rc;
+ }
+ 
+-int q6asm_enc_cfg_blk_pcm(struct audio_client *ac,
+-			uint32_t rate, uint32_t channels)
++static int __q6asm_enc_cfg_blk_pcm(struct audio_client *ac,
++		uint32_t rate, uint32_t channels, uint16_t bits_per_sample)
+ {
+ 	struct asm_multi_channel_pcm_enc_cfg_v2  enc_cfg;
+ 	u8 *channel_mapping;
+@@ -1884,7 +1893,7 @@ int q6asm_enc_cfg_blk_pcm(struct audio_client *ac,
+ 					sizeof(struct asm_enc_cfg_blk_param_v2);
+ 
+ 	enc_cfg.num_channels = channels;
+-	enc_cfg.bits_per_sample = 16;
++	enc_cfg.bits_per_sample = bits_per_sample;
+ 	enc_cfg.sample_rate = rate;
+ 	enc_cfg.is_signed = 1;
+ 	channel_mapping = enc_cfg.channel_mapping;
+@@ -1911,6 +1920,18 @@ fail_cmd:
+ 	return -EINVAL;
+ }
+ 
++int q6asm_enc_cfg_blk_pcm(struct audio_client *ac,
++			uint32_t rate, uint32_t channels)
++{
++	return __q6asm_enc_cfg_blk_pcm(ac, rate, channels, 16);
++}
++
++int q6asm_enc_cfg_blk_pcm_format_support(struct audio_client *ac,
++		uint32_t rate, uint32_t channels, uint16_t bits_per_sample)
++{
++	 return __q6asm_enc_cfg_blk_pcm(ac, rate, channels, bits_per_sample);
++}
++
+ int q6asm_enc_cfg_blk_pcm_native(struct audio_client *ac,
+ 			uint32_t rate, uint32_t channels)
+ {
+-- 
+1.8.1.2
+

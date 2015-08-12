@@ -1,0 +1,62 @@
+From cd8369ceb2765540ced21869ac40bcbd63fe71a7 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 20 Nov 2013 05:00:05 +0100
+Subject: [PATCH 462/507] dt2w: fix triple tap to wake occuring sometimes
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/doubletap2wake.c |   22 +++++++++++++---------
+ 1 file changed, 13 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/input/touchscreen/doubletap2wake.c b/drivers/input/touchscreen/doubletap2wake.c
+index 2016abd..a73e2aa 100644
+--- a/drivers/input/touchscreen/doubletap2wake.c
++++ b/drivers/input/touchscreen/doubletap2wake.c
+@@ -131,6 +131,14 @@ static unsigned int calc_feather(int coord, int prev_coord) {
+ 	return calc_coord;
+ }
+ 
++/* init a new touch */
++static void new_touch(int x, int y) {
++	tap_time_pre = ktime_to_ms(ktime_get());
++	x_pre = x;
++	y_pre = y;
++	touch_nr++;
++}
++
+ /* Doubletap2wake main function */
+ static void detect_doubletap2wake(int x, int y, bool st)
+ {
+@@ -142,23 +150,19 @@ static void detect_doubletap2wake(int x, int y, bool st)
+ 	if ((single_touch) && (dt2w_switch > 0) && (exec_count) && (touch_cnt)) {
+ 		touch_cnt = false;
+ 		if (touch_nr == 0) {
+-			tap_time_pre = ktime_to_ms(ktime_get());
+-			x_pre = x;
+-			y_pre = y;
+-			touch_nr++;
++			new_touch(x, y);
+ 		} else if (touch_nr == 1) {
+ 			if ((calc_feather(x, x_pre) < DT2W_FEATHER) &&
+ 			    (calc_feather(y, y_pre) < DT2W_FEATHER) &&
+ 			    ((ktime_to_ms(ktime_get())-tap_time_pre) < DT2W_TIME))
+ 				touch_nr++;
+-			else
++			else {
+ 				doubletap2wake_reset();
++				new_touch(x, y);
++			}
+ 		} else {
+ 			doubletap2wake_reset();
+-			tap_time_pre = ktime_to_ms(ktime_get());
+-			x_pre = x;
+-			y_pre = y;
+-			touch_nr++;
++			new_touch(x, y);
+ 		}
+ 		if ((touch_nr > 1)) {
+ 			pr_info(LOGTAG"ON\n");
+-- 
+1.7.9.5
+

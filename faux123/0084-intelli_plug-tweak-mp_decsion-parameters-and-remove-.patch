@@ -1,0 +1,40 @@
+From c46807457d7007a5a310019795105985d70ac467 Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Wed, 20 Feb 2013 13:22:34 -0600
+Subject: [PATCH 084/338] intelli_plug: tweak mp_decsion parameters and remove
+ unused logic
+
+Signed-off-by: faux123 <reioux@gmail.com>
+---
+ arch/arm/mach-msm/intelli_plug.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-msm/intelli_plug.c b/arch/arm/mach-msm/intelli_plug.c
+index bbfd753..cde6dbb 100644
+--- a/arch/arm/mach-msm/intelli_plug.c
++++ b/arch/arm/mach-msm/intelli_plug.c
+@@ -65,8 +65,8 @@ module_param(nr_run_hysteresis, uint, 0644);
+ 
+ static unsigned int nr_run_last;
+ 
+-static unsigned int NwNs_Threshold[] = {13, 30, 15, 11, 17, 11, 0, 11};
+-static unsigned int TwTs_Threshold[] = {140, 0, 140, 190, 140, 190, 0, 190};
++static unsigned int NwNs_Threshold[] = { 19, 30,  27,  11,  19,  11, 0,  11};
++static unsigned int TwTs_Threshold[] = {140,  0, 180, 190, 140, 190, 0, 190};
+ 
+ static int mp_decision(void)
+ {
+@@ -98,10 +98,6 @@ static int mp_decision(void)
+ 			if (total_time >= TwTs_Threshold[index]) {
+ 				new_state = 1;
+ 			}
+-		} else if (rq_depth <= NwNs_Threshold[index+1]) {
+-			if (total_time >= TwTs_Threshold[index+1] ) {
+-				new_state = 0;
+-			}
+ 		} else {
+ 			total_time = 0;
+ 		}
+-- 
+1.8.1.2
+

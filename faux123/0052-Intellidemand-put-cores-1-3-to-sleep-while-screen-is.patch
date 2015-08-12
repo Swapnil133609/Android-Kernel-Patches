@@ -1,0 +1,35 @@
+From 9c91e79bbf2a85f11b8d5cc98e5c70f47db13ca7 Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Sun, 2 Dec 2012 10:47:31 -0800
+Subject: [PATCH 052/507] Intellidemand: put cores 1~3 to sleep while screen
+ is off
+
+Signed-off-by: faux123 <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/cpufreq.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/mach-msm/cpufreq.c b/arch/arm/mach-msm/cpufreq.c
+index ce784f7..a7fc5f9 100644
+--- a/arch/arm/mach-msm/cpufreq.c
++++ b/arch/arm/mach-msm/cpufreq.c
+@@ -319,6 +319,15 @@ static void msm_cpu_early_suspend(struct early_suspend *h)
+ 
+ 		mutex_lock(&per_cpu(cpufreq_suspend, cpu).suspend_mutex);
+ 		lmf_screen_state = false;
++		// put rest of the cores to sleep!
++		switch (num_online_cpus()) {
++		case 4:
++			cpu_down(3);
++		case 3:
++			cpu_down(2);
++		case 2:
++			cpu_down(1);
++		}
+ 		mutex_unlock(&per_cpu(cpufreq_suspend, cpu).suspend_mutex);
+ 	}
+ #endif
+-- 
+1.7.9.5
+

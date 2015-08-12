@@ -1,0 +1,320 @@
+From 33407fd2d63290540eb0054bc7c6611f2080ea8b Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sun, 17 Nov 2013 16:47:38 -0600
+Subject: [PATCH 445/507] Sound Control: (Optional) work around for Nexus 4/5
+ audio issues
+
+(Use this only for devices with audio reset issues)
+
+Also bump version to 3.1
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+
+wcd9xxx-core: add register write without mutex protection
+
+This is assuming the calling function will take care of the mutex.
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/mfd/wcd9xxx-core.c             |   16 +++++++
+ include/linux/mfd/wcd9xxx/core.h       |    3 ++
+ sound/soc/codecs/sound_control_3_gpl.c |   73 +++++++++++++++++++++++++++++---
+ sound/soc/codecs/wcd9320.c             |   61 ++++++++++++++++----------
+ 4 files changed, 124 insertions(+), 29 deletions(-)
+
+diff --git a/drivers/mfd/wcd9xxx-core.c b/drivers/mfd/wcd9xxx-core.c
+index 31750af..ca5d8c4 100644
+--- a/drivers/mfd/wcd9xxx-core.c
++++ b/drivers/mfd/wcd9xxx-core.c
+@@ -105,6 +105,22 @@ int wcd9xxx_reg_read(struct wcd9xxx *wcd9xxx, unsigned short reg)
+ }
+ EXPORT_SYMBOL_GPL(wcd9xxx_reg_read);
+ 
++#ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
++int wcd9xxx_reg_read_safe(struct wcd9xxx *wcd9xxx, unsigned short reg)
++{
++        u8 val;
++        int ret;
++
++        ret = wcd9xxx_read(wcd9xxx, reg, 1, &val, false);
++
++        if (ret < 0)
++                return ret;
++        else
++                return val;
++}
++EXPORT_SYMBOL_GPL(wcd9xxx_reg_read_safe);
++#endif
++
+ static int wcd9xxx_write(struct wcd9xxx *wcd9xxx, unsigned short reg,
+ 			int bytes, void *src, bool interface_reg)
+ {
+diff --git a/include/linux/mfd/wcd9xxx/core.h b/include/linux/mfd/wcd9xxx/core.h
+index d6de4e9..5e456ce 100644
+--- a/include/linux/mfd/wcd9xxx/core.h
++++ b/include/linux/mfd/wcd9xxx/core.h
+@@ -223,6 +223,9 @@ struct wcd9xxx {
+ };
+ 
+ int wcd9xxx_reg_read(struct wcd9xxx *wcd9xxx, unsigned short reg);
++#ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
++int wcd9xxx_reg_read_safe(struct wcd9xxx *wcd9xxx, unsigned short reg);
++#endif
+ int wcd9xxx_reg_write(struct wcd9xxx *wcd9xxx, unsigned short reg,
+ 		u8 val);
+ int wcd9xxx_interface_reg_read(struct wcd9xxx *wcd9xxx, unsigned short reg);
+diff --git a/sound/soc/codecs/sound_control_3_gpl.c b/sound/soc/codecs/sound_control_3_gpl.c
+index 8e497e0..ed851f2 100644
+--- a/sound/soc/codecs/sound_control_3_gpl.c
++++ b/sound/soc/codecs/sound_control_3_gpl.c
+@@ -22,14 +22,48 @@
+ #include <linux/mfd/wcd9xxx/wcd9320_registers.h>
+ 
+ #define SOUND_CONTROL_MAJOR_VERSION	3
+-#define SOUND_CONTROL_MINOR_VERSION	0
++#define SOUND_CONTROL_MINOR_VERSION	1
+ 
+ extern struct snd_soc_codec *fauxsound_codec_ptr;
+ 
++static int snd_ctrl_locked = 0;
++
+ unsigned int taiko_read(struct snd_soc_codec *codec, unsigned int reg);
+ int taiko_write(struct snd_soc_codec *codec, unsigned int reg,
+ 		unsigned int value);
+ 
++int reg_access(unsigned int reg)
++{
++	int ret = 1;
++
++	switch (reg) {
++		case TAIKO_A_CDC_RX1_VOL_CTL_B2_CTL:
++		case TAIKO_A_CDC_RX2_VOL_CTL_B2_CTL:
++		case TAIKO_A_CDC_RX3_VOL_CTL_B2_CTL:
++		case TAIKO_A_CDC_RX4_VOL_CTL_B2_CTL:
++		case TAIKO_A_CDC_RX5_VOL_CTL_B2_CTL:
++		case TAIKO_A_CDC_RX6_VOL_CTL_B2_CTL:
++		case TAIKO_A_CDC_RX7_VOL_CTL_B2_CTL:
++		case TAIKO_A_CDC_TX1_VOL_CTL_GAIN:
++		case TAIKO_A_CDC_TX2_VOL_CTL_GAIN:
++		case TAIKO_A_CDC_TX3_VOL_CTL_GAIN:
++		case TAIKO_A_CDC_TX4_VOL_CTL_GAIN:
++		case TAIKO_A_CDC_TX5_VOL_CTL_GAIN:
++		case TAIKO_A_CDC_TX6_VOL_CTL_GAIN:
++		case TAIKO_A_CDC_TX7_VOL_CTL_GAIN:
++		case TAIKO_A_CDC_TX8_VOL_CTL_GAIN:
++		case TAIKO_A_CDC_TX9_VOL_CTL_GAIN:
++		case TAIKO_A_CDC_TX10_VOL_CTL_GAIN:
++			if (snd_ctrl_locked)
++				ret = 0;
++			break;
++		default:
++			break;
++	}
++	return ret;
++}
++EXPORT_SYMBOL(reg_access);
++
+ static bool calc_checksum(unsigned int a, unsigned int b, unsigned int c)
+ {
+ 	unsigned char chksum = 0;
+@@ -46,7 +80,7 @@ static bool calc_checksum(unsigned int a, unsigned int b, unsigned int c)
+ static ssize_t cam_mic_gain_show(struct kobject *kobj,
+ 		struct kobj_attribute *attr, char *buf)
+ {
+-        return sprintf(buf, "%u",
++        return sprintf(buf, "%u\n",
+ 		taiko_read(fauxsound_codec_ptr,
+ 			TAIKO_A_CDC_TX6_VOL_CTL_GAIN));
+ 
+@@ -69,7 +103,7 @@ static ssize_t cam_mic_gain_store(struct kobject *kobj,
+ static ssize_t mic_gain_show(struct kobject *kobj,
+ 		struct kobj_attribute *attr, char *buf)
+ {
+-	return sprintf(buf, "%u",
++	return sprintf(buf, "%u\n",
+ 		taiko_read(fauxsound_codec_ptr,
+ 			TAIKO_A_CDC_TX7_VOL_CTL_GAIN));
+ }
+@@ -92,7 +126,7 @@ static ssize_t mic_gain_store(struct kobject *kobj,
+ static ssize_t speaker_gain_show(struct kobject *kobj,
+ 		struct kobj_attribute *attr, char *buf)
+ {
+-        return sprintf(buf, "%u %u",
++        return sprintf(buf, "%u %u\n",
+ 			taiko_read(fauxsound_codec_ptr,
+ 				TAIKO_A_CDC_RX7_VOL_CTL_B2_CTL),
+ 			taiko_read(fauxsound_codec_ptr,
+@@ -119,7 +153,7 @@ static ssize_t speaker_gain_store(struct kobject *kobj,
+ static ssize_t headphone_gain_show(struct kobject *kobj,
+ 		struct kobj_attribute *attr, char *buf)
+ {
+-	return sprintf(buf, "%u %u",
++	return sprintf(buf, "%u %u\n",
+ 			taiko_read(fauxsound_codec_ptr,
+ 				TAIKO_A_CDC_RX1_VOL_CTL_B2_CTL),
+ 			taiko_read(fauxsound_codec_ptr,
+@@ -145,7 +179,7 @@ static ssize_t headphone_gain_store(struct kobject *kobj,
+ static ssize_t headphone_pa_gain_show(struct kobject *kobj,
+ 		struct kobj_attribute *attr, char *buf)
+ {
+-	return sprintf(buf, "%u %u",
++	return sprintf(buf, "%u %u\n",
+ 		taiko_read(fauxsound_codec_ptr, TAIKO_A_RX_HPH_L_GAIN),
+ 		taiko_read(fauxsound_codec_ptr, TAIKO_A_RX_HPH_R_GAIN));
+ }
+@@ -186,6 +220,26 @@ static ssize_t sound_control_version_show(struct kobject *kobj, struct kobj_attr
+ 			SOUND_CONTROL_MINOR_VERSION);
+ }
+ 
++static ssize_t sound_control_locked_store(struct kobject *kobj,
++                struct kobj_attribute *attr, const char *buf, size_t count)
++{
++	int inp;
++
++	sscanf(buf, "%d", &inp);
++
++	if (inp == 0)
++		snd_ctrl_locked = 0;
++	else
++		snd_ctrl_locked = 1;
++
++	return count;
++}
++
++static ssize_t sound_control_locked_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
++{
++        return sprintf(buf, "%d\n", snd_ctrl_locked);
++}
++
+ static struct kobj_attribute cam_mic_gain_attribute =
+ 	__ATTR(gpl_cam_mic_gain,
+ 		0666,
+@@ -216,6 +270,12 @@ static struct kobj_attribute headphone_pa_gain_attribute =
+ 		headphone_pa_gain_show,
+ 		headphone_pa_gain_store);
+ 
++static struct kobj_attribute sound_control_locked_attribute =
++	__ATTR(gpl_sound_control_locked,
++		0666,
++		sound_control_locked_show,
++		sound_control_locked_store);
++
+ static struct kobj_attribute sound_control_version_attribute =
+ 	__ATTR(gpl_sound_control_version,
+ 		0444,
+@@ -228,6 +288,7 @@ static struct attribute *sound_control_attrs[] =
+ 		&speaker_gain_attribute.attr,
+ 		&headphone_gain_attribute.attr,
+ 		&headphone_pa_gain_attribute.attr,
++		&sound_control_locked_attribute.attr,
+ 		&sound_control_version_attribute.attr,
+ 		NULL,
+ 	};
+diff --git a/sound/soc/codecs/wcd9320.c b/sound/soc/codecs/wcd9320.c
+index 1b4dec6..63ed0bf 100644
+--- a/sound/soc/codecs/wcd9320.c
++++ b/sound/soc/codecs/wcd9320.c
+@@ -4010,12 +4010,13 @@ static int taiko_volatile(struct snd_soc_codec *ssc, unsigned int reg)
+ 	return 0;
+ }
+ 
+-#ifndef CONFIG_SOUND_CONTROL_HAX_3_GPL
++#ifndef CONFIG_SOUND_CONTROL_HAX_3_GPL 
+ static
+ #endif
+-int taiko_write(struct snd_soc_codec *codec, unsigned int reg,
+-	unsigned int value)
++unsigned int taiko_read(struct snd_soc_codec *codec,
++				unsigned int reg)
+ {
++	unsigned int val;
+ 	int ret;
+ 
+ 	if (reg == SND_SOC_NOPM)
+@@ -4023,48 +4024,62 @@ int taiko_write(struct snd_soc_codec *codec, unsigned int reg,
+ 
+ 	BUG_ON(reg > TAIKO_MAX_REGISTER);
+ 
+-	if (!taiko_volatile(codec, reg)) {
+-		ret = snd_soc_cache_write(codec, reg, value);
+-		if (ret != 0)
+-			dev_err(codec->dev, "Cache write to %x failed: %d\n",
++	if (!taiko_volatile(codec, reg) && taiko_readable(codec, reg) &&
++		reg < codec->driver->reg_cache_size) {
++		ret = snd_soc_cache_read(codec, reg, &val);
++		if (ret >= 0) {
++			return val;
++		} else
++			dev_err(codec->dev, "Cache read from %x failed: %d\n",
+ 				reg, ret);
+ 	}
+ 
+-	return wcd9xxx_reg_write(codec->control_data, reg, value);
++	val = wcd9xxx_reg_read(codec->control_data, reg);
++	return val;
+ }
+ #ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
+-EXPORT_SYMBOL(taiko_write);
++EXPORT_SYMBOL(taiko_read);
+ #endif
+ 
+-#ifndef CONFIG_SOUND_CONTROL_HAX_3_GPL 
++#ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
++extern int reg_access(unsigned int);
++#endif
++
++#ifndef CONFIG_SOUND_CONTROL_HAX_3_GPL
+ static
+ #endif
+-unsigned int taiko_read(struct snd_soc_codec *codec,
+-				unsigned int reg)
++int taiko_write(struct snd_soc_codec *codec, unsigned int reg,
++	unsigned int value)
+ {
+-	unsigned int val;
+ 	int ret;
++#ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
++	int val;
++#endif
+ 
+ 	if (reg == SND_SOC_NOPM)
+ 		return 0;
+ 
+ 	BUG_ON(reg > TAIKO_MAX_REGISTER);
+ 
+-	if (!taiko_volatile(codec, reg) && taiko_readable(codec, reg) &&
+-		reg < codec->driver->reg_cache_size) {
+-		ret = snd_soc_cache_read(codec, reg, &val);
+-		if (ret >= 0) {
+-			return val;
+-		} else
+-			dev_err(codec->dev, "Cache read from %x failed: %d\n",
++	if (!taiko_volatile(codec, reg)) {
++		ret = snd_soc_cache_write(codec, reg, value);
++		if (ret != 0)
++			dev_err(codec->dev, "Cache write to %x failed: %d\n",
+ 				reg, ret);
+ 	}
+ 
+-	val = wcd9xxx_reg_read(codec->control_data, reg);
+-	return val;
++#ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
++	if (!reg_access(reg))
++		val = wcd9xxx_reg_read_safe(codec->control_data, reg);
++	else
++		val = value;
++	return wcd9xxx_reg_write(codec->control_data, reg, val);
++#else
++	return wcd9xxx_reg_write(codec->control_data, reg, value);
++#endif
+ }
+ #ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
+-EXPORT_SYMBOL(taiko_read);
++EXPORT_SYMBOL(taiko_write);
+ #endif
+ 
+ static int taiko_startup(struct snd_pcm_substream *substream,
+-- 
+1.7.9.5
+

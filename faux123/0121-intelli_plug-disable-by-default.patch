@@ -1,0 +1,30 @@
+From f65130c5f58d1488f8536b7d5ffb2f0c0f0273c0 Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Wed, 6 Mar 2013 17:20:10 -0600
+Subject: [PATCH 121/507] intelli_plug: disable by default
+
+let the user enable via sysfs so it won't clash with mpdecision which is
+enabled by default for qualcomm phones
+
+Signed-off-by: faux123 <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/intelli_plug.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/intelli_plug.c b/arch/arm/mach-msm/intelli_plug.c
+index 4e6366a..d029e25 100644
+--- a/arch/arm/mach-msm/intelli_plug.c
++++ b/arch/arm/mach-msm/intelli_plug.c
+@@ -39,7 +39,7 @@ static DEFINE_MUTEX(intelli_plug_mutex);
+ 
+ struct delayed_work intelli_plug_work;
+ 
+-static unsigned int intelli_plug_active = 1;
++static unsigned int intelli_plug_active = 0;
+ module_param(intelli_plug_active, uint, 0644);
+ 
+ static unsigned int eco_mode_active = 0;
+-- 
+1.7.9.5
+

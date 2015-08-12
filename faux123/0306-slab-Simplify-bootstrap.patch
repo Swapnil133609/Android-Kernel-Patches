@@ -1,0 +1,116 @@
+From 5139da19e81586d05f6a98dbacf2ecf0308f552b Mon Sep 17 00:00:00 2001
+From: Christoph Lameter <cl@linux.com>
+Date: Wed, 28 Nov 2012 16:23:01 +0000
+Subject: [PATCH 306/507] slab: Simplify bootstrap
+
+The nodelists field in kmem_cache is pointing to the first unused
+object in the array field when bootstrap is complete.
+
+A problem with the current approach is that the statically sized
+kmem_cache structure use on boot can only contain NR_CPUS entries.
+If the number of nodes plus the number of cpus is greater then we
+would overwrite memory following the kmem_cache_boot definition.
+
+Increase the size of the array field to ensure that also the node
+pointers fit into the array field.
+
+Once we do that we no longer need the kmem_cache_nodelists
+array and we can then also use that structure elsewhere.
+
+Acked-by: Glauber Costa <glommer@parallels.com>
+Signed-off-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/slab_def.h |    6 +++++-
+ mm/slab.c                |   21 +++++++++++++--------
+ 2 files changed, 18 insertions(+), 9 deletions(-)
+
+diff --git a/include/linux/slab_def.h b/include/linux/slab_def.h
+index 30110dc..b91c69f 100644
+--- a/include/linux/slab_def.h
++++ b/include/linux/slab_def.h
+@@ -90,9 +90,13 @@ struct kmem_cache {
+ 	 * (see kmem_cache_init())
+ 	 * We still use [NR_CPUS] and not [1] or [0] because cache_cache
+ 	 * is statically defined, so we reserve the max number of cpus.
++	 *
++	 * We also need to guarantee that the list is able to accomodate a
++	 * pointer for each node since "nodelists" uses the remainder of
++	 * available pointers.
+ 	 */
+ 	struct kmem_list3 **nodelists;
+-	struct array_cache *array[NR_CPUS];
++	struct array_cache *array[NR_CPUS + MAX_NUMNODES];
+ 	/*
+ 	 * Do not add fields after array[]
+ 	 */
+diff --git a/mm/slab.c b/mm/slab.c
+index 90d7787..874ba27 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -553,9 +553,7 @@ static struct arraycache_init initarray_generic =
+     { {0, BOOT_CPUCACHE_ENTRIES, 1, 0} };
+ 
+ /* internal cache of cache description objs */
+-static struct kmem_list3 *kmem_cache_nodelists[MAX_NUMNODES];
+ static struct kmem_cache kmem_cache_boot = {
+-	.nodelists = kmem_cache_nodelists,
+ 	.batchcount = 1,
+ 	.limit = BOOT_CPUCACHE_ENTRIES,
+ 	.shared = 1,
+@@ -1560,6 +1558,15 @@ static void __init set_up_list3s(struct kmem_cache *cachep, int index)
+ }
+ 
+ /*
++ * The memory after the last cpu cache pointer is used for the
++ * the nodelists pointer.
++ */
++static void setup_nodelists_pointer(struct kmem_cache *cachep)
++{
++	cachep->nodelists = (struct kmem_list3 **)&cachep->array[nr_cpu_ids];
++}
++
++/*
+  * Initialisation.  Called after the page allocator have been initialised and
+  * before smp_init().
+  */
+@@ -1573,15 +1580,14 @@ void __init kmem_cache_init(void)
+ 	int node;
+ 
+ 	kmem_cache = &kmem_cache_boot;
++	setup_nodelists_pointer(kmem_cache);
+ 
+ 	if (num_possible_nodes() == 1)
+ 		use_alien_caches = 0;
+ 
+-	for (i = 0; i < NUM_INIT_LISTS; i++) {
++	for (i = 0; i < NUM_INIT_LISTS; i++)
+ 		kmem_list3_init(&initkmem_list3[i]);
+-		if (i < MAX_NUMNODES)
+-			kmem_cache->nodelists[i] = NULL;
+-	}
++
+ 	set_up_list3s(kmem_cache, CACHE_CACHE);
+ 
+ 	/*
+@@ -1619,7 +1625,6 @@ void __init kmem_cache_init(void)
+ 	list_add(&kmem_cache->list, &slab_caches);
+ 	kmem_cache->colour_off = cache_line_size();
+ 	kmem_cache->array[smp_processor_id()] = &initarray_cache.cache;
+-	kmem_cache->nodelists[node] = &initkmem_list3[CACHE_CACHE + node];
+ 
+ 	/*
+ 	 * struct kmem_cache size depends on nr_node_ids & nr_cpu_ids
+@@ -2422,7 +2427,7 @@ __kmem_cache_create (struct kmem_cache *cachep, unsigned long flags)
+ 	else
+ 		gfp = GFP_NOWAIT;
+ 
+-	cachep->nodelists = (struct kmem_list3 **)&cachep->array[nr_cpu_ids];
++	setup_nodelists_pointer(cachep);
+ #if DEBUG
+ 
+ 	/*
+-- 
+1.7.9.5
+

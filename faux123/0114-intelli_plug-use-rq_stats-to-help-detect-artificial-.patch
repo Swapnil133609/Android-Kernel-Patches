@@ -1,0 +1,81 @@
+From 67ee227c51a20d977640bf904d503186be4265d0 Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Mon, 18 Feb 2013 13:46:02 -0600
+Subject: [PATCH 114/507] intelli_plug: use rq_stats to help detect artificial
+ or constant loads
+
+benchmarks often create fake / artificial loads at a constant rate.  These
+type of loads are not detected corectly by run average algorithms. Use
+the run queue stats to help detect these cases and bring up the cores in
+correspondence.
+
+bump version to 1.2
+
+Signed-off-by: faux123 <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/intelli_plug.c |   26 ++++++++++++++++++++++++--
+ 1 file changed, 24 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-msm/intelli_plug.c b/arch/arm/mach-msm/intelli_plug.c
+index 6fd9cb5..9337d29 100644
+--- a/arch/arm/mach-msm/intelli_plug.c
++++ b/arch/arm/mach-msm/intelli_plug.c
+@@ -19,9 +19,10 @@
+ #include <linux/sched.h>
+ #include <linux/mutex.h>
+ #include <linux/module.h>
++#include <linux/rq_stats.h>
+ 
+ #define INTELLI_PLUG_MAJOR_VERSION	1
+-#define INTELLI_PLUG_MINOR_VERSION	1
++#define INTELLI_PLUG_MINOR_VERSION	2
+ 
+ #define DEF_SAMPLING_RATE		(50000)
+ #define DEF_SAMPLING_MS			(50)
+@@ -30,6 +31,8 @@
+ #define TRI_CORE_PERSISTENCE		40
+ #define QUAD_CORE_PERSISTENCE		30
+ 
++#define RUN_QUEUE_THRESHOLD		38
++
+ static DEFINE_MUTEX(intelli_plug_mutex);
+ 
+ struct delayed_work intelli_plug_work;
+@@ -101,13 +104,32 @@ static unsigned int calculate_thread_stats(void)
+ static void __cpuinit intelli_plug_work_fn(struct work_struct *work)
+ {
+ 	unsigned int nr_run_stat;
++	unsigned int rq_stat;
++	unsigned int cpu_count = 0;
+ 
+ 	if (intelli_plug_active == 1) {
+ 		nr_run_stat = calculate_thread_stats();
+ 		//pr_info("nr_run_stat: %u\n", nr_run_stat);
++		rq_stat = rq_info.rq_avg;
++
++		cpu_count = nr_run_stat;
++		// detect artificial loads or constant loads
++		// using msm rqstats
++		if (!eco_mode_active && nr_run_stat > 1) {
++			if (rq_stat >= RUN_QUEUE_THRESHOLD) {
++				switch (num_online_cpus()) {
++					case 2:
++						cpu_count = 3;
++						break;
++					case 3:
++						cpu_count = 4;
++						break;
++				}
++			}
++		}
+ 
+ 		if (!suspended) {
+-			switch (nr_run_stat) {
++			switch (cpu_count) {
+ 				case 1:
+ 					if (persist_count > 0)
+ 						persist_count--;
+-- 
+1.7.9.5
+

@@ -1,0 +1,36 @@
+From ddbc4fb34ab323bd63bb676c3894ea90df376054 Mon Sep 17 00:00:00 2001
+From: Joonsoo Kim <js1304@gmail.com>
+Date: Mon, 17 Sep 2012 14:09:06 -0700
+Subject: [PATCH 278/507] slab: fix starting index for finding another object
+
+In array cache, there is a object at index 0, check it.
+
+Signed-off-by: Joonsoo Kim <js1304@gmail.com>
+Signed-off-by: Mel Gorman <mgorman@suse.de>
+Cc: David Miller <davem@davemloft.net>
+Cc: Chuck Lever <chuck.lever@oracle.com>
+Cc: David Rientjes <rientjes@google.com>
+Cc: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slab.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mm/slab.c b/mm/slab.c
+index 30d1a3e..c5a750d 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -976,7 +976,7 @@ static void *__ac_get_obj(struct kmem_cache *cachep, struct array_cache *ac,
+ 		}
+ 
+ 		/* The caller cannot use PFMEMALLOC objects, find another one */
+-		for (i = 1; i < ac->avail; i++) {
++		for (i = 0; i < ac->avail; i++) {
+ 			/* If a !PFMEMALLOC object is found, swap them */
+ 			if (!is_obj_pfmemalloc(ac->entry[i])) {
+ 				objp = ac->entry[i];
+-- 
+1.7.9.5
+

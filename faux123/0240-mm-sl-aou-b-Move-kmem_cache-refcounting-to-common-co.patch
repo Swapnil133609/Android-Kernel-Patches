@@ -1,0 +1,76 @@
+From 59f8b8cadb6ed338504fcb0df13f17c480f2db87 Mon Sep 17 00:00:00 2001
+From: Christoph Lameter <cl@linux.com>
+Date: Tue, 4 Sep 2012 23:38:33 +0000
+Subject: [PATCH 240/338] mm/sl[aou]b: Move kmem_cache refcounting to common
+ code
+
+Get rid of the refcount stuff in the allocators and do that part of
+kmem_cache management in the common code.
+
+Signed-off-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+---
+ mm/slab.c        | 1 -
+ mm/slab_common.c | 5 +++--
+ mm/slob.c        | 1 -
+ mm/slub.c        | 1 -
+ 4 files changed, 3 insertions(+), 5 deletions(-)
+
+diff --git a/mm/slab.c b/mm/slab.c
+index 3cd83cc..e275d75 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -2555,7 +2555,6 @@ __kmem_cache_create (struct kmem_cache *cachep, unsigned long flags)
+ 		 */
+ 		BUG_ON(ZERO_OR_NULL_PTR(cachep->slabp_cache));
+ 	}
+-	cachep->refcount = 1;
+ 
+ 	err = setup_cpu_cache(cachep, gfp);
+ 	if (err) {
+diff --git a/mm/slab_common.c b/mm/slab_common.c
+index 8a85a19..651a3c6 100644
+--- a/mm/slab_common.c
++++ b/mm/slab_common.c
+@@ -125,11 +125,12 @@ struct kmem_cache *kmem_cache_create(const char *name, size_t size, size_t align
+ 		}
+ 
+ 		err = __kmem_cache_create(s, flags);
+-		if (!err)
++		if (!err) {
+ 
++			s->refcount = 1;
+ 			list_add(&s->list, &slab_caches);
+ 
+-		else {
++		} else {
+ 			kfree(s->name);
+ 			kmem_cache_free(kmem_cache, s);
+ 		}
+diff --git a/mm/slob.c b/mm/slob.c
+index cac05d9..3edfeaa 100644
+--- a/mm/slob.c
++++ b/mm/slob.c
+@@ -524,7 +524,6 @@ int __kmem_cache_create(struct kmem_cache *c, unsigned long flags)
+ 	if (c->align < align)
+ 		c->align = align;
+ 
+-	c->refcount = 1;
+ 	return 0;
+ }
+ 
+diff --git a/mm/slub.c b/mm/slub.c
+index 4ffe06b..040b937 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -3097,7 +3097,6 @@ static int kmem_cache_open(struct kmem_cache *s, unsigned long flags)
+ 	else
+ 		s->cpu_partial = 30;
+ 
+-	s->refcount = 1;
+ #ifdef CONFIG_NUMA
+ 	s->remote_node_defrag_ratio = 1000;
+ #endif
+-- 
+1.8.1.2
+

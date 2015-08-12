@@ -1,0 +1,72 @@
+From 02afe17fca994df167f8382a2f553a13e8216fc6 Mon Sep 17 00:00:00 2001
+From: Ezequiel Garcia <elezegarcia@gmail.com>
+Date: Sat, 8 Sep 2012 17:47:51 -0300
+Subject: [PATCH 297/507] mm, slob: Use NUMA_NO_NODE instead of -1
+
+Acked-by: David Rientjes <rientjes@google.com>
+Signed-off-by: Ezequiel Garcia <elezegarcia@gmail.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+
+Conflicts:
+	mm/slob.c
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/slob_def.h |    6 ++++--
+ mm/slob.c                |    4 ++--
+ 2 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/include/linux/slob_def.h b/include/linux/slob_def.h
+index 0ec00b3..f28e14a 100644
+--- a/include/linux/slob_def.h
++++ b/include/linux/slob_def.h
+@@ -1,12 +1,14 @@
+ #ifndef __LINUX_SLOB_DEF_H
+ #define __LINUX_SLOB_DEF_H
+ 
++#include <linux/numa.h>
++
+ void *kmem_cache_alloc_node(struct kmem_cache *, gfp_t flags, int node);
+ 
+ static __always_inline void *kmem_cache_alloc(struct kmem_cache *cachep,
+ 					      gfp_t flags)
+ {
+-	return kmem_cache_alloc_node(cachep, flags, -1);
++	return kmem_cache_alloc_node(cachep, flags, NUMA_NO_NODE);
+ }
+ 
+ void *__kmalloc_node(size_t size, gfp_t flags, int node);
+@@ -26,7 +28,7 @@ static __always_inline void *kmalloc_node(size_t size, gfp_t flags, int node)
+  */
+ static __always_inline void *kmalloc(size_t size, gfp_t flags)
+ {
+-	return __kmalloc_node(size, flags, -1);
++	return __kmalloc_node(size, flags, NUMA_NO_NODE);
+ }
+ 
+ static __always_inline void *__kmalloc(size_t size, gfp_t flags)
+diff --git a/mm/slob.c b/mm/slob.c
+index 3edfeaa..7564e57 100644
+--- a/mm/slob.c
++++ b/mm/slob.c
+@@ -194,7 +194,7 @@ static void *slob_new_pages(gfp_t gfp, int order, int node)
+ 	void *page;
+ 
+ #ifdef CONFIG_NUMA
+-	if (node != -1)
++	if (node != NUMA_NO_NODE)
+ 		page = alloc_pages_exact_node(node, gfp, order);
+ 	else
+ #endif
+@@ -290,7 +290,7 @@ static void *slob_alloc(size_t size, gfp_t gfp, int align, int node)
+ 		 * If there's a node specification, search for a partial
+ 		 * page with a matching node id in the freelist.
+ 		 */
+-		if (node != -1 && page_to_nid(sp) != node)
++		if (node != NUMA_NO_NODE && page_to_nid(sp) != node)
+ 			continue;
+ #endif
+ 		/* Enough room on this page? */
+-- 
+1.7.9.5
+

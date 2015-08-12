@@ -1,0 +1,56 @@
+From 5b2f6f6dbf2c0f4a33a92a923568f6ca05b19f25 Mon Sep 17 00:00:00 2001
+From: David Rientjes <rientjes@google.com>
+Date: Mon, 9 Jul 2012 14:00:38 -0700
+Subject: [PATCH 244/507] mm, slub: ensure irqs are enabled for kmemcheck
+
+kmemcheck_alloc_shadow() requires irqs to be enabled, so wait to disable
+them until after its called for __GFP_WAIT allocations.
+
+This fixes a warning for such allocations:
+
+	WARNING: at kernel/lockdep.c:2739 lockdep_trace_alloc+0x14e/0x1c0()
+
+Acked-by: Fengguang Wu <fengguang.wu@intel.com>
+Acked-by: Steven Rostedt <rostedt@goodmis.org>
+Tested-by: Fengguang Wu <fengguang.wu@intel.com>
+Signed-off-by: David Rientjes <rientjes@google.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slub.c |   13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
+
+diff --git a/mm/slub.c b/mm/slub.c
+index 6273c0a..55c7f22 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -1299,13 +1299,7 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
+ 			stat(s, ORDER_FALLBACK);
+ 	}
+ 
+-	if (flags & __GFP_WAIT)
+-		local_irq_disable();
+-
+-	if (!page)
+-		return NULL;
+-
+-	if (kmemcheck_enabled
++	if (kmemcheck_enabled && page
+ 		&& !(s->flags & (SLAB_NOTRACK | DEBUG_DEFAULT_FLAGS))) {
+ 		int pages = 1 << oo_order(oo);
+ 
+@@ -1321,6 +1315,11 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
+ 			kmemcheck_mark_unallocated_pages(page, pages);
+ 	}
+ 
++	if (flags & __GFP_WAIT)
++		local_irq_disable();
++	if (!page)
++		return NULL;
++
+ 	page->objects = oo_objects(oo);
+ 	mod_zone_page_state(page_zone(page),
+ 		(s->flags & SLAB_RECLAIM_ACCOUNT) ?
+-- 
+1.7.9.5
+

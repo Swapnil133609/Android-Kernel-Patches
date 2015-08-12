@@ -1,0 +1,101 @@
+From c5374c308f07d79a3c62746a44a46e28a2c85440 Mon Sep 17 00:00:00 2001
+From: Adrian Salido-Moreno <adrianm@codeaurora.org>
+Date: Tue, 22 Oct 2013 14:50:28 -0700
+Subject: [PATCH 005/507] msm: mdss: wait for ping pong during unblank kickoff
+
+During panel unblank a kickoff is done to turn on the panel so that the
+first update is not delayed. However since buffer sync and display
+commit is not called on this, need to make sure that the update finishes
+completely including the workqueue that signals the fences. Signaling
+the sync fence can potentially cause timeline to be ahead and end up
+signaling the acquire fences early leading to source tearing on command
+mode panels.
+
+Change-Id: I56edf8355e1c635c3da24f20405c3ae4fe31cf2e
+Signed-off-by: Adrian Salido-Moreno <adrianm@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_fb.c           |    2 +-
+ drivers/video/msm/mdss/mdss_mdp_ctl.c      |    4 ++--
+ drivers/video/msm/mdss/mdss_mdp_intf_cmd.c |    4 ++++
+ drivers/video/msm/mdss/mdss_mdp_overlay.c  |    6 +++++-
+ 4 files changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_fb.c b/drivers/video/msm/mdss/mdss_fb.c
+index f5e4010..edfedb3 100644
+--- a/drivers/video/msm/mdss/mdss_fb.c
++++ b/drivers/video/msm/mdss/mdss_fb.c
+@@ -1316,7 +1316,7 @@ void mdss_fb_signal_timeline(struct msm_sync_pt_data *sync_pt_data)
+ 			sync_pt_data->fence_name, sync_pt_data->timeline_value,
+ 			atomic_read(&sync_pt_data->commit_cnt));
+ 	} else {
+-		pr_warn("%s timeline signaled without commits val=%d\n",
++		pr_debug("%s timeline signaled without commits val=%d\n",
+ 			sync_pt_data->fence_name, sync_pt_data->timeline_value);
+ 	}
+ 	mutex_unlock(&sync_pt_data->sync_mutex);
+diff --git a/drivers/video/msm/mdss/mdss_mdp_ctl.c b/drivers/video/msm/mdss/mdss_mdp_ctl.c
+index d43b926..11dac47 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_ctl.c
++++ b/drivers/video/msm/mdss/mdss_mdp_ctl.c
+@@ -1741,7 +1741,7 @@ int mdss_mdp_display_wait4pingpong(struct mdss_mdp_ctl *ctl)
+ 	}
+ 
+ 	if (ctl->wait_pingpong)
+-		ret = ctl->wait_pingpong(ctl, NULL);
++		ret = ctl->wait_pingpong(ctl, (void*) 1);
+ 
+ 	mutex_unlock(&ctl->lock);
+ 
+@@ -1807,7 +1807,7 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg)
+ 	mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_READY);
+ 
+ 	if (ctl->wait_pingpong)
+-		ctl->wait_pingpong(ctl, NULL);
++		ctl->wait_pingpong(ctl, (void*) 0);
+ 
+ 	/* postprocessing setup, including dspp */
+ 	mdss_mdp_pp_setup_locked(ctl);
+diff --git a/drivers/video/msm/mdss/mdss_mdp_intf_cmd.c b/drivers/video/msm/mdss/mdss_mdp_intf_cmd.c
+index 27bdd0a..053d563 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_intf_cmd.c
++++ b/drivers/video/msm/mdss/mdss_mdp_intf_cmd.c
+@@ -415,6 +415,7 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
+ 	unsigned long flags;
+ 	int need_wait = 0;
+ 	int rc = 0;
++	int flush_wq = (int) arg;
+ 
+ 	ctx = (struct mdss_mdp_cmd_ctx *) ctl->priv_data;
+ 	if (!ctx) {
+@@ -444,6 +445,9 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
+ 		}
+ 	}
+ 
++	if (flush_wq)
++		flush_work_sync(&ctx->pp_done_work);
++
+ 	return rc;
+ }
+ 
+diff --git a/drivers/video/msm/mdss/mdss_mdp_overlay.c b/drivers/video/msm/mdss/mdss_mdp_overlay.c
+index c379fff..845c2c8 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_overlay.c
++++ b/drivers/video/msm/mdss/mdss_mdp_overlay.c
+@@ -2026,8 +2026,12 @@ static int mdss_mdp_overlay_on(struct msm_fb_data_type *mfd)
+ 	if (!mfd->panel_info->cont_splash_enabled) {
+ 		rc = mdss_mdp_overlay_start(mfd);
+ 		if (!IS_ERR_VALUE(rc) && (mfd->panel_info->type != DTV_PANEL) &&
+-			(mfd->panel_info->type != WRITEBACK_PANEL))
++			(mfd->panel_info->type != WRITEBACK_PANEL)) {
+ 			rc = mdss_mdp_overlay_kickoff(mfd);
++
++			if (mfd->panel_info->type == MIPI_CMD_PANEL)
++				mdss_mdp_display_wait4pingpong(mdp5_data->ctl);
++		}
+ 	} else {
+ 		rc = mdss_mdp_ctl_setup(mdp5_data->ctl);
+ 		if (rc)
+-- 
+1.7.9.5
+

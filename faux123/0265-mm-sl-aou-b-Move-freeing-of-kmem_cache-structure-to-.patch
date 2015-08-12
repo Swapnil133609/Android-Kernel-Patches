@@ -1,0 +1,81 @@
+From f54e5dac644cea00239d4d0dfe0f6fb2ead7723c Mon Sep 17 00:00:00 2001
+From: Christoph Lameter <cl@linux.com>
+Date: Wed, 5 Sep 2012 00:18:32 +0000
+Subject: [PATCH 265/507] mm/sl[aou]b: Move freeing of kmem_cache structure to
+ common code
+
+The freeing action is basically the same in all slab allocators.
+Move to the common kmem_cache_destroy() function.
+
+Reviewed-by: Glauber Costa <glommer@parallels.com>
+Reviewed-by: Joonsoo Kim <js1304@gmail.com>
+Signed-off-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slab.c        |    1 -
+ mm/slab_common.c |    1 +
+ mm/slob.c        |    2 --
+ mm/slub.c        |    2 --
+ 4 files changed, 1 insertion(+), 5 deletions(-)
+
+diff --git a/mm/slab.c b/mm/slab.c
+index 68050d7..dcd3eba 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -2225,7 +2225,6 @@ void __kmem_cache_destroy(struct kmem_cache *cachep)
+ 			kfree(l3);
+ 		}
+ 	}
+-	kmem_cache_free(kmem_cache, cachep);
+ }
+ 
+ 
+diff --git a/mm/slab_common.c b/mm/slab_common.c
+index 5374150..d6deae9 100644
+--- a/mm/slab_common.c
++++ b/mm/slab_common.c
+@@ -154,6 +154,7 @@ void kmem_cache_destroy(struct kmem_cache *s)
+ 				rcu_barrier();
+ 
+ 			__kmem_cache_destroy(s);
++			kmem_cache_free(kmem_cache, s);
+ 		} else {
+ 			list_add(&s->list, &slab_caches);
+ 			printk(KERN_ERR "kmem_cache_destroy %s: Slab cache still has objects\n",
+diff --git a/mm/slob.c b/mm/slob.c
+index 7d272c3..cb4ab96 100644
+--- a/mm/slob.c
++++ b/mm/slob.c
+@@ -540,8 +540,6 @@ struct kmem_cache *__kmem_cache_create(const char *name, size_t size,
+ 
+ void __kmem_cache_destroy(struct kmem_cache *c)
+ {
+-	kmemleak_free(c);
+-	slob_free(c, sizeof(struct kmem_cache));
+ }
+ 
+ void *kmem_cache_alloc_node(struct kmem_cache *c, gfp_t flags, int node)
+diff --git a/mm/slub.c b/mm/slub.c
+index a96596b..859ccf8 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -213,7 +213,6 @@ static inline int sysfs_slab_alias(struct kmem_cache *s, const char *p)
+ static inline void sysfs_slab_remove(struct kmem_cache *s)
+ {
+ 	kfree(s->name);
+-	kmem_cache_free(kmem_cache, s);
+ }
+ 
+ #endif
+@@ -5210,7 +5209,6 @@ static void kmem_cache_release(struct kobject *kobj)
+ 	struct kmem_cache *s = to_slab(kobj);
+ 
+ 	kfree(s->name);
+-	kmem_cache_free(kmem_cache, s);
+ }
+ 
+ static const struct sysfs_ops slab_sysfs_ops = {
+-- 
+1.7.9.5
+

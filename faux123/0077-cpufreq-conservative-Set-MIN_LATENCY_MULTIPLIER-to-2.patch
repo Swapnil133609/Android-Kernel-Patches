@@ -1,0 +1,35 @@
+From 358cc0ae690214b2837cb400ee89178af50d0cae Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Thu, 21 Mar 2013 01:42:01 -0500
+Subject: [PATCH 077/507] cpufreq: conservative: Set MIN_LATENCY_MULTIPLIER to
+ 20
+
+Currently MIN_LATENCY_MULTIPLIER is set defined as 100 and so on a system with
+transition latency of 1 ms, the minimum sampling time comes to be around 100 ms.
+That is quite big if you want to get better performance for your system.
+
+Redefine MIN_LATENCY_MULTIPLIER to 20 so that we can support 20ms sampling rate
+for such platforms.
+
+Signed-off-by: faux123 <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_conservative.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/cpufreq_conservative.c b/drivers/cpufreq/cpufreq_conservative.c
+index 85c28d4..76bd3c1 100644
+--- a/drivers/cpufreq/cpufreq_conservative.c
++++ b/drivers/cpufreq/cpufreq_conservative.c
+@@ -47,7 +47,7 @@
+ static unsigned int min_sampling_rate;
+ 
+ #define LATENCY_MULTIPLIER			(1000)
+-#define MIN_LATENCY_MULTIPLIER			(100)
++#define MIN_LATENCY_MULTIPLIER			(20)
+ #define DEF_SAMPLING_DOWN_FACTOR		(1)
+ #define MAX_SAMPLING_DOWN_FACTOR		(10)
+ #define TRANSITION_LATENCY_LIMIT		(10 * 1000 * 1000)
+-- 
+1.7.9.5
+

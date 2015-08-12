@@ -1,0 +1,32 @@
+From 3b784c95ee4fb2d4a1e6c71639cc8fdbcdbb611f Mon Sep 17 00:00:00 2001
+From: Jeff Boody <jboody@codeaurora.org>
+Date: Wed, 23 Oct 2013 16:47:47 -0600
+Subject: [PATCH 009/507] Revert "msm: kgsl: schedule the event queue after
+ the dispatcher work queue"
+
+This reverts commit 4f36f4e8474b15812f4d660206519b214daf5d06.
+
+Change-Id: I2d9a7b89aebc7fb548531dbecb791f2b2f5b4526
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/msm/adreno_dispatch.c |    3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/drivers/gpu/msm/adreno_dispatch.c b/drivers/gpu/msm/adreno_dispatch.c
+index 0334ed2..fd1c315 100644
+--- a/drivers/gpu/msm/adreno_dispatch.c
++++ b/drivers/gpu/msm/adreno_dispatch.c
+@@ -1426,9 +1426,6 @@ done:
+ 	mutex_unlock(&device->mutex);
+ 
+ 	mutex_unlock(&dispatcher->mutex);
+-
+-	/* Schedule the event queue */
+-	queue_work(device->work_queue, &device->ts_expired_ws);
+ }
+ 
+ void adreno_dispatcher_schedule(struct kgsl_device *device)
+-- 
+1.7.9.5
+

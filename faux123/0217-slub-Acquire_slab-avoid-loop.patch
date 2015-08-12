@@ -1,0 +1,76 @@
+From 0e85e32ca6bc07adce529517a610b074da3949c3 Mon Sep 17 00:00:00 2001
+From: Christoph Lameter <cl@linux.com>
+Date: Sun, 8 Sep 2013 17:29:21 -0500
+Subject: [PATCH 217/507] slub: Acquire_slab() avoid loop
+
+Avoid the loop in acquire slab and simply fail if there is a conflict.
+
+This will cause the next page on the list to be considered.
+
+Acked-by: David Rientjes <rientjes@google.com>
+Signed-off-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slub.c |   28 +++++++++++++++-------------
+ 1 file changed, 15 insertions(+), 13 deletions(-)
+
+diff --git a/mm/slub.c b/mm/slub.c
+index b0f8285..de2dda9 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -1490,12 +1490,12 @@ static inline void remove_partial(struct kmem_cache_node *n,
+ }
+ 
+ /*
+- * Lock slab, remove from the partial list and put the object into the
+- * per cpu freelist.
++ * Remove slab from the partial list, freeze it and
++ * return the pointer to the freelist.
+  *
+  * Returns a list of objects or NULL if it fails.
+  *
+- * Must hold list_lock.
++ * Must hold list_lock since we modify the partial list.
+  */
+ static inline void *acquire_slab(struct kmem_cache *s,
+ 		struct kmem_cache_node *n, struct page *page,
+@@ -1510,22 +1510,24 @@ static inline void *acquire_slab(struct kmem_cache *s,
+ 	 * The old freelist is the list of objects for the
+ 	 * per cpu allocation list.
+ 	 */
+-	do {
+-		freelist = page->freelist;
+-		counters = page->counters;
+-		new.counters = counters;
+-		if (mode)
+-			new.inuse = page->objects;
++	freelist = page->freelist;
++	counters = page->counters;
++	new.counters = counters;
++	if (mode)
++		new.inuse = page->objects;
+ 
+-		VM_BUG_ON(new.frozen);
+-		new.frozen = 1;
++	VM_BUG_ON(new.frozen);
++	new.frozen = 1;
+ 
+-	} while (!__cmpxchg_double_slab(s, page,
++	if (!__cmpxchg_double_slab(s, page,
+ 			freelist, counters,
+ 			NULL, new.counters,
+-			"lock and freeze"));
++			"acquire_slab"))
++
++		return NULL;
+ 
+ 	remove_partial(n, page);
++	WARN_ON(!freelist);
+ 	return freelist;
+ }
+ 
+-- 
+1.7.9.5
+

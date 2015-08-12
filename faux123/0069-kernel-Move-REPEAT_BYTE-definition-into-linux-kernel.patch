@@ -1,0 +1,69 @@
+From bdf3aea0ad8cdb46ad090c915206e1736a0a2232 Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Sat, 2 Feb 2013 08:35:08 -0800
+Subject: [PATCH 069/338] kernel: Move REPEAT_BYTE definition into
+ linux/kernel.h
+
+And make sure that everything using it explicitly includes
+that header file.
+
+Signed-off-by: David S. Miller <davem@davemloft.net>
+modified for Mako kernel from kernel.org
+
+Signed-off-by: faux123 <reioux@gmail.com>
+---
+ arch/x86/include/asm/word-at-a-time.h | 4 ++--
+ fs/namei.c                            | 1 +
+ include/linux/kernel.h                | 2 ++
+ 3 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/arch/x86/include/asm/word-at-a-time.h b/arch/x86/include/asm/word-at-a-time.h
+index e58f03b..ae03fac 100644
+--- a/arch/x86/include/asm/word-at-a-time.h
++++ b/arch/x86/include/asm/word-at-a-time.h
+@@ -1,6 +1,8 @@
+ #ifndef _ASM_WORD_AT_A_TIME_H
+ #define _ASM_WORD_AT_A_TIME_H
+ 
++#include <linux/kernel.h>
++
+ /*
+  * This is largely generic for little-endian machines, but the
+  * optimal byte mask counting is probably going to be something
+@@ -35,8 +37,6 @@ static inline long count_masked_bytes(long mask)
+ 
+ #endif
+ 
+-#define REPEAT_BYTE(x)	((~0ul / 0xff) * (x))
+-
+ /* Return the high bit set in the first byte that is a zero */
+ static inline unsigned long has_zero(unsigned long a)
+ {
+diff --git a/fs/namei.c b/fs/namei.c
+index c427919..ef87bdf 100644
+--- a/fs/namei.c
++++ b/fs/namei.c
+@@ -16,6 +16,7 @@
+ 
+ #include <linux/init.h>
+ #include <linux/export.h>
++#include <linux/kernel.h>
+ #include <linux/slab.h>
+ #include <linux/fs.h>
+ #include <linux/namei.h>
+diff --git a/include/linux/kernel.h b/include/linux/kernel.h
+index fb0c7af..7b69a81 100644
+--- a/include/linux/kernel.h
++++ b/include/linux/kernel.h
+@@ -38,6 +38,8 @@
+ 
+ #define STACK_MAGIC	0xdeadbeef
+ 
++#define REPEAT_BYTE(x)	((~0ul / 0xff) * (x))
++
+ #define ALIGN(x, a)		__ALIGN_KERNEL((x), (a))
+ #define __ALIGN_MASK(x, mask)	__ALIGN_KERNEL_MASK((x), (mask))
+ #define PTR_ALIGN(p, a)		((typeof(p))ALIGN((unsigned long)(p), (a)))
+-- 
+1.8.1.2
+

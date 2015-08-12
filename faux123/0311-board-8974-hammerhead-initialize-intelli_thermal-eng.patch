@@ -1,0 +1,29 @@
+From 4a3b5d7d63609dd99618c673c8727b8e0b8667ee Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sat, 2 Nov 2013 19:09:42 -0500
+Subject: [PATCH 311/338] board-8974-hammerhead: initialize intelli_thermal
+ engine
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ arch/arm/mach-msm/lge/board-8974-hammerhead.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/lge/board-8974-hammerhead.c b/arch/arm/mach-msm/lge/board-8974-hammerhead.c
+index a394635..17586a1 100644
+--- a/arch/arm/mach-msm/lge/board-8974-hammerhead.c
++++ b/arch/arm/mach-msm/lge/board-8974-hammerhead.c
+@@ -109,7 +109,9 @@ void __init msm8974_add_drivers(void)
+ 	krait_power_init();
+ 	msm_clock_init(&msm8974_clock_init_data);
+ 	tsens_tm_init_driver();
+-#ifndef CONFIG_INTELLI_THERMAL
++#ifdef CONFIG_INTELLI_THERMAL
++	msm_thermal_init(NULL);
++#else
+ 	msm_thermal_device_init();
+ #endif
+ 	lge_add_persistent_device();
+-- 
+1.8.1.2
+

@@ -1,0 +1,268 @@
+From 9cd22d95369202b8dbdbc3da59b6c6911cdab232 Mon Sep 17 00:00:00 2001
+From: yank555-lu <yank555.lu@gmail.com>
+Date: Mon, 11 Nov 2013 01:48:32 -0600
+Subject: [PATCH 327/338] kernel/power/powersuspend: remove userspace
+ dependency from powersuspend
+
+make powersuspend not depend on a userspace initiator anymore, but use a hook
+in autosleep instead.
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ include/linux/powersuspend.h | 10 +++++
+ kernel/power/autosleep.c     | 10 +++++
+ kernel/power/powersuspend.c  | 87 +++++++++++++++++++++++++++-----------------
+ 3 files changed, 73 insertions(+), 34 deletions(-)
+
+diff --git a/include/linux/powersuspend.h b/include/linux/powersuspend.h
+index a365114..8efae0d 100644
+--- a/include/linux/powersuspend.h
++++ b/include/linux/powersuspend.h
+@@ -3,6 +3,11 @@
+  * Copyright (C) 2007-2008 Google, Inc.
+  * Copyright (C) 2013 Paul Reioux 
+  *
++ * Modified by Jean-Pierre Rasquin <yank555.lu@gmail.com>
++ *
++ *   make powersuspend not depend on a userspace initiator anymore,
++ *   but use a hook in autosleep instead.
++ *
+  * This software is licensed under the terms of the GNU General Public
+  * License version 2, as published by the Free Software Foundation, and
+  * may be copied, distributed, and modified under those terms.
+@@ -19,6 +24,9 @@
+ 
+ #include <linux/list.h>
+ 
++#define POWER_SUSPEND_INACTIVE	0
++#define POWER_SUSPEND_ACTIVE	1
++
+ struct power_suspend {
+ 	struct list_head link;
+ 	void (*suspend)(struct power_suspend *h);
+@@ -28,5 +36,7 @@ struct power_suspend {
+ void register_power_suspend(struct power_suspend *handler);
+ void unregister_power_suspend(struct power_suspend *handler);
+ 
++void set_power_suspend_state_hook(int new_state);
++
+ #endif
+ 
+diff --git a/kernel/power/autosleep.c b/kernel/power/autosleep.c
+index ca304046..416d130 100644
+--- a/kernel/power/autosleep.c
++++ b/kernel/power/autosleep.c
+@@ -10,6 +10,10 @@
+ #include <linux/mutex.h>
+ #include <linux/pm_wakeup.h>
+ 
++#ifdef CONFIG_POWERSUSPEND
++#include <linux/powersuspend.h>
++#endif
++
+ #include "power.h"
+ 
+ static suspend_state_t autosleep_state;
+@@ -104,8 +108,14 @@ int pm_autosleep_set_state(suspend_state_t state)
+ 	if (state > PM_SUSPEND_ON) {
+ 		pm_wakep_autosleep_enabled(true);
+ 		queue_up_suspend_work();
++#ifdef CONFIG_POWERSUSPEND
++		set_power_suspend_state_hook(POWER_SUSPEND_ACTIVE); // Yank555.lu : add hook to handle powersuspend tasks
++#endif
+ 	} else {
+ 		pm_wakep_autosleep_enabled(false);
++#ifdef CONFIG_POWERSUSPEND
++		set_power_suspend_state_hook(POWER_SUSPEND_INACTIVE); // Yank555.lu : add hook to handle powersuspend tasks
++#endif
+ 	}
+ 
+ 	mutex_unlock(&autosleep_lock);
+diff --git a/kernel/power/powersuspend.c b/kernel/power/powersuspend.c
+index cc647c5..d6d1243 100644
+--- a/kernel/power/powersuspend.c
++++ b/kernel/power/powersuspend.c
+@@ -3,6 +3,11 @@
+  * Copyright (C) 2005-2008 Google, Inc.
+  * Copyright (C) 2013 Paul Reioux
+  *
++ * Modified by Jean-Pierre Rasquin <yank555.lu@gmail.com>
++ *
++ *   make powersuspend not depend on a userspace initiator anymore,
++ *   but use a hook in autosleep instead.
++ *
+  * This software is licensed under the terms of the GNU General Public
+  * License version 2, as published by the Free Software Foundation, and
+  * may be copied, distributed, and modified under those terms.
+@@ -20,7 +25,9 @@
+ #include <linux/workqueue.h>
+ 
+ #define MAJOR_VERSION	1
+-#define MINOR_VERSION	0
++#define MINOR_VERSION	1
++
++//#define POWER_SUSPEND_DEBUG
+ 
+ struct workqueue_struct *suspend_work_queue;
+ 
+@@ -62,22 +69,30 @@ static void power_suspend(struct work_struct *work)
+ 	unsigned long irqflags;
+ 	int abort = 0;
+ 
++#ifdef POWER_SUSPEND_DEBUG
++	pr_warn("power_suspend: entering suspend...\n");
++#endif
+ 	mutex_lock(&power_suspend_lock);
+ 	spin_lock_irqsave(&state_lock, irqflags);
+-	if (state != 1)
++	if (state == POWER_SUSPEND_INACTIVE)
+ 		abort = 1;
+ 	spin_unlock_irqrestore(&state_lock, irqflags);
+ 
+-	if (abort) {
+-		mutex_unlock(&power_suspend_lock);
+-		return;
+-	}
++	if (abort)
++		goto abort_suspend;
+ 
++#ifdef POWER_SUSPEND_DEBUG
++	pr_warn("power_suspend: suspending...\n");
++#endif
+ 	list_for_each_entry(pos, &power_suspend_handlers, link) {
+ 		if (pos->suspend != NULL) {
+ 			pos->suspend(pos);
+ 		}
+ 	}
++#ifdef POWER_SUSPEND_DEBUG
++	pr_warn("power_suspend: suspended.\n");
++#endif
++abort_suspend:
+ 	mutex_unlock(&power_suspend_lock);
+ }
+ 
+@@ -87,60 +102,68 @@ static void power_resume(struct work_struct *work)
+ 	unsigned long irqflags;
+ 	int abort = 0;
+ 
++#ifdef POWER_SUSPEND_DEBUG
++	pr_warn("powersuspend: entering resume...\n");
++#endif
+ 	mutex_lock(&power_suspend_lock);
+ 	spin_lock_irqsave(&state_lock, irqflags);
+-	if (state == 1)
++	if (state == POWER_SUSPEND_ACTIVE)
+ 		abort = 1;
+ 	spin_unlock_irqrestore(&state_lock, irqflags);
+ 
+-	if (abort) {
+-		goto abort;
+-	}
++	if (abort)
++		goto abort_resume;
++
++#ifdef POWER_SUSPEND_DEBUG
++	pr_warn("powersuspend: resuming...\n");
++#endif
+ 	list_for_each_entry_reverse(pos, &power_suspend_handlers, link) {
+ 		if (pos->resume != NULL) {
+ 			pos->resume(pos);
+ 		}
+ 	}
+-abort:
++#ifdef POWER_SUSPEND_DEBUG
++	pr_warn("power_suspend: resumed.\n");
++#endif
++abort_resume:
+ 	mutex_unlock(&power_suspend_lock);
+ }
+ 
+-static void set_power_suspend_state(int new_state)
++void set_power_suspend_state_hook(int new_state)
+ {
+ 	unsigned long irqflags;
+ 	int old_sleep;
+ 
+ 	spin_lock_irqsave(&state_lock, irqflags);
+ 	old_sleep = state;
+-	if (!old_sleep && new_state == 1) {
++	if (old_sleep == POWER_SUSPEND_INACTIVE && new_state == POWER_SUSPEND_ACTIVE) {
++#ifdef POWER_SUSPEND_DEBUG
++		pr_warn("power_suspend: activated.\n");
++#endif
+ 		state = new_state;
+ 		queue_work(suspend_work_queue, &power_suspend_work);
+-	} else if (!old_sleep || new_state == 0) {
++	} else if (old_sleep == POWER_SUSPEND_INACTIVE || new_state == POWER_SUSPEND_INACTIVE) {
++#ifdef POWER_SUSPEND_DEBUG
++		pr_warn("power_suspend: deactivated.\n");
++#endif
+ 		state = new_state;
+ 		queue_work(suspend_work_queue, &power_resume_work);
+ 	}
+ 	spin_unlock_irqrestore(&state_lock, irqflags);
+ }
+ 
++EXPORT_SYMBOL(set_power_suspend_state_hook);
++
+ static ssize_t power_suspend_show(struct kobject *kobj,
+ 		struct kobj_attribute *attr, char *buf)
+ {
+         return sprintf(buf, "%u\n", state);
+ }
+ 
+-static ssize_t power_suspend_store(struct kobject *kobj,
+-		struct kobj_attribute *attr, const char *buf, size_t count)
+-{
+-	int data = 0;
+-
+-	sscanf(buf, "%d\n", &data);
+-
+-	if(data == 1 || data == 0) {
+-		set_power_suspend_state(data);
+-		pr_info("power suspend state requested => %d\n", data);
+-	}
+-	return count;
+-}
++static struct kobj_attribute power_suspend_attribute =
++	__ATTR(power_suspend_state, 0444,
++		power_suspend_show,
++		NULL);
+ 
+ static ssize_t power_suspend_version_show(struct kobject *kobj,
+ 		struct kobj_attribute *attr, char *buf)
+@@ -148,13 +171,8 @@ static ssize_t power_suspend_version_show(struct kobject *kobj,
+ 	return sprintf(buf, "version: %d.%d\n", MAJOR_VERSION, MINOR_VERSION);
+ }
+ 
+-static struct kobj_attribute power_suspend_attribute =
+-        __ATTR(power_suspend_state, 0666,
+-		power_suspend_show,
+-		power_suspend_store);
+-
+ static struct kobj_attribute power_suspend_version_attribute =
+-        __ATTR(power_suspend_version, 0444,
++	__ATTR(power_suspend_version, 0444,
+ 		power_suspend_version_show,
+ 		NULL);
+ 
+@@ -198,6 +216,7 @@ static int __init power_suspend_init(void)
+ 	if (suspend_work_queue == NULL) {
+ 		return -ENOMEM;
+ 	}
++
+ 	return 0;
+ }
+ 
+@@ -212,7 +231,7 @@ static void __exit power_suspend_exit(void)
+ core_initcall(power_suspend_init);
+ module_exit(power_suspend_exit);
+ 
+-MODULE_AUTHOR("Paul Reioux <reioux@gmail.com>");
++MODULE_AUTHOR("Paul Reioux <reioux@gmail.com> / Jean-Pierre Rasquin <yank555.lu@gmail.com>");
+ MODULE_DESCRIPTION("power_suspend - A replacement kernel PM driver for"
+         "Android's deprecated early_suspend/late_resume PM driver!");
+ MODULE_LICENSE("GPL v2");
+-- 
+1.8.1.2
+

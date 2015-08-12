@@ -1,0 +1,37 @@
+From 38b11e906107bbcbb4e89c0f81cbb0e379b6d23c Mon Sep 17 00:00:00 2001
+From: Viresh Kumar <viresh.kumar@linaro.org>
+Date: Mon, 17 Jun 2013 12:39:50 -0500
+Subject: [PATCH 182/507] sched: Use cached value of span instead of calling
+ sched_domain_span()
+
+Date	Tue, 11 Jun 2013 16:32:43 +0530
+
+In the beginning of build_sched_groups() we called sched_domain_span() and
+cached its return value in span. Few statements later we are calling it again to
+get the same pointer.
+
+Lets use the cached value instead as it hasn't changed in between.
+
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/sched/core.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 1edae0c..a1befdb 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -6212,7 +6212,7 @@ build_sched_groups(struct sched_domain *sd, int cpu)
+ 	get_group(cpu, sdd, &sd->groups);
+ 	atomic_inc(&sd->groups->ref);
+ 
+-	if (cpu != cpumask_first(sched_domain_span(sd)))
++	if (cpu != cpumask_first(span))
+ 		return 0;
+ 
+ 	lockdep_assert_held(&sched_domains_mutex);
+-- 
+1.7.9.5
+

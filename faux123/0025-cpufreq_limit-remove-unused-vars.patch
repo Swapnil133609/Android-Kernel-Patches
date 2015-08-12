@@ -1,0 +1,25 @@
+From 0ee21ac718e308cea0a24dfe07d88407ed4fef43 Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Fri, 7 Dec 2012 22:49:17 -0800
+Subject: [PATCH 025/338] cpufreq_limit: remove unused vars
+
+Signed-off-by: faux123 <reioux@gmail.com>
+---
+ arch/arm/mach-msm/cpufreq_limit.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/cpufreq_limit.c b/arch/arm/mach-msm/cpufreq_limit.c
+index d30c209..e880dce 100644
+--- a/arch/arm/mach-msm/cpufreq_limit.c
++++ b/arch/arm/mach-msm/cpufreq_limit.c
+@@ -56,7 +56,6 @@ static ssize_t msm_cpufreq_limit_store(struct kobject *kobj, struct kobj_attribu
+ {
+ 	int cpu = 0;
+ 	int ret = 0;
+-	uint32_t max_freq = limited_max_freq;
+ 
+ 	unsigned int data;
+ 
+-- 
+1.8.1.2
+

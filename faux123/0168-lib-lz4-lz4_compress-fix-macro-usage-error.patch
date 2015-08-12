@@ -1,0 +1,30 @@
+From 61c97c907539bc01c4f97e1a3237cc03faee3106 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Fri, 9 Aug 2013 13:05:22 -0500
+Subject: [PATCH 168/338] lib/lz4/lz4_compress: fix macro usage error
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ lib/lz4/lz4_compress.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/lib/lz4/lz4_compress.c b/lib/lz4/lz4_compress.c
+index fd94058..1076281 100644
+--- a/lib/lz4/lz4_compress.c
++++ b/lib/lz4/lz4_compress.c
+@@ -423,10 +423,10 @@ int lz4_compress(const unsigned char *src, size_t src_len,
+ 
+ 	if (src_len < LZ4_64KLIMIT)
+ 		out_len = lz4_compress64kctx(wrkmem, src, dst, src_len,
+-				lz4_compressbound(src_len));
++				LZ4_COMPRESSBOUND(src_len));
+ 	else
+ 		out_len = lz4_compressctx(wrkmem, src, dst, src_len,
+-				lz4_compressbound(src_len));
++				LZ4_COMPRESSBOUND(src_len));
+ 
+ 	if (out_len < 0)
+ 		goto exit;
+-- 
+1.8.1.2
+

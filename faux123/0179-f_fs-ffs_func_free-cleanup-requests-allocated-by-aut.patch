@@ -1,0 +1,49 @@
+From 362777361b04bff458597bc3134c65ca07985915 Mon Sep 17 00:00:00 2001
+From: Peter Korsgaard <peter.korsgaard@barco.com>
+Date: Thu, 3 May 2012 12:58:49 +0200
+Subject: [PATCH 179/507] f_fs: ffs_func_free: cleanup requests allocated by
+ autoconfig
+
+functionfs was leaking request objects created by autoconfig.
+
+Bug: 8659094
+
+Change-Id: I641326cb5cb26e0a2ffa082cd2be2c21c66c38e5
+Signed-off-by: Peter Korsgaard <peter.korsgaard@barco.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Benoit Goby <benoit@android.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/usb/gadget/f_fs.c |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/drivers/usb/gadget/f_fs.c b/drivers/usb/gadget/f_fs.c
+index f52cb1a..1d4c535 100644
+--- a/drivers/usb/gadget/f_fs.c
++++ b/drivers/usb/gadget/f_fs.c
+@@ -1473,8 +1473,22 @@ static int functionfs_bind_config(struct usb_composite_dev *cdev,
+ 
+ static void ffs_func_free(struct ffs_function *func)
+ {
++	struct ffs_ep *ep         = func->eps;
++	unsigned count            = func->ffs->eps_count;
++	unsigned long flags;
++
+ 	ENTER();
+ 
++	/* cleanup after autoconfig */
++	spin_lock_irqsave(&func->ffs->eps_lock, flags);
++	do {
++		if (ep->ep && ep->req)
++			usb_ep_free_request(ep->ep, ep->req);
++		ep->req = NULL;
++		++ep;
++	} while (--count);
++	spin_unlock_irqrestore(&func->ffs->eps_lock, flags);
++
+ 	ffs_data_put(func->ffs);
+ 
+ 	kfree(func->eps);
+-- 
+1.7.9.5
+

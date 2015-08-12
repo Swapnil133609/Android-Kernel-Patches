@@ -1,0 +1,40 @@
+From 3812c28085fb648251c60df672623e8d69c53a8d Mon Sep 17 00:00:00 2001
+From: Christoph Lameter <cl@linux.com>
+Date: Tue, 4 Sep 2012 23:06:14 +0000
+Subject: [PATCH 250/507] mm/slub: Add debugging to verify correct cache use
+ on kmem_cache_free()
+
+Add additional debugging to check that the objects is actually from the cache
+the caller claims. Doing so currently trips up some other debugging code. It
+takes a lot to infer from that what was happening.
+
+Reviewed-by: Glauber Costa <glommer@parallels.com>
+Signed-off-by: Christoph Lameter <cl@linux.com>
+[ penberg@kernel.org: Use pr_err() ]
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slub.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/mm/slub.c b/mm/slub.c
+index 5a1537c..40c78ea 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -2618,6 +2618,13 @@ void kmem_cache_free(struct kmem_cache *s, void *x)
+ 
+ 	page = virt_to_head_page(x);
+ 
++	if (kmem_cache_debug(s) && page->slab != s) {
++		pr_err("kmem_cache_free: Wrong slab cache. %s but object"
++			" is from  %s\n", page->slab->name, s->name);
++		WARN_ON_ONCE(1);
++		return;
++	}
++
+ 	slab_free(s, page, x, _RET_IP_);
+ 
+ 	trace_kmem_cache_free(_RET_IP_, x);
+-- 
+1.7.9.5
+

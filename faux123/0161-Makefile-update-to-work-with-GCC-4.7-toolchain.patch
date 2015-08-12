@@ -1,0 +1,30 @@
+From 84eb65f15d5fe1077f739c118b53629d39eb6339 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Wed, 7 Aug 2013 16:28:59 -0500
+Subject: [PATCH 161/338] Makefile: update to work with GCC 4.7 toolchain
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ Makefile | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 39bf5f4..d87ca89 100644
+--- a/Makefile
++++ b/Makefile
+@@ -351,10 +351,10 @@ CC		= $(srctree)/scripts/gcc-wrapper.py $(REAL_CC)
+ 
+ CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
+ 		  -Wbitwise -Wno-return-void $(CF)
+-CFLAGS_MODULE   = -fno-pic -mcpu=cortex-a15 -mtune=cortex-a15 -mfpu=neon-vfpv4
++CFLAGS_MODULE   = -munaligned-access -fno-pic -mfpu=neon-vfpv4
+ AFLAGS_MODULE   =
+ LDFLAGS_MODULE  =
+-CFLAGS_KERNEL	= -mcpu=cortex-a15 -mtune=cortex-a15 -mfpu=neon-vfpv4
++CFLAGS_KERNEL	= -munaligned-access -mfpu=neon-vfpv4
+ AFLAGS_KERNEL	=
+ CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
+ 
+-- 
+1.8.1.2
+

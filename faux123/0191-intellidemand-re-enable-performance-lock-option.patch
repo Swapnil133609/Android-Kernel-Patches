@@ -1,0 +1,72 @@
+From 0780e56a39671fa79e0cd9c07f1e05331fb959c7 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Mon, 24 Jun 2013 14:20:57 -0500
+Subject: [PATCH 191/507] intellidemand: re-enable performance lock option
+
+with low freq enabled kernels, minimum performance lock will help music
+playback to be smooth and glitch free
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/Kconfig                 |    2 +-
+ drivers/cpufreq/cpufreq_intellidemand.c |   16 +++++++++++++++-
+ 2 files changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+index d77174c..b174640 100644
+--- a/drivers/cpufreq/Kconfig
++++ b/drivers/cpufreq/Kconfig
+@@ -184,7 +184,7 @@ config CPU_FREQ_GOV_ONDEMAND
+ config CPUFREQ_ID_PERFLOCK
+ 	bool "Intellidemand Performance Lock"
+ 	depends on CPU_FREQ_GOV_INTELLIDEMAND
+-	default	y
++	default	n
+ 	help
+ 		Minimum CPU performance lock for Intellidemand governor
+ 
+diff --git a/drivers/cpufreq/cpufreq_intellidemand.c b/drivers/cpufreq/cpufreq_intellidemand.c
+index 0ccd1b5..5b00ce0 100644
+--- a/drivers/cpufreq/cpufreq_intellidemand.c
++++ b/drivers/cpufreq/cpufreq_intellidemand.c
+@@ -61,6 +61,10 @@
+ #define DBS_SYNC_FREQ				(702000)
+ #define DBS_OPTIMAL_FREQ			(1566000)
+ 
++#ifdef CONFIG_CPUFREQ_ID_PERFLOCK
++#define DBS_PERFLOCK_MIN_FREQ			(594000)
++#endif
++
+ static u64 freq_boosted_time;
+ /*
+  * The polling frequency of this governor depends on the capability of
+@@ -93,7 +97,7 @@ static u64 sampling_rate_boosted_time;
+ static unsigned int current_sampling_rate = DEF_SAMPLING_RATE;
+ 
+ #ifdef CONFIG_CPUFREQ_ID_PERFLOCK
+-static unsigned int saved_policy_min;
++static unsigned int saved_policy_min = 0;
+ #endif
+ 
+ static void do_dbs_timer(struct work_struct *work);
+@@ -1348,6 +1352,16 @@ static void do_dbs_timer(struct work_struct *work)
+ 		if (rq_persist_count > 0)
+ 			rq_persist_count--;
+ 
++#ifdef CONFIG_CPUFREQ_ID_PERFLOCK
++	if (num_online_cpus() >= 2) {
++		if (saved_policy_min != 0)
++			policy->min = saved_policy_min;
++	} else if (num_online_cpus() == 1) {
++		saved_policy_min = policy->min;
++		policy->min = DBS_PERFLOCK_MIN_FREQ;
++	}
++#endif
++
+ #ifdef CONFIG_CPUFREQ_LIMIT_MAX_FREQ
+ 	if (rq_persist_count > 3) {
+ 		lmf_browsing_state = false;
+-- 
+1.7.9.5
+

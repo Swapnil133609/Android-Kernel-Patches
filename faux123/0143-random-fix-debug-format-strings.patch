@@ -1,0 +1,93 @@
+From 32b13dcca93d5f0d307cf28416d266e9a01f5db3 Mon Sep 17 00:00:00 2001
+From: Jiri Kosina <jkosina@suse.cz>
+Date: Mon, 15 Oct 2012 23:43:29 +0200
+Subject: [PATCH 143/507] random: fix debug format strings
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Fix the following warnings in formatting debug output:
+
+drivers/char/random.c: In function ‘xfer_secondary_pool’:
+drivers/char/random.c:827: warning: format ‘%d’ expects type ‘int’, but argument 7 has type ‘size_t’
+drivers/char/random.c: In function ‘account’:
+drivers/char/random.c:859: warning: format ‘%d’ expects type ‘int’, but argument 5 has type ‘size_t’
+drivers/char/random.c:881: warning: format ‘%d’ expects type ‘int’, but argument 5 has type ‘size_t’
+drivers/char/random.c: In function ‘random_read’:
+drivers/char/random.c:1141: warning: format ‘%d’ expects type ‘int’, but argument 5 has type ‘ssize_t’
+drivers/char/random.c:1145: warning: format ‘%d’ expects type ‘int’, but argument 5 has type ‘ssize_t’
+drivers/char/random.c:1145: warning: format ‘%d’ expects type ‘int’, but argument 6 has type ‘long unsigned int’
+
+by using '%zd' instead of '%d' to properly denote ssize_t/size_t conversion.
+
+Signed-off-by: Jiri Kosina <jkosina@suse.cz>
+Signed-off-by: Theodore Ts'o <tytso@mit.edu>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/char/random.c |   19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/char/random.c b/drivers/char/random.c
+index b86eae9..aefb0b5 100644
+--- a/drivers/char/random.c
++++ b/drivers/char/random.c
+@@ -829,7 +829,7 @@ static void xfer_secondary_pool(struct entropy_store *r, size_t nbytes)
+ 		bytes = min_t(int, bytes, sizeof(tmp));
+ 
+ 		DEBUG_ENT("going to reseed %s with %d bits "
+-			  "(%d of %d requested)\n",
++			  "(%zu of %d requested)\n",
+ 			  r->name, bytes * 8, nbytes * 8, r->entropy_count);
+ 
+ 		bytes = extract_entropy(r->pull, tmp, bytes,
+@@ -860,7 +860,7 @@ static size_t account(struct entropy_store *r, size_t nbytes, int min,
+ 	spin_lock_irqsave(&r->lock, flags);
+ 
+ 	BUG_ON(r->entropy_count > r->poolinfo->POOLBITS);
+-	DEBUG_ENT("trying to extract %d bits from %s\n",
++	DEBUG_ENT("trying to extract %zu bits from %s\n",
+ 		  nbytes * 8, r->name);
+ 
+ 	/* Can we pull enough? */
+@@ -882,7 +882,7 @@ static size_t account(struct entropy_store *r, size_t nbytes, int min,
+ 		}
+ 	}
+ 
+-	DEBUG_ENT("debiting %d entropy credits from %s%s\n",
++	DEBUG_ENT("debiting %zu entropy credits from %s%s\n",
+ 		  nbytes * 8, r->name, r->limit ? "" : " (unlimited)");
+ 
+ 	spin_unlock_irqrestore(&r->lock, flags);
+@@ -1142,11 +1142,16 @@ random_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
+ 		if (n > SEC_XFER_SIZE)
+ 			n = SEC_XFER_SIZE;
+ 
+-		DEBUG_ENT("reading %d bits\n", n*8);
++		DEBUG_ENT("reading %zu bits\n", n*8);
+ 
+ 		n = extract_entropy_user(&blocking_pool, buf, n);
+ 
+-		DEBUG_ENT("read got %d bits (%d still needed)\n",
++		if (n < 0) {
++			retval = n;
++			break;
++		}
++
++		DEBUG_ENT("read got %zd bits (%zd still needed)\n",
+ 			  n*8, (nbytes-n)*8);
+ 
+ 		if (n == 0) {
+@@ -1171,10 +1176,6 @@ random_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
+ 			continue;
+ 		}
+ 
+-		if (n < 0) {
+-			retval = n;
+-			break;
+-		}
+ 		count += n;
+ 		buf += n;
+ 		nbytes -= n;
+-- 
+1.7.9.5
+

@@ -1,0 +1,48 @@
+From 1785a0efa9d3418c048b5776cd457d2ad28ab57b Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Fri, 24 May 2013 16:31:19 -0500
+Subject: [PATCH 139/338] intellidemand: set default sampling rate to 50k
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ drivers/cpufreq/cpufreq_intellidemand.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_intellidemand.c b/drivers/cpufreq/cpufreq_intellidemand.c
+index dfe6d95..0ccd1b5 100644
+--- a/drivers/cpufreq/cpufreq_intellidemand.c
++++ b/drivers/cpufreq/cpufreq_intellidemand.c
+@@ -54,7 +54,7 @@
+ #define MIN_FREQUENCY_UP_THRESHOLD		(11)
+ #define MAX_FREQUENCY_UP_THRESHOLD		(100)
+ #define MIN_FREQUENCY_DOWN_DIFFERENTIAL		(1)
+-#define DEFAULT_FREQ_BOOST_TIME			(2500000)
++#define DEFAULT_FREQ_BOOST_TIME			(3500000)
+ #define DEF_SAMPLING_RATE			(50000)
+ #define BOOSTED_SAMPLING_RATE			(15000)
+ #define DBS_INPUT_EVENT_MIN_FREQ		(1026000)
+@@ -90,7 +90,7 @@ static unsigned long stored_sampling_rate;
+ #define TIMER_RATE_BOOST_TIME 2500000
+ static int sampling_rate_boosted;
+ static u64 sampling_rate_boosted_time;
+-static unsigned int current_sampling_rate;
++static unsigned int current_sampling_rate = DEF_SAMPLING_RATE;
+ 
+ #ifdef CONFIG_CPUFREQ_ID_PERFLOCK
+ static unsigned int saved_policy_min;
+@@ -1676,10 +1676,8 @@ static void dbs_refresh_callback(struct work_struct *work)
+ 	}
+ 
+ 	if (policy->cur < DBS_INPUT_EVENT_MIN_FREQ) {
+-#if 1
+-		pr_info("%s: set cpufreq to DBS_INPUT_EVENT_MIN_FREQ(%d) \
+-			directly due to input events!\n", __func__, \
+-			DBS_INPUT_EVENT_MIN_FREQ);
++#if 0
++		pr_info("%s: set cpufreq to DBS_INPUT_EVENT_MIN_FREQ(%d) due to input events!\n", __func__, DBS_INPUT_EVENT_MIN_FREQ);
+ #endif
+ 		/*
+ 		 * Arch specific cpufreq driver may fail.
+-- 
+1.8.1.2
+

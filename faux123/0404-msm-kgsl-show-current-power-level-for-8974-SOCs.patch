@@ -1,0 +1,58 @@
+From 9906882c448f285f05545f251000a98a9fc9348d Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Mon, 11 Nov 2013 20:02:39 -0600
+Subject: [PATCH 404/507] msm: kgsl: show current power level for 8974 SOCs.
+
+since 8974 uses duplicate frequencies in its table, it's not possible to tell
+which of the duplicates is actually in use
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/msm/kgsl_pwrctrl.c |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/drivers/gpu/msm/kgsl_pwrctrl.c b/drivers/gpu/msm/kgsl_pwrctrl.c
+index d01a1ec..4d3189b 100644
+--- a/drivers/gpu/msm/kgsl_pwrctrl.c
++++ b/drivers/gpu/msm/kgsl_pwrctrl.c
+@@ -364,6 +364,18 @@ static int kgsl_pwrctrl_min_pwrlevel_show(struct device *dev,
+ 	return snprintf(buf, PAGE_SIZE, "%d\n", pwr->min_pwrlevel);
+ }
+ 
++static int kgsl_pwrctrl_active_pwrlevel_show(struct device *dev,
++                                        struct device_attribute *attr,
++                                        char *buf)
++{
++	struct kgsl_device *device = kgsl_device_from_dev(dev);
++	struct kgsl_pwrctrl *pwr;
++	if (device == NULL)
++		return 0;
++	pwr = &device->pwrctrl;
++	return snprintf(buf, PAGE_SIZE, "%d\n", pwr->active_pwrlevel);
++}
++
+ static int kgsl_pwrctrl_num_pwrlevels_show(struct device *dev,
+ 					struct device_attribute *attr,
+ 					char *buf)
+@@ -760,6 +772,9 @@ DEVICE_ATTR(max_pwrlevel, 0644,
+ DEVICE_ATTR(min_pwrlevel, 0644,
+ 	kgsl_pwrctrl_min_pwrlevel_show,
+ 	kgsl_pwrctrl_min_pwrlevel_store);
++DEVICE_ATTR(active_pwrlevel, 0444,
++	kgsl_pwrctrl_active_pwrlevel_show,
++	NULL);
+ DEVICE_ATTR(thermal_pwrlevel, 0644,
+ 	kgsl_pwrctrl_thermal_pwrlevel_show,
+ 	kgsl_pwrctrl_thermal_pwrlevel_store);
+@@ -791,6 +806,7 @@ static const struct device_attribute *pwrctrl_attr_list[] = {
+ 	&dev_attr_gpu_available_frequencies,
+ 	&dev_attr_max_pwrlevel,
+ 	&dev_attr_min_pwrlevel,
++	&dev_attr_active_pwrlevel,
+ 	&dev_attr_thermal_pwrlevel,
+ 	&dev_attr_num_pwrlevels,
+ 	&dev_attr_pmqos_latency,
+-- 
+1.7.9.5
+

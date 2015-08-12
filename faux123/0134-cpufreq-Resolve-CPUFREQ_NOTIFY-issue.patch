@@ -1,0 +1,40 @@
+From 670a7b4ff80c221d59d29fe7a06422f75383b98a Mon Sep 17 00:00:00 2001
+From: Archana Sathyakumar <asathyak@codeaurora.org>
+Date: Wed, 1 May 2013 15:26:36 -0600
+Subject: [PATCH 134/507] cpufreq: Resolve CPUFREQ_NOTIFY issue
+
+When the cpufreq_stat receives the frequency policy notification,
+it checks if the frequency table and stats table are present for the cpu.
+If both are present, it returns with -EBUSY error to the notification.
+Due to this, none of the other registered modules receive this
+notification.
+
+If the stat table and sysfs nodes are already created, return 0 instead
+of returning EBUSY error.
+
+Change-Id: I1fd4a46e6a65edfc6253c4271288f10912ae2ad7
+Signed-off-by: Archana Sathyakumar <asathyak@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_stats.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/cpufreq_stats.c b/drivers/cpufreq/cpufreq_stats.c
+index c3110c3..9c74ef1 100644
+--- a/drivers/cpufreq/cpufreq_stats.c
++++ b/drivers/cpufreq/cpufreq_stats.c
+@@ -306,8 +306,10 @@ static int cpufreq_stats_create_table(struct cpufreq_policy *policy,
+ 	struct cpufreq_policy *data;
+ 	unsigned int alloc_size;
+ 	unsigned int cpu = policy->cpu;
++
+ 	if (per_cpu(cpufreq_stats_table, cpu))
+-		return -EBUSY;
++		return 0;
++
+ 	stat = kzalloc(sizeof(struct cpufreq_stats), GFP_KERNEL);
+ 	if ((stat) == NULL)
+ 		return -ENOMEM;
+-- 
+1.7.9.5
+

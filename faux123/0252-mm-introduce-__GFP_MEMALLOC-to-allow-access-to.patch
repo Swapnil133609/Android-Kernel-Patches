@@ -1,0 +1,173 @@
+From 8f04e07de24d1c870691e1618e086d30ebce3da2 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sat, 2 Nov 2013 19:00:22 -0500
+Subject: [PATCH 252/507] mm: introduce __GFP_MEMALLOC to allow access to 
+ emergency reserves
+
+__GFP_MEMALLOC will allow the allocation to disregard the watermarks, much
+like PF_MEMALLOC.  It allows one to pass along the memalloc state in
+object related allocation flags as opposed to task related flags, such as
+sk->sk_allocation.  This removes the need for ALLOC_PFMEMALLOC as callers
+using __GFP_MEMALLOC can get the ALLOC_NO_WATERMARK flag which is now
+enough to identify allocations related to page reclaim.
+
+Signed-off-by: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Signed-off-by: Mel Gorman <mgorman@suse.de>
+Cc: David Miller <davem@davemloft.net>
+Cc: Neil Brown <neilb@suse.de>
+Cc: Mike Christie <michaelc@cs.wisc.edu>
+Cc: Eric B Munson <emunson@mgebm.net>
+Cc: Eric Dumazet <eric.dumazet@gmail.com>
+Cc: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
+Cc: Mel Gorman <mgorman@suse.de>
+Cc: Christoph Lameter <cl@linux.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+backported to Android Linux 3.4 by faux123
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/gfp.h             |   10 ++++++++--
+ include/linux/mm_types.h        |    2 +-
+ include/trace/events/gfpflags.h |    1 +
+ mm/internal.h                   |    1 -
+ mm/page_alloc.c                 |   21 ++++++++++-----------
+ mm/slab.c                       |    2 +-
+ 6 files changed, 21 insertions(+), 16 deletions(-)
+
+diff --git a/include/linux/gfp.h b/include/linux/gfp.h
+index 7b3823e..55acab0 100644
+--- a/include/linux/gfp.h
++++ b/include/linux/gfp.h
+@@ -30,6 +30,7 @@ struct vm_area_struct;
+ #define ___GFP_HARDWALL		0x20000u
+ #define ___GFP_THISNODE		0x40000u
+ #define ___GFP_RECLAIMABLE	0x80000u
++#define ___GFP_MEMALLOC		0x100000u
+ #ifdef CONFIG_KMEMCHECK
+ #define ___GFP_NOTRACK		0x200000u
+ #else
+@@ -79,9 +80,14 @@ struct vm_area_struct;
+ #define __GFP_REPEAT	((__force gfp_t)___GFP_REPEAT)	/* See above */
+ #define __GFP_NOFAIL	((__force gfp_t)___GFP_NOFAIL)	/* See above */
+ #define __GFP_NORETRY	((__force gfp_t)___GFP_NORETRY) /* See above */
++#define __GFP_MEMALLOC	((__force gfp_t)___GFP_MEMALLOC)/* Allow access to emergency reserves */
+ #define __GFP_COMP	((__force gfp_t)___GFP_COMP)	/* Add compound page metadata */
+ #define __GFP_ZERO	((__force gfp_t)___GFP_ZERO)	/* Return zeroed page on success */
+-#define __GFP_NOMEMALLOC ((__force gfp_t)___GFP_NOMEMALLOC) /* Don't use emergency reserves */
++#define __GFP_NOMEMALLOC ((__force gfp_t)___GFP_NOMEMALLOC) /* Don't use emergency reserves.
++							 * This takes precedence over the
++							 * __GFP_MEMALLOC flag if both are
++							 * set
++							 */
+ #define __GFP_HARDWALL   ((__force gfp_t)___GFP_HARDWALL) /* Enforce hardwall cpuset memory allocs */
+ #define __GFP_THISNODE	((__force gfp_t)___GFP_THISNODE)/* No fallback, no policies */
+ #define __GFP_RECLAIMABLE ((__force gfp_t)___GFP_RECLAIMABLE) /* Page is reclaimable */
+@@ -132,7 +138,7 @@ struct vm_area_struct;
+ /* Control page allocator reclaim behavior */
+ #define GFP_RECLAIM_MASK (__GFP_WAIT|__GFP_HIGH|__GFP_IO|__GFP_FS|\
+ 			__GFP_NOWARN|__GFP_REPEAT|__GFP_NOFAIL|\
+-			__GFP_NORETRY|__GFP_NOMEMALLOC)
++			__GFP_NORETRY|__GFP_MEMALLOC|__GFP_NOMEMALLOC)
+ 
+ /* Control slab gfp mask during early boot */
+ #define GFP_BOOT_MASK (__GFP_BITS_MASK & ~(__GFP_WAIT|__GFP_IO|__GFP_FS))
+diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
+index d00e5be..b71581c 100644
+--- a/include/linux/mm_types.h
++++ b/include/linux/mm_types.h
+@@ -55,7 +55,7 @@ struct page {
+ 			pgoff_t index;		/* Our offset within mapping. */
+ 			void *freelist;		/* slub/slob first free object */
+ 			bool pfmemalloc;	/* If set by the page allocator,
+-						 * ALLOC_PFMEMALLOC was set
++						 * ALLOC_NO_WATERMARKS was set
+ 						 * and the low watermark was not
+ 						 * met implying that the system
+ 						 * is under some pressure. The
+diff --git a/include/trace/events/gfpflags.h b/include/trace/events/gfpflags.h
+index 9fe3a36..d6fd8e5 100644
+--- a/include/trace/events/gfpflags.h
++++ b/include/trace/events/gfpflags.h
+@@ -30,6 +30,7 @@
+ 	{(unsigned long)__GFP_COMP,		"GFP_COMP"},		\
+ 	{(unsigned long)__GFP_ZERO,		"GFP_ZERO"},		\
+ 	{(unsigned long)__GFP_NOMEMALLOC,	"GFP_NOMEMALLOC"},	\
++	{(unsigned long)__GFP_MEMALLOC,		"GFP_MEMALLOC"},	\
+ 	{(unsigned long)__GFP_HARDWALL,		"GFP_HARDWALL"},	\
+ 	{(unsigned long)__GFP_THISNODE,		"GFP_THISNODE"},	\
+ 	{(unsigned long)__GFP_RECLAIMABLE,	"GFP_RECLAIMABLE"},	\
+diff --git a/mm/internal.h b/mm/internal.h
+index db9a9cbe..7ee736d 100644
+--- a/mm/internal.h
++++ b/mm/internal.h
+@@ -359,4 +359,3 @@ extern u32 hwpoison_filter_enable;
+ #define ALLOC_HIGH		0x20 /* __GFP_HIGH set */
+ #define ALLOC_CPUSET		0x40 /* check for correct cpuset */
+ #define ALLOC_CMA		0x80 /* allow allocations from CMA areas */
+-#define ALLOC_PFMEMALLOC       0x100 /* Caller has PF_MEMALLOC set */
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 398ac55..9ea0f09 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -2336,11 +2336,10 @@ gfp_to_alloc_flags(gfp_t gfp_mask)
+ 	} else if (unlikely(rt_task(current)) && !in_interrupt())
+ 		alloc_flags |= ALLOC_HARDER;
+ 
+-	if ((current->flags & PF_MEMALLOC) ||
+-			unlikely(test_thread_flag(TIF_MEMDIE))) {
+-		alloc_flags |= ALLOC_PFMEMALLOC;
+-
+-		if (likely(!(gfp_mask & __GFP_NOMEMALLOC)) && !in_interrupt())
++	if (likely(!(gfp_mask & __GFP_NOMEMALLOC))) {
++		if (gfp_mask & __GFP_MEMALLOC)
++			alloc_flags |= ALLOC_NO_WATERMARKS;
++		else if (likely(!(gfp_mask & __GFP_NOMEMALLOC)) && !in_interrupt())
+ 			alloc_flags |= ALLOC_NO_WATERMARKS;
+ 	}
+ #ifdef CONFIG_CMA
+@@ -2352,7 +2351,7 @@ gfp_to_alloc_flags(gfp_t gfp_mask)
+ 
+ bool gfp_pfmemalloc_allowed(gfp_t gfp_mask)
+ {
+-	return !!(gfp_to_alloc_flags(gfp_mask) & ALLOC_PFMEMALLOC);
++	return !!(gfp_to_alloc_flags(gfp_mask) & ALLOC_NO_WATERMARKS);
+ }
+ 
+ static inline struct page *
+@@ -2543,12 +2542,12 @@ nopage:
+ 	return page;
+ got_pg:
+ 	/*
+-	 * page->pfmemalloc is set when the caller had PFMEMALLOC set or is
+-	 * been OOM killed. The expectation is that the caller is taking
+-	 * steps that will free more memory. The caller should avoid the
+-	 * page being used for !PFMEMALLOC purposes.
++	 * page->pfmemalloc is set when the caller had PFMEMALLOC set, is
++	 * been OOM killed or specified __GFP_MEMALLOC. The expectation is
++	 * that the caller is taking steps that will free more memory. The
++	 * caller should avoid the page being used for !PFMEMALLOC purposes.
+ 	 */
+-	page->pfmemalloc = !!(alloc_flags & ALLOC_PFMEMALLOC);
++	page->pfmemalloc = !!(alloc_flags & ALLOC_NO_WATERMARKS);
+ 
+ 	if (kmemcheck_enabled)
+ 		kmemcheck_pagealloc_alloc(page, order, gfp_mask);
+diff --git a/mm/slab.c b/mm/slab.c
+index 55d84a2..77be18d 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -1884,7 +1884,7 @@ static void *kmem_getpages(struct kmem_cache *cachep, gfp_t flags, int nodeid)
+ 		return NULL;
+ 	}
+ 
+-	/* Record if ALLOC_PFMEMALLOC was set when allocating the slab */
++	/* Record if ALLOC_NO_WATERMARKS was set when allocating the slab */
+ 	if (unlikely(page->pfmemalloc))
+ 		pfmemalloc_active = true;
+ 
+-- 
+1.7.9.5
+

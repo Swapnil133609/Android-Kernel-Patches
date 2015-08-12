@@ -1,0 +1,26 @@
+From 03bd869c0910cd6844d83dc1075e8bad4f3072f4 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Fri, 17 May 2013 00:38:56 -0500
+Subject: [PATCH 132/507] block/Kconfig.iosched: disable test I/O scheduler
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ block/Kconfig.iosched |    1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/block/Kconfig.iosched b/block/Kconfig.iosched
+index fbad0b8..3e4c992 100644
+--- a/block/Kconfig.iosched
++++ b/block/Kconfig.iosched
+@@ -15,7 +15,6 @@ config IOSCHED_NOOP
+ config IOSCHED_TEST
+ 	tristate "Test I/O scheduler"
+ 	depends on DEBUG_FS
+-	default m
+ 	---help---
+ 	  The test I/O scheduler is a duplicate of the noop scheduler with
+ 	  addition of test utlity.
+-- 
+1.7.9.5
+

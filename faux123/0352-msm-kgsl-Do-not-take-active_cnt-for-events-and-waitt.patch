@@ -1,0 +1,120 @@
+From c49c975eb958325d3f96606a5ee20163223a023f Mon Sep 17 00:00:00 2001
+From: Jordan Crouse <jcrouse@codeaurora.org>
+Date: Thu, 24 Oct 2013 14:05:50 -0600
+Subject: [PATCH 352/507] msm: kgsl: Do not take active_cnt for events and
+ waittimestamp
+
+In the mists of time it was nessesary to take an active count
+for waittimestamp and events because we did not want to run
+the risk of suspending while the GPU was active.  Now that we
+have the dispatcher we have much better control over the GPU
+so the original risk is diminished.
+
+The problem is that holding active_cnt prevents us from going
+into nap and suspend and with server-side-sync a lot of the
+events we are waiting for might take a very long time before
+they even get dispatched on the GPU so we are essentially
+keeping the clocks on waiting for other people.
+
+z180 must take active count on its own.
+
+Change-Id: Ic0dedbadcb608115938b198faebe333d19c6a8f6
+Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/gpu/msm/kgsl.c        |    6 ++----
+ drivers/gpu/msm/kgsl_events.c |   14 --------------
+ drivers/gpu/msm/z180.c        |   10 +++++++---
+ 3 files changed, 9 insertions(+), 21 deletions(-)
+
+diff --git a/drivers/gpu/msm/kgsl.c b/drivers/gpu/msm/kgsl.c
+index 295edb9..ffbd52d 100644
+--- a/drivers/gpu/msm/kgsl.c
++++ b/drivers/gpu/msm/kgsl.c
+@@ -1767,10 +1767,8 @@ static int kgsl_cmdbatch_add_sync_timestamp(struct kgsl_device *device,
+ 	spin_unlock(&cmdbatch->lock);
+ 
+ 	mutex_lock(&device->mutex);
+-	kgsl_active_count_get(device);
+ 	ret = kgsl_add_event(device, context->id, sync->timestamp,
+ 		kgsl_cmdbatch_sync_func, event, NULL);
+-	kgsl_active_count_put(device);
+ 	mutex_unlock(&device->mutex);
+ 
+ 	if (ret) {
+@@ -3376,10 +3374,10 @@ static const struct {
+ 			KGSL_IOCTL_LOCK),
+ 	KGSL_IOCTL_FUNC(IOCTL_KGSL_DEVICE_WAITTIMESTAMP,
+ 			kgsl_ioctl_device_waittimestamp,
+-			KGSL_IOCTL_LOCK | KGSL_IOCTL_WAKE),
++			KGSL_IOCTL_LOCK),
+ 	KGSL_IOCTL_FUNC(IOCTL_KGSL_DEVICE_WAITTIMESTAMP_CTXTID,
+ 			kgsl_ioctl_device_waittimestamp_ctxtid,
+-			KGSL_IOCTL_LOCK | KGSL_IOCTL_WAKE),
++			KGSL_IOCTL_LOCK),
+ 	KGSL_IOCTL_FUNC(IOCTL_KGSL_RINGBUFFER_ISSUEIBCMDS,
+ 			kgsl_ioctl_rb_issueibcmds, 0),
+ 	KGSL_IOCTL_FUNC(IOCTL_KGSL_SUBMIT_COMMANDS,
+diff --git a/drivers/gpu/msm/kgsl_events.c b/drivers/gpu/msm/kgsl_events.c
+index ea863ea..bac16a2 100644
+--- a/drivers/gpu/msm/kgsl_events.c
++++ b/drivers/gpu/msm/kgsl_events.c
+@@ -58,8 +58,6 @@ static inline void _do_signal_event(struct kgsl_device *device,
+ 	list_del(&event->list);
+ 	kgsl_context_put(event->context);
+ 	kfree(event);
+-
+-	kgsl_active_count_put(device);
+ }
+ 
+ static void _retire_events(struct kgsl_device *device,
+@@ -212,7 +210,6 @@ EXPORT_SYMBOL(kgsl_signal_events);
+ int kgsl_add_event(struct kgsl_device *device, u32 id, u32 ts,
+ 	kgsl_event_func func, void *priv, void *owner)
+ {
+-	int ret;
+ 	struct kgsl_event *event;
+ 	unsigned int cur_ts;
+ 	struct kgsl_context *context = NULL;
+@@ -262,17 +259,6 @@ int kgsl_add_event(struct kgsl_device *device, u32 id, u32 ts,
+ 		return -ENOMEM;
+ 	}
+ 
+-	/*
+-	 * Increase the active count on the device to avoid going into power
+-	 * saving modes while events are pending
+-	 */
+-	ret = kgsl_active_count_get(device);
+-	if (ret < 0) {
+-		kgsl_context_put(context);
+-		kfree(event);
+-		return ret;
+-	}
+-
+ 	event->context = context;
+ 	event->timestamp = ts;
+ 	event->priv = priv;
+diff --git a/drivers/gpu/msm/z180.c b/drivers/gpu/msm/z180.c
+index 7ff5686..f98c078 100644
+--- a/drivers/gpu/msm/z180.c
++++ b/drivers/gpu/msm/z180.c
+@@ -863,9 +863,13 @@ static int z180_waittimestamp(struct kgsl_device *device,
+ 	if (msecs == -1)
+ 		msecs = Z180_IDLE_TIMEOUT;
+ 
+-	mutex_unlock(&device->mutex);
+-	status = z180_wait(device, context, timestamp, msecs);
+-	mutex_lock(&device->mutex);
++	status = kgsl_active_count_get(device);
++	if (!status) {
++		mutex_unlock(&device->mutex);
++		status = z180_wait(device, context, timestamp, msecs);
++		mutex_lock(&device->mutex);
++		kgsl_active_count_put(device);
++	}
+ 
+ 	return status;
+ }
+-- 
+1.7.9.5
+

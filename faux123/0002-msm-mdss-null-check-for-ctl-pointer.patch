@@ -1,0 +1,46 @@
+From 508136450b5b39112e8907e4d7a7fc8e5376d40d Mon Sep 17 00:00:00 2001
+From: Naseer Ahmed <naseer@codeaurora.org>
+Date: Mon, 21 Oct 2013 22:39:01 -0400
+Subject: [PATCH 002/507] msm: mdss: null check for ctl pointer
+
+display_commit may be called before overlay_on, which passes a null
+ctl pointer. Adding a null check to avoid the crash.
+
+Signed-off-by: Huaibin Yang <huaibiny@codeaurora.org>
+Signed-off-by: Naseer Ahmed <naseer@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_mdp_ctl.c      |    2 +-
+ drivers/video/msm/mdss/mdss_mdp_intf_cmd.c |    3 +++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_mdp_ctl.c b/drivers/video/msm/mdss/mdss_mdp_ctl.c
+index 0b7ffaa..d43b926 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_ctl.c
++++ b/drivers/video/msm/mdss/mdss_mdp_ctl.c
+@@ -1645,7 +1645,7 @@ int mdss_mdp_display_wakeup_time(struct mdss_mdp_ctl *ctl,
+ 	u32 time_of_line, time_to_vsync;
+ 	ktime_t current_time = ktime_get();
+ 
+-	if (!ctl->read_line_cnt_fnc)
++	if (!ctl || !ctl->read_line_cnt_fnc)
+ 		return -ENOSYS;
+ 
+ 	pinfo = &ctl->panel_data->panel_info;
+diff --git a/drivers/video/msm/mdss/mdss_mdp_intf_cmd.c b/drivers/video/msm/mdss/mdss_mdp_intf_cmd.c
+index 48c6f8e..27bdd0a 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_intf_cmd.c
++++ b/drivers/video/msm/mdss/mdss_mdp_intf_cmd.c
+@@ -63,6 +63,9 @@ static inline u32 mdss_mdp_cmd_line_count(struct mdss_mdp_ctl *ctl)
+ 	u32 init;
+ 	u32 height;
+ 
++	if (!ctl)
++		goto exit;
++
+ 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
+ 
+ 	mixer = mdss_mdp_mixer_get(ctl, MDSS_MDP_MIXER_MUX_LEFT);
+-- 
+1.7.9.5
+

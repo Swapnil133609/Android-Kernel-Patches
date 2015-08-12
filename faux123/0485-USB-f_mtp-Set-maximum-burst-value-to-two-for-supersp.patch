@@ -1,0 +1,44 @@
+From 5a78f9a42f49febcd4e17e7ebbdaaee646279849 Mon Sep 17 00:00:00 2001
+From: Vijayavardhan Vennapusa <vvreddy@codeaurora.org>
+Date: Wed, 21 Aug 2013 08:01:15 +0000
+Subject: [PATCH 485/507] USB: f_mtp: Set maximum burst value to two for
+ superspeed mode
+
+Currently burst value is set to zero for superspeed in mtp driver.
+MTP throughput can be improved by setting max burst vlaue to non
+zero value in superspeed mode. Hence set max burst vlaue to two
+for both IN and OUT bulk endpoints in superspeed mode.
+
+CRs-Fixed: 532070
+Change-Id: Ib78b8fec5d1ab934f4d4ec80b7e008149707ce0f
+Signed-off-by: Vijayavardhan Vennapusa <vvreddy@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/usb/gadget/f_mtp.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/usb/gadget/f_mtp.c b/drivers/usb/gadget/f_mtp.c
+index ffbbae0..6a38958 100644
+--- a/drivers/usb/gadget/f_mtp.c
++++ b/drivers/usb/gadget/f_mtp.c
+@@ -151,7 +151,7 @@ static struct usb_ss_ep_comp_descriptor mtp_superspeed_in_comp_desc = {
+ 	.bDescriptorType =	USB_DT_SS_ENDPOINT_COMP,
+ 
+ 	/* the following 2 values can be tweaked if necessary */
+-	/* .bMaxBurst =		0, */
++	.bMaxBurst =		2,
+ 	/* .bmAttributes =	0, */
+ };
+ 
+@@ -168,7 +168,7 @@ static struct usb_ss_ep_comp_descriptor mtp_superspeed_out_comp_desc = {
+ 	.bDescriptorType =	USB_DT_SS_ENDPOINT_COMP,
+ 
+ 	/* the following 2 values can be tweaked if necessary */
+-	/* .bMaxBurst =		0, */
++	 .bMaxBurst =		2,
+ 	/* .bmAttributes =	0, */
+ };
+ 
+-- 
+1.7.9.5
+

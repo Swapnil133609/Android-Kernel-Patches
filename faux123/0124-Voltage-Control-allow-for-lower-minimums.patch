@@ -1,0 +1,60 @@
+From 47ad558f7f30cdd74a88bb74848c5173355d0110 Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Thu, 9 May 2013 15:34:24 -0700
+Subject: [PATCH 124/507] Voltage Control: allow for lower minimums
+
+this allows the low CPU frequencies to take advantage of UV control
+
+Signed-off-by: faux123 <reioux@gmail.com>
+
+Conflicts:
+
+	arch/arm/mach-msm/board-m7-regulator.c
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/acpuclock-krait.c      |    4 ++--
+ arch/arm/mach-msm/board-8064-regulator.c |    8 ++++----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-msm/acpuclock-krait.c b/arch/arm/mach-msm/acpuclock-krait.c
+index c7eceb1..17dc57f 100644
+--- a/arch/arm/mach-msm/acpuclock-krait.c
++++ b/arch/arm/mach-msm/acpuclock-krait.c
+@@ -939,8 +939,8 @@ static void __init bus_init(const struct l2_level *l2_level)
+ 
+ #ifdef CONFIG_CPU_VOLTAGE_TABLE
+ 
+-#define HFPLL_MIN_VDD		 800000
+-#define HFPLL_MAX_VDD		1350000
++#define HFPLL_MIN_VDD		 600000
++#define HFPLL_MAX_VDD		1450000
+ 
+ ssize_t acpuclk_get_vdd_levels_str(char *buf) {
+ 
+diff --git a/arch/arm/mach-msm/board-8064-regulator.c b/arch/arm/mach-msm/board-8064-regulator.c
+index 57ecc27..f934ef4 100644
+--- a/arch/arm/mach-msm/board-8064-regulator.c
++++ b/arch/arm/mach-msm/board-8064-regulator.c
+@@ -621,15 +621,15 @@ struct fixed_voltage_config mpq8064_3p3_regulator_pdata = {
+ /* SAW regulator constraints */
+ struct regulator_init_data msm8064_saw_regulator_pdata_8921_s5 =
+ 	/*	      ID  vreg_name	       min_uV   max_uV */
+-	SAW_VREG_INIT(S5, "8921_s5",	       850000, 1300000);
++	SAW_VREG_INIT(S5, "8921_s5",	       600000, 1300000);
+ struct regulator_init_data msm8064_saw_regulator_pdata_8921_s6 =
+-	SAW_VREG_INIT(S6, "8921_s6",	       850000, 1300000);
++	SAW_VREG_INIT(S6, "8921_s6",	       600000, 1300000);
+ 
+ struct regulator_init_data msm8064_saw_regulator_pdata_8821_s0 =
+ 	/*	      ID       vreg_name	min_uV  max_uV */
+-	SAW_VREG_INIT(8821_S0, "8821_s0",       850000, 1300000);
++	SAW_VREG_INIT(8821_S0, "8821_s0",       600000, 1300000);
+ struct regulator_init_data msm8064_saw_regulator_pdata_8821_s1 =
+-	SAW_VREG_INIT(8821_S1, "8821_s1",       850000, 1300000);
++	SAW_VREG_INIT(8821_S1, "8821_s1",       600000, 1300000);
+ 
+ /* PM8921 regulator constraints */
+ struct pm8xxx_regulator_platform_data
+-- 
+1.7.9.5
+

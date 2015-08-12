@@ -1,0 +1,66 @@
+From 2f7c89cf6e9dbd05ebcfcbf5bfb8672f2797e9fe Mon Sep 17 00:00:00 2001
+From: myfluxi <linflux@arcor.de>
+Date: Thu, 28 Nov 2013 19:39:04 +0100
+Subject: [PATCH 471/507] msm: mdss: Send panel commands via separate function
+
+Sending panel comnmands is very expensive, add a separate function to
+accomplish this. Once all commands have been stored write anything to
+the kgamma_send file.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_dsi_panel.c |   24 ++++++++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_dsi_panel.c b/drivers/video/msm/mdss/mdss_dsi_panel.c
+index 138d647..d341148 100644
+--- a/drivers/video/msm/mdss/mdss_dsi_panel.c
++++ b/drivers/video/msm/mdss/mdss_dsi_panel.c
+@@ -1185,7 +1185,26 @@ static int write_local_on_cmds(struct device *dev, const char *buf,
+ 		cnt = strlen(tmp);
+ 	}
+ 
+-	/* send commands */
++	return rc;
++}
++
++/************************** sysfs interface ************************/
++
++static ssize_t write_kgamma_send(struct device *dev,
++				 struct device_attribute *attr,
++				 const char *buf, size_t count)
++{
++	int rc;
++	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
++
++	if (cmds_panel_data == NULL) {
++		pr_err("%s: Invalid input data\n", __func__);
++		return -EINVAL;
++	}
++
++	ctrl = container_of(cmds_panel_data, struct mdss_dsi_ctrl_pdata,
++			    panel_data);
++
+ 	if (local_pdata->on_cmds.cmd_cnt)
+ 		mdss_dsi_panel_cmds_send(ctrl, &local_pdata->on_cmds);
+ 
+@@ -1194,7 +1213,7 @@ static int write_local_on_cmds(struct device *dev, const char *buf,
+ 	return rc;
+ }
+ 
+-/************************** sysfs interface ************************/
++static DEVICE_ATTR(kgamma_send, 0644, NULL, write_kgamma_send);
+ 
+ #define read_one(file_name, cmd)				\
+ static ssize_t read_##file_name					\
+@@ -1246,6 +1265,7 @@ static struct attribute *dsi_panel_attributes[] = {
+ 	&dev_attr_kgamma_gn.attr,
+ 	&dev_attr_kgamma_bp.attr,
+ 	&dev_attr_kgamma_bn.attr,
++	&dev_attr_kgamma_send.attr,
+ 	NULL
+ };
+ 
+-- 
+1.7.9.5
+

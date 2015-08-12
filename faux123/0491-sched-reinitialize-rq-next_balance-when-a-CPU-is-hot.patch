@@ -1,0 +1,69 @@
+From a7d5c17966a943908cc52349f9234dc285610343 Mon Sep 17 00:00:00 2001
+From: Paul Walmsley <pwalmsley@nvidia.com>
+Date: Wed, 6 Mar 2013 19:02:56 -0800
+Subject: [PATCH 491/507] sched: reinitialize rq->next_balance when a CPU is
+ hot-added
+
+Reinitialize rq->next_balance when a CPU is hot-added.  Otherwise,
+scheduler domain rebalancing may be skipped if rq->next_balance was
+set to a future time when the CPU was last active, and the
+newly-re-added CPU is in idle_balance().  As a result, the
+newly-re-added CPU will remain idle with no tasks scheduled until the
+softlockup watchdog runs - potentially 4 seconds later.  This can
+waste energy and reduce performance.
+
+This behavior can be observed in some SoC kernels, which use CPU
+hotplug to dynamically remove and add CPUs in response to load.  In
+one case that triggered this behavior,
+
+0. the system started with all cores enabled, running multi-threaded
+   CPU-bound code;
+
+1. the system entered some single-threaded code;
+
+2. a CPU went idle and was hot-removed;
+
+3. the system started executing a multi-threaded CPU-bound task;
+
+4. the CPU from event 2 was re-added, to respond to the load.
+
+The time interval between events 2 and 4 was approximately 300
+milliseconds.
+
+Of course, ideally CPU hotplug would not be used in this manner,
+but this patch does appear to fix a real bug.
+
+Nvidia folks: this patch is submitted as at least a partial fix for
+bug 1243368 ("[sched] Load-balancing not happening correctly after
+cores brought online")
+
+Change-Id: Iabac21e110402bb581b7db40c42babc951d378d0
+Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
+Cc: Peter Boonstoppel <pboonstoppel@nvidia.com>
+Reviewed-on: http://git-master/r/208927
+Reviewed-by: Automatic_Commit_Validation_User
+Reviewed-by: Peter Zu <pzu@nvidia.com>
+Reviewed-by: Peter Boonstoppel <pboonstoppel@nvidia.com>
+GVS: Gerrit_Virtual_Submit
+Tested-by: Peter Zu <pzu@nvidia.com>
+Reviewed-by: Yu-Huan Hsu <yhsu@nvidia.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/sched/core.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index b2d6124..3d067f7 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -5485,6 +5485,7 @@ migration_call(struct notifier_block *nfb, unsigned long action, void *hcpu)
+ 
+ 	case CPU_UP_PREPARE:
+ 		rq->calc_load_update = calc_load_update;
++		rq->next_balance = jiffies;
+ 		break;
+ 
+ 	case CPU_ONLINE:
+-- 
+1.7.9.5
+

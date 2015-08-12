@@ -1,0 +1,75 @@
+From 82dd23f8fe2f66d050cd4bf3c11fe8f82f3c99ff Mon Sep 17 00:00:00 2001
+From: Jarod Wilson <jarod@redhat.com>
+Date: Tue, 6 Nov 2012 10:42:42 -0500
+Subject: [PATCH 144/507] random: prime last_data value per fips requirements
+
+The value stored in last_data must be primed for FIPS 140-2 purposes. Upon
+first use, either on system startup or after an RNDCLEARPOOL ioctl, we
+need to take an initial random sample, store it internally in last_data,
+then pass along the value after that to the requester, so that consistency
+checks aren't being run against stale and possibly known data.
+
+CC: Herbert Xu <herbert@gondor.apana.org.au>
+CC: "David S. Miller" <davem@davemloft.net>
+CC: Matt Mackall <mpm@selenic.com>
+CC: linux-crypto@vger.kernel.org
+Acked-by: Neil Horman <nhorman@tuxdriver.com>
+Signed-off-by: Jarod Wilson <jarod@redhat.com>
+Signed-off-by: "Theodore Ts'o" <tytso@mit.edu>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/char/random.c |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/drivers/char/random.c b/drivers/char/random.c
+index aefb0b5..6217fb6 100644
+--- a/drivers/char/random.c
++++ b/drivers/char/random.c
+@@ -437,6 +437,7 @@ struct entropy_store {
+ 	int entropy_count;
+ 	int entropy_total;
+ 	unsigned int initialized:1;
++	bool last_data_init;
+ 	__u8 last_data[EXTRACT_SIZE];
+ };
+ 
+@@ -957,6 +958,10 @@ static ssize_t extract_entropy(struct entropy_store *r, void *buf,
+ 	ssize_t ret = 0, i;
+ 	__u8 tmp[EXTRACT_SIZE];
+ 
++	/* if last_data isn't primed, we need EXTRACT_SIZE extra bytes */
++	if (fips_enabled && !r->last_data_init)
++		nbytes += EXTRACT_SIZE;
++
+ 	trace_extract_entropy(r->name, nbytes, r->entropy_count, _RET_IP_);
+ 	xfer_secondary_pool(r, nbytes);
+ 	nbytes = account(r, nbytes, min, reserved);
+@@ -967,6 +972,17 @@ static ssize_t extract_entropy(struct entropy_store *r, void *buf,
+ 		if (fips_enabled) {
+ 			unsigned long flags;
+ 
++
++			/* prime last_data value if need be, per fips 140-2 */
++			if (!r->last_data_init) {
++				spin_lock_irqsave(&r->lock, flags);
++				memcpy(r->last_data, tmp, EXTRACT_SIZE);
++				r->last_data_init = true;
++				nbytes -= EXTRACT_SIZE;
++				spin_unlock_irqrestore(&r->lock, flags);
++				extract_buf(r, tmp);
++			}
++
+ 			spin_lock_irqsave(&r->lock, flags);
+ 			if (!memcmp(tmp, r->last_data, EXTRACT_SIZE))
+ 				panic("Hardware RNG duplicated output!\n");
+@@ -1086,6 +1102,7 @@ static void init_std_data(struct entropy_store *r)
+ 
+ 	r->entropy_count = 0;
+ 	r->entropy_total = 0;
++	r->last_data_init = false;
+ 	mix_pool_bytes(r, &now, sizeof(now), NULL);
+ 	for (i = r->poolinfo->POOLBYTES; i > 0; i -= sizeof(rv)) {
+ 		if (!arch_get_random_long(&rv))
+-- 
+1.7.9.5
+

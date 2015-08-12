@@ -1,0 +1,66 @@
+From 387db3fa51410c3f3bf397c6f22987219692b763 Mon Sep 17 00:00:00 2001
+From: Waiman Long <Waiman.Long@hp.com>
+Date: Mon, 15 Apr 2013 14:36:55 -0500
+Subject: [PATCH 131/507] mutex: back out architecture specific check for
+ negative mutex count
+
+Date	Mon, 15 Apr 2013 10:37:59 -0400
+
+If it is confirmed that all the supported architectures can allow a
+negative mutex count without incorrect behavior, we can then back
+out the architecture specific change and allow the mutex count to
+go to any negative number. That should further reduce contention for
+non-x86 architecture.
+
+If this is not the case, this patch should be dropped.
+
+Signed-off-by: Waiman Long <Waiman.Long@hp.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/x86/include/asm/mutex.h |   10 ----------
+ kernel/mutex.c               |    9 ++-------
+ 2 files changed, 2 insertions(+), 17 deletions(-)
+
+diff --git a/arch/x86/include/asm/mutex.h b/arch/x86/include/asm/mutex.h
+index a4daf1d..a731b9c 100644
+--- a/arch/x86/include/asm/mutex.h
++++ b/arch/x86/include/asm/mutex.h
+@@ -3,13 +3,3 @@
+ #else
+ # include "mutex_64.h"
+ #endif
+-
+-#ifndef	__ASM_MUTEX_H
+-#define	__ASM_MUTEX_H
+-/*
+- * For the x86 architecture, it allows any negative number (besides -1) in
+- * the mutex count to indicate that some other threads are waiting on the
+- * mutex.
+- */
+-#define __ARCH_ALLOW_ANY_NEGATIVE_MUTEX_COUNT	1
+-#endif
+diff --git a/kernel/mutex.c b/kernel/mutex.c
+index b777c9e..b15e673 100644
+--- a/kernel/mutex.c
++++ b/kernel/mutex.c
+@@ -37,15 +37,10 @@
+ #endif
+ 
+ /*
+- * A mutex count of -1 indicates that waiters are sleeping waiting for the
+- * mutex. Some architectures can allow any negative number, not just -1, for
+- * this purpose.
++ * A negative mutex count indicates that waiters are sleeping waiting for the
++ * mutex.
+  */
+-#ifdef __ARCH_ALLOW_ANY_NEGATIVE_MUTEX_COUNT
+ #define	MUTEX_SHOW_NO_WAITER(mutex)	(atomic_read(&(mutex)->count) >= 0)
+-#else
+-#define	MUTEX_SHOW_NO_WAITER(mutex)	(atomic_read(&(mutex)->count) != -1)
+-#endif
+ 
+ void
+ __mutex_init(struct mutex *lock, const char *name, struct lock_class_key *key)
+-- 
+1.7.9.5
+

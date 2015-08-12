@@ -1,0 +1,56 @@
+From 88db50426e0a7d47394c4105e3f92f6777676ea9 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Mon, 21 Oct 2013 14:04:06 -0500
+Subject: [PATCH 305/338] cpufreq: intellidemand: update default settings for
+ Snapdragon 800 Socs
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ drivers/cpufreq/cpufreq_intellidemand.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_intellidemand.c b/drivers/cpufreq/cpufreq_intellidemand.c
+index ef158f8..4519d85 100644
+--- a/drivers/cpufreq/cpufreq_intellidemand.c
++++ b/drivers/cpufreq/cpufreq_intellidemand.c
+@@ -54,12 +54,12 @@
+ #define DEFAULT_FREQ_BOOST_TIME			(3500000)
+ #define DEF_SAMPLING_RATE			(50000)
+ #define BOOSTED_SAMPLING_RATE			(15000)
+-#define DBS_INPUT_EVENT_MIN_FREQ		(1026000)
+-#define DBS_SYNC_FREQ				(702000)
+-#define DBS_OPTIMAL_FREQ			(1566000)
++#define DBS_INPUT_EVENT_MIN_FREQ		(1036800)
++#define DBS_SYNC_FREQ				(729600)
++#define DBS_OPTIMAL_FREQ			(1574400)
+ 
+ #ifdef CONFIG_CPUFREQ_ID_PERFLOCK
+-#define DBS_PERFLOCK_MIN_FREQ			(594000)
++#define DBS_PERFLOCK_MIN_FREQ			(576000)
+ #endif
+ 
+ static u64 freq_boosted_time;
+@@ -174,17 +174,17 @@ static struct dbs_tuners {
+ 	unsigned int two_phase_freq;
+ } dbs_tuners_ins = {
+ 	.up_threshold_multi_core = DEF_FREQUENCY_UP_THRESHOLD,
+-	.up_threshold = DEF_FREQUENCY_UP_THRESHOLD,
++	.up_threshold = 95,
+ 	.sampling_down_factor = DEF_SAMPLING_DOWN_FACTOR,
+ 	.down_differential = DEF_FREQUENCY_DOWN_DIFFERENTIAL,
+ 	.down_differential_multi_core = MICRO_FREQUENCY_DOWN_DIFFERENTIAL,
+-	.up_threshold_any_cpu_load = DEF_FREQUENCY_UP_THRESHOLD,
++	.up_threshold_any_cpu_load = 85,
+ 	.ignore_nice = 0,
+ 	.powersave_bias = 0,
+ 	.sync_freq = DBS_SYNC_FREQ,
+ 	.optimal_freq = DBS_OPTIMAL_FREQ,
+ 	.freq_boost_time = DEFAULT_FREQ_BOOST_TIME,
+-	.two_phase_freq = 0,
++	.two_phase_freq = 1267200,
+ };
+ 
+ static inline cputime64_t get_cpu_idle_time_jiffy(unsigned int cpu,
+-- 
+1.8.1.2
+

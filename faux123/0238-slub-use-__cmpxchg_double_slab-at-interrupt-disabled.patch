@@ -1,0 +1,64 @@
+From 5a67fef21e22e941adfe40bd4b044785833aedc1 Mon Sep 17 00:00:00 2001
+From: Joonsoo Kim <js1304@gmail.com>
+Date: Fri, 18 May 2012 22:01:17 +0900
+Subject: [PATCH 238/507] slub: use __cmpxchg_double_slab() at interrupt
+ disabled place
+
+get_freelist(), unfreeze_partials() are only called with interrupt disabled,
+so __cmpxchg_double_slab() is suitable.
+
+Acked-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Joonsoo Kim <js1304@gmail.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slub.c |   12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/mm/slub.c b/mm/slub.c
+index 8d064fb..73ca0e5 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -1870,7 +1870,11 @@ redo:
+ 	}
+ }
+ 
+-/* Unfreeze all the cpu partial slabs */
++/*
++ * Unfreeze all the cpu partial slabs.
++ *
++ * This function must be called with interrupt disabled.
++ */
+ static void unfreeze_partials(struct kmem_cache *s)
+ {
+ 	struct kmem_cache_node *n = NULL;
+@@ -1926,7 +1930,7 @@ static void unfreeze_partials(struct kmem_cache *s)
+ 				l = m;
+ 			}
+ 
+-		} while (!cmpxchg_double_slab(s, page,
++		} while (!__cmpxchg_double_slab(s, page,
+ 				old.freelist, old.counters,
+ 				new.freelist, new.counters,
+ 				"unfreezing slab"));
+@@ -2163,6 +2167,8 @@ static inline void *new_slab_objects(struct kmem_cache *s, gfp_t flags,
+  * The page is still frozen if the return value is not NULL.
+  *
+  * If this function returns NULL then the page has been unfrozen.
++ *
++ * This function must be called with interrupt disabled.
+  */
+ static inline void *get_freelist(struct kmem_cache *s, struct page *page)
+ {
+@@ -2180,7 +2186,7 @@ static inline void *get_freelist(struct kmem_cache *s, struct page *page)
+ 		new.inuse = page->objects;
+ 		new.frozen = freelist != NULL;
+ 
+-	} while (!cmpxchg_double_slab(s, page,
++	} while (!__cmpxchg_double_slab(s, page,
+ 		freelist, counters,
+ 		NULL, new.counters,
+ 		"get_freelist"));
+-- 
+1.7.9.5
+

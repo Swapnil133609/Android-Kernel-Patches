@@ -1,0 +1,58 @@
+From 1db4474fcffb3360e6eccf312872526a5e3b567a Mon Sep 17 00:00:00 2001
+From: Al Viro <viro@zeniv.linux.org.uk>
+Date: Mon, 17 Jun 2013 12:33:40 -0500
+Subject: [PATCH 149/338] old bug in htree_dirblock_to_tree()
+
+Both ext3 and ext4 htree_dirblock_to_tree() is just filling
+the in-core rbtree for use by call_filldir().  All updates of
+->f_pos are done by the latter; bumping it here (on error) is obviously
+wrong - we might very well have it nowhere near the block we'd found
+an error in.
+
+Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ fs/ext3/namei.c | 7 ++-----
+ fs/ext4/namei.c | 7 ++-----
+ 2 files changed, 4 insertions(+), 10 deletions(-)
+
+diff --git a/fs/ext3/namei.c b/fs/ext3/namei.c
+index d7940b2..fbb9b82 100644
+--- a/fs/ext3/namei.c
++++ b/fs/ext3/namei.c
+@@ -573,11 +573,8 @@ static int htree_dirblock_to_tree(struct file *dir_file,
+ 		if (!ext3_check_dir_entry("htree_dirblock_to_tree", dir, de, bh,
+ 					(block<<EXT3_BLOCK_SIZE_BITS(dir->i_sb))
+ 						+((char *)de - bh->b_data))) {
+-			/* On error, skip the f_pos to the next block. */
+-			dir_file->f_pos = (dir_file->f_pos |
+-					(dir->i_sb->s_blocksize - 1)) + 1;
+-			brelse (bh);
+-			return count;
++			/* silently ignore the rest of the block */
++			break;
+ 		}
+ 		ext3fs_dirhash(de->name, de->name_len, hinfo);
+ 		if ((hinfo->hash < start_hash) ||
+diff --git a/fs/ext4/namei.c b/fs/ext4/namei.c
+index 349d7b3..54ab1ad 100644
+--- a/fs/ext4/namei.c
++++ b/fs/ext4/namei.c
+@@ -585,11 +585,8 @@ static int htree_dirblock_to_tree(struct file *dir_file,
+ 		if (ext4_check_dir_entry(dir, NULL, de, bh,
+ 				(block<<EXT4_BLOCK_SIZE_BITS(dir->i_sb))
+ 					 + ((char *)de - bh->b_data))) {
+-			/* On error, skip the f_pos to the next block. */
+-			dir_file->f_pos = (dir_file->f_pos |
+-					(dir->i_sb->s_blocksize - 1)) + 1;
+-			brelse(bh);
+-			return count;
++			/* silently ignore the rest of the block */
++			break;
+ 		}
+ 		ext4fs_dirhash(de->name, de->name_len, hinfo);
+ 		if ((hinfo->hash < start_hash) ||
+-- 
+1.8.1.2
+

@@ -1,0 +1,33 @@
+From 2f7097607e53a4c884f5557e76dd2b781272ce1f Mon Sep 17 00:00:00 2001
+From: Lei Wen <leiwen@marvell.com>
+Date: Sun, 1 Sep 2013 17:48:08 -0500
+Subject: [PATCH 177/338] sched: change pick_next_task_fair to h_nr_running
+
+Date	Sun, 18 Aug 2013 16:25:18 +0800
+
+Since pick_next_task_fair only want to ensure there is some task in the
+run queue to be picked up, it should use the h_nr_running instead of
+nr_running, since nr_running cannot present all tasks if group existed.
+
+Signed-off-by: Lei Wen <leiwen@marvell.com>
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ kernel/sched/fair.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 1d7afec..2ab3809 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -2991,7 +2991,7 @@ static struct task_struct *pick_next_task_fair(struct rq *rq)
+ 	struct cfs_rq *cfs_rq = &rq->cfs;
+ 	struct sched_entity *se;
+ 
+-	if (!cfs_rq->nr_running)
++	if (!cfs_rq->h_nr_running)
+ 		return NULL;
+ 
+ 	do {
+-- 
+1.8.1.2
+

@@ -1,0 +1,71 @@
+From f574eec4d911be45fd14b9595818681da9a84504 Mon Sep 17 00:00:00 2001
+From: Christoph Lameter <cl@linux.com>
+Date: Wed, 13 Jun 2012 10:24:55 -0500
+Subject: [PATCH 193/338] slab: Use page struct fields instead of casting
+
+Add fields to the page struct so that it is properly documented that
+slab overlays the lru fields.
+
+This cleans up some casts in slab.
+
+Reviewed-by: Glauber Costa <glommer@parallels.com>
+Reviewed-by: Joonsoo Kim <js1304@gmail.com>
+Signed-off-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+---
+ include/linux/mm_types.h | 4 ++++
+ mm/slab.c                | 8 ++++----
+ 2 files changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
+index bf02eea..40b0792 100644
+--- a/include/linux/mm_types.h
++++ b/include/linux/mm_types.h
+@@ -110,6 +110,10 @@ struct page {
+ 		};
+ 
+ 		struct list_head list;	/* slobs list of pages */
++		struct {		/* slab fields */
++			struct kmem_cache *slab_cache;
++			struct slab *slab_page;
++		};
+ 	};
+ 
+ 	/* Remainder is not double word aligned */
+diff --git a/mm/slab.c b/mm/slab.c
+index e901a36..af05147 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -496,25 +496,25 @@ static bool slab_max_order_set __initdata;
+  */
+ static inline void page_set_cache(struct page *page, struct kmem_cache *cache)
+ {
+-	page->lru.next = (struct list_head *)cache;
++	page->slab_cache = cache;
+ }
+ 
+ static inline struct kmem_cache *page_get_cache(struct page *page)
+ {
+ 	page = compound_head(page);
+ 	BUG_ON(!PageSlab(page));
+-	return (struct kmem_cache *)page->lru.next;
++	return page->slab_cache;
+ }
+ 
+ static inline void page_set_slab(struct page *page, struct slab *slab)
+ {
+-	page->lru.prev = (struct list_head *)slab;
++	page->slab_page = slab;
+ }
+ 
+ static inline struct slab *page_get_slab(struct page *page)
+ {
+ 	BUG_ON(!PageSlab(page));
+-	return (struct slab *)page->lru.prev;
++	return page->slab_page;
+ }
+ 
+ static inline struct kmem_cache *virt_to_cache(const void *obj)
+-- 
+1.8.1.2
+

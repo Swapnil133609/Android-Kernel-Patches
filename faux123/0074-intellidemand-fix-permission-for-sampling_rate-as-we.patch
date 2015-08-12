@@ -1,0 +1,31 @@
+From 1cf5c74fef32aa734734ff0076e578e7e1f60841 Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Thu, 14 Mar 2013 11:17:57 -0500
+Subject: [PATCH 074/507] intellidemand: fix permission for sampling_rate as
+ well
+
+to work with Android's PowerHAL
+
+Signed-off-by: faux123 <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_intellidemand.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/cpufreq/cpufreq_intellidemand.c b/drivers/cpufreq/cpufreq_intellidemand.c
+index 6255e9d..9d75d20 100644
+--- a/drivers/cpufreq/cpufreq_intellidemand.c
++++ b/drivers/cpufreq/cpufreq_intellidemand.c
+@@ -1643,6 +1643,9 @@ static void dbs_chown(void)
+ 	int ret;
+ 
+ 	ret =
++	sys_chown("/sys/devices/system/cpu/cpufreq/intellidemand/sampling_rate",
++		low2highuid(AID_SYSTEM), low2highgid(0));
++	ret =
+ 	sys_chown("/sys/devices/system/cpu/cpufreq/intellidemand/boostpulse",
+ 		low2highuid(AID_SYSTEM), low2highgid(0));
+ 	if (ret)
+-- 
+1.7.9.5
+

@@ -1,0 +1,42 @@
+From 895cd750c539332dcd3e7f0d39955b058e24f728 Mon Sep 17 00:00:00 2001
+From: Glauber Costa <glommer@parallels.com>
+Date: Fri, 3 Aug 2012 22:51:37 +0400
+Subject: [PATCH 247/507] slub: use free_page instead of put_page for freeing
+ kmalloc allocation
+
+When freeing objects, the slub allocator will most of the time free
+empty pages by calling __free_pages(). But high-order kmalloc will be
+diposed by means of put_page() instead. It makes no sense to call
+put_page() in kernel pages that are provided by the object allocators,
+so we shouldn't be doing this ourselves. Aside from the consistency
+change, we don't change the flow too much. put_page()'s would call its
+dtor function, which is __free_pages. We also already do all of the
+Compound page tests ourselves, and the Mlock test we lose don't really
+matter.
+
+Signed-off-by: Glauber Costa <glommer@parallels.com>
+Acked-by: Christoph Lameter <cl@linux.com>
+CC: David Rientjes <rientjes@google.com>
+CC: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slub.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mm/slub.c b/mm/slub.c
+index 7df87f5..ffdacaf 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -3481,7 +3481,7 @@ void kfree(const void *x)
+ 	if (unlikely(!PageSlab(page))) {
+ 		BUG_ON(!PageCompound(page));
+ 		kmemleak_free(x);
+-		put_page(page);
++		__free_pages(page, compound_order(page));
+ 		return;
+ 	}
+ 	slab_free(page->slab, page, object, _RET_IP_);
+-- 
+1.7.9.5
+

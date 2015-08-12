@@ -1,0 +1,82 @@
+From 39699792987e1aa939809e9eb5caf310132cb265 Mon Sep 17 00:00:00 2001
+From: Shaohua Li <shaohua.li@intel.com>
+Date: Sat, 15 Dec 2012 22:38:11 -0800
+Subject: [PATCH 089/507] block: fiops add some trace information
+
+Add some trace information, which is helpful when I do debugging.
+
+Signed-off-by: Shaohua Li <shaohua.li@intel.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ block/fiops-iosched.c |   19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/block/fiops-iosched.c b/block/fiops-iosched.c
+index be54a9c..671b1d3 100644
+--- a/block/fiops-iosched.c
++++ b/block/fiops-iosched.c
+@@ -10,6 +10,7 @@
+ #include <linux/jiffies.h>
+ #include <linux/rbtree.h>
+ #include <linux/ioprio.h>
++#include <linux/blktrace_api.h>
+ #include "blk.h"
+ 
+ #define VIOS_SCALE_SHIFT 10
+@@ -99,6 +100,11 @@ FIOPS_IOC_FNS(on_rr);
+ FIOPS_IOC_FNS(prio_changed);
+ #undef FIOPS_IOC_FNS
+ 
++#define fiops_log_ioc(fiopsd, ioc, fmt, args...)	\
++	blk_add_trace_msg((fiopsd)->queue, "ioc%d " fmt, (ioc)->pid, ##args)
++#define fiops_log(fiopsd, fmt, args...)	\
++	blk_add_trace_msg((fiopsd)->queue, "fiops " fmt, ##args)
++
+ enum wl_prio_t fiops_wl_type(short prio_class)
+ {
+ 	if (prio_class == IOPRIO_CLASS_RT)
+@@ -200,6 +206,8 @@ static void fiops_service_tree_add(struct fiops_data *fiopsd,
+ 		ioc->service_tree = NULL;
+ 	}
+ 
++	fiops_log_ioc(fiopsd, ioc, "service tree add, vios %lld", vios);
++
+ 	left = 1;
+ 	parent = NULL;
+ 	ioc->service_tree = service_tree;
+@@ -393,8 +401,12 @@ static struct fiops_ioc *fiops_select_ioc(struct fiops_data *fiopsd)
+ 	 * to be starved, don't delay
+ 	 */
+ 	if (!rq_is_sync(rq) && fiopsd->in_flight[1] != 0 &&
+-			service_tree->count == 1)
++			service_tree->count == 1) {
++		fiops_log_ioc(fiopsd, ioc,
++				"postpone async, in_flight async %d sync %d",
++				fiopsd->in_flight[0], fiopsd->in_flight[1]);
+ 		return NULL;
++	}
+ 
+ 	return ioc;
+ }
+@@ -405,6 +417,8 @@ static void fiops_charge_vios(struct fiops_data *fiopsd,
+ 	struct fiops_rb_root *service_tree = ioc->service_tree;
+ 	ioc->vios += vios;
+ 
++	fiops_log_ioc(fiopsd, ioc, "charge vios %lld, new vios %lld", vios, ioc->vios);
++
+ 	if (RB_EMPTY_ROOT(&ioc->sort_list))
+ 		fiops_del_ioc_rr(fiopsd, ioc);
+ 	else
+@@ -498,6 +512,9 @@ static void fiops_completed_request(struct request_queue *q, struct request *rq)
+ 	fiopsd->in_flight[rq_is_sync(rq)]--;
+ 	ioc->in_flight--;
+ 
++	fiops_log_ioc(fiopsd, ioc, "in_flight %d, busy queues %d",
++		ioc->in_flight, fiopsd->busy_queues);
++
+ 	if (fiopsd->in_flight[0] + fiopsd->in_flight[1] == 0)
+ 		fiops_schedule_dispatch(fiopsd);
+ }
+-- 
+1.7.9.5
+

@@ -1,0 +1,114 @@
+From af7d7279dc03e6289eb1d8cd7dad8559c1e472a7 Mon Sep 17 00:00:00 2001
+From: Ezequiel Garcia <elezegarcia@gmail.com>
+Date: Sat, 8 Sep 2012 17:47:58 -0300
+Subject: [PATCH 281/507] mm, slub: Rename slab_alloc() -> slab_alloc_node()
+ to match SLAB
+
+This patch does not fix anything, and its only goal is to enable us
+to obtain some common code between SLAB and SLUB.
+Neither behavior nor produced code is affected.
+
+Cc: Christoph Lameter <cl@linux.com>
+Signed-off-by: Ezequiel Garcia <elezegarcia@gmail.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slub.c |   24 +++++++++++++++---------
+ 1 file changed, 15 insertions(+), 9 deletions(-)
+
+diff --git a/mm/slub.c b/mm/slub.c
+index 2e36e99..822090e 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -2312,7 +2312,7 @@ new_slab:
+  *
+  * Otherwise we can simply pick the next object from the lockless free list.
+  */
+-static __always_inline void *slab_alloc(struct kmem_cache *s,
++static __always_inline void *slab_alloc_node(struct kmem_cache *s,
+ 		gfp_t gfpflags, int node, unsigned long addr)
+ {
+ 	void **object;
+@@ -2387,9 +2387,15 @@ redo:
+ 	return object;
+ }
+ 
++static __always_inline void *slab_alloc(struct kmem_cache *s,
++		gfp_t gfpflags, unsigned long addr)
++{
++	return slab_alloc_node(s, gfpflags, NUMA_NO_NODE, addr);
++}
++
+ void *kmem_cache_alloc(struct kmem_cache *s, gfp_t gfpflags)
+ {
+-	void *ret = slab_alloc(s, gfpflags, NUMA_NO_NODE, _RET_IP_);
++	void *ret = slab_alloc(s, gfpflags, _RET_IP_);
+ 
+ 	trace_kmem_cache_alloc(_RET_IP_, ret, s->object_size, s->size, gfpflags);
+ 
+@@ -2400,7 +2406,7 @@ EXPORT_SYMBOL(kmem_cache_alloc);
+ #ifdef CONFIG_TRACING
+ void *kmem_cache_alloc_trace(struct kmem_cache *s, gfp_t gfpflags, size_t size)
+ {
+-	void *ret = slab_alloc(s, gfpflags, NUMA_NO_NODE, _RET_IP_);
++	void *ret = slab_alloc(s, gfpflags, _RET_IP_);
+ 	trace_kmalloc(_RET_IP_, ret, size, s->size, gfpflags);
+ 	return ret;
+ }
+@@ -2418,7 +2424,7 @@ EXPORT_SYMBOL(kmalloc_order_trace);
+ #ifdef CONFIG_NUMA
+ void *kmem_cache_alloc_node(struct kmem_cache *s, gfp_t gfpflags, int node)
+ {
+-	void *ret = slab_alloc(s, gfpflags, node, _RET_IP_);
++	void *ret = slab_alloc_node(s, gfpflags, node, _RET_IP_);
+ 
+ 	trace_kmem_cache_alloc_node(_RET_IP_, ret,
+ 				    s->object_size, s->size, gfpflags, node);
+@@ -2432,7 +2438,7 @@ void *kmem_cache_alloc_node_trace(struct kmem_cache *s,
+ 				    gfp_t gfpflags,
+ 				    int node, size_t size)
+ {
+-	void *ret = slab_alloc(s, gfpflags, node, _RET_IP_);
++	void *ret = slab_alloc_node(s, gfpflags, node, _RET_IP_);
+ 
+ 	trace_kmalloc_node(_RET_IP_, ret,
+ 			   size, s->size, gfpflags, node);
+@@ -3356,7 +3362,7 @@ void *__kmalloc(size_t size, gfp_t flags)
+ 	if (unlikely(ZERO_OR_NULL_PTR(s)))
+ 		return s;
+ 
+-	ret = slab_alloc(s, flags, NUMA_NO_NODE, _RET_IP_);
++	ret = slab_alloc(s, flags, _RET_IP_);
+ 
+ 	trace_kmalloc(_RET_IP_, ret, size, s->size, flags);
+ 
+@@ -3399,7 +3405,7 @@ void *__kmalloc_node(size_t size, gfp_t flags, int node)
+ 	if (unlikely(ZERO_OR_NULL_PTR(s)))
+ 		return s;
+ 
+-	ret = slab_alloc(s, flags, node, _RET_IP_);
++	ret = slab_alloc_node(s, flags, node, _RET_IP_);
+ 
+ 	trace_kmalloc_node(_RET_IP_, ret, size, s->size, flags, node);
+ 
+@@ -4022,7 +4028,7 @@ void *__kmalloc_track_caller(size_t size, gfp_t gfpflags, unsigned long caller)
+ 	if (unlikely(ZERO_OR_NULL_PTR(s)))
+ 		return s;
+ 
+-	ret = slab_alloc(s, gfpflags, NUMA_NO_NODE, caller);
++	ret = slab_alloc(s, gfpflags, caller);
+ 
+ 	/* Honor the call site pointer we received. */
+ 	trace_kmalloc(caller, ret, size, s->size, gfpflags);
+@@ -4052,7 +4058,7 @@ void *__kmalloc_node_track_caller(size_t size, gfp_t gfpflags,
+ 	if (unlikely(ZERO_OR_NULL_PTR(s)))
+ 		return s;
+ 
+-	ret = slab_alloc(s, gfpflags, node, caller);
++	ret = slab_alloc_node(s, gfpflags, node, caller);
+ 
+ 	/* Honor the call site pointer we received. */
+ 	trace_kmalloc_node(caller, ret, size, s->size, gfpflags, node);
+-- 
+1.7.9.5
+

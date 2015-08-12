@@ -1,0 +1,38 @@
+From c4c5011c67fe6b0af54c4aa539609a00604b1369 Mon Sep 17 00:00:00 2001
+From: Michel Lespinasse <walken@google.com>
+Date: Tue, 14 Aug 2012 14:53:20 -0700
+Subject: [PATCH 254/507] slab: do not call compound_head() in
+ page_get_cache()
+
+page_get_cache() does not need to call compound_head(), as its unique
+caller virt_to_slab() already makes sure to return a head page.
+
+Additionally, removing the compound_head() call makes page_get_cache()
+consistent with page_get_slab().
+
+Signed-off-by: Michel Lespinasse <walken@google.com>
+Cc: Christoph Lameter <cl@linux-foundation.org>
+Cc: Pekka Enberg <penberg@kernel.org>
+Acked-by: David Rientjes <rientjes@google.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slab.c |    1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/mm/slab.c b/mm/slab.c
+index f8b0d53..cb6ce2d 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -517,7 +517,6 @@ static bool slab_max_order_set __initdata;
+ 
+ static inline struct kmem_cache *page_get_cache(struct page *page)
+ {
+-	page = compound_head(page);
+ 	BUG_ON(!PageSlab(page));
+ 	return page->slab_cache;
+ }
+-- 
+1.7.9.5
+

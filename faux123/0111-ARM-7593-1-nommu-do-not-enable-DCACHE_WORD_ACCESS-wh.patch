@@ -1,0 +1,46 @@
+From 2b22f08dd296b07e7810c9f75e5b8d236b22f16a Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Sat, 2 Feb 2013 09:02:08 -0800
+Subject: [PATCH 111/507] ARM: 7593/1: nommu: do not enable DCACHE_WORD_ACCESS
+ when !CONFIG_MMU
+
+Commit b9a50f74905a ("ARM: 7450/1: dcache: select DCACHE_WORD_ACCESS for
+little-endian ARMv6+ CPUs") added support for word-at-time path
+comparisons, relying on the ability to perform unaligned loads with
+negligible performance impact in hardware.
+
+For nommu configurations without MPU support, this is unpredictable and
+so we should fall back to the byte-by-byte routines.
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Tested-by: Jonathan Austin <jonathan.austin@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+modified for Mako from kernel.org
+
+Signed-off-by: faux123 <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5a5bb87..cc3a719 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -35,11 +35,11 @@ config ARM
+ 	select HAVE_GENERIC_HARDIRQS
+ 	select GENERIC_IRQ_SHOW
+ 	select CPU_PM if (SUSPEND || CPU_IDLE)
++	select DCACHE_WORD_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && !CPU_BIG_ENDIAN && MMU
+ 	select GENERIC_PCI_IOMAP
+ 	select HAVE_BPF_JIT if NET
+ 	select GENERIC_STRNCPY_FROM_USER
+ 	select GENERIC_STRNLEN_USER
+-	select DCACHE_WORD_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && !CPU_BIG_ENDIAN
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
+-- 
+1.7.9.5
+

@@ -1,0 +1,45 @@
+From 2fe20fb142fad4c421d6c194d231bc1bcd26e546 Mon Sep 17 00:00:00 2001
+From: Ezequiel Garcia <elezegarcia@gmail.com>
+Date: Mon, 22 Oct 2012 09:04:31 -0300
+Subject: [PATCH 310/507] mm/slob: Use free_page instead of put_page for
+ page-size kmalloc allocations
+
+When freeing objects, the slob allocator currently free empty pages
+calling __free_pages(). However, page-size kmallocs are disposed
+using put_page() instead.
+
+It makes no sense to call put_page() for kernel pages that are provided
+by the object allocator, so we shouldn't be doing this ourselves.
+
+This is based on:
+commit d9b7f22623b5fa9cc189581dcdfb2ac605933bf4
+Author: Glauber Costa <glommer@parallels.com>
+slub: use free_page instead of put_page for freeing kmalloc allocation
+
+Cc: Christoph Lameter <cl@linux-foundation.org>
+Cc: Pekka Enberg <penberg@kernel.org>
+Cc: Matt Mackall <mpm@selenic.com>
+Acked-by: Glauber Costa <glommer@parallels.com>
+Signed-off-by: Ezequiel Garcia <elezegarcia@gmail.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slob.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mm/slob.c b/mm/slob.c
+index fffbc82..e7d7901 100644
+--- a/mm/slob.c
++++ b/mm/slob.c
+@@ -500,7 +500,7 @@ void kfree(const void *block)
+ 		unsigned int *m = (unsigned int *)(block - align);
+ 		slob_free(m, *m + align);
+ 	} else
+-		put_page(sp);
++		__free_pages(sp, compound_order(sp));
+ }
+ EXPORT_SYMBOL(kfree);
+ 
+-- 
+1.7.9.5
+

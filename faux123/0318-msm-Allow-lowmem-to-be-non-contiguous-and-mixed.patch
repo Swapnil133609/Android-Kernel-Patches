@@ -1,0 +1,55 @@
+From e94cdf521f87f18610131a9d194b8672ec406d23 Mon Sep 17 00:00:00 2001
+From: Neeti Desai <neetid@codeaurora.org>
+Date: Tue, 11 Jun 2013 00:14:21 +0000
+Subject: [PATCH 318/507] msm: Allow lowmem to be non contiguous and mixed.
+
+Any image that is expected to have a lifetime of
+the entire system can give the virtual address
+space back for use in vmalloc.
+
+Change-Id: I81ce848cd37e8573d706fa5d1aa52147b3c8da12
+Signed-off-by: Neeti Desai <neetid@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/vmalloc.c |   24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+index 5065adb..368977a 100644
+--- a/mm/vmalloc.c
++++ b/mm/vmalloc.c
+@@ -1116,7 +1116,31 @@ void *vm_map_ram(struct page **pages, unsigned int count, int node, pgprot_t pro
+ 	return mem;
+ }
+ EXPORT_SYMBOL(vm_map_ram);
++/**
++ * vm_area_check_early - check if vmap area is already mapped
++ * @vm: vm_struct to be checked
++ *
++ * This function is used to check if the vmap area has been
++ * mapped already. @vm->addr, @vm->size and @vm->flags should
++ * contain proper values.
++ *
++ */
++int __init vm_area_check_early(struct vm_struct *vm)
++{
++	struct vm_struct *tmp, **p;
+ 
++	BUG_ON(vmap_initialized);
++	for (p = &vmlist; (tmp = *p) != NULL; p = &tmp->next) {
++		if (tmp->addr >= vm->addr) {
++			if (tmp->addr < vm->addr + vm->size)
++				return 1;
++		} else {
++			if (tmp->addr + tmp->size > vm->addr)
++				return 1;
++		}
++	}
++	return 0;
++}
+ /**
+  * vm_area_add_early - add vmap area early during boot
+  * @vm: vm_struct to add
+-- 
+1.7.9.5
+

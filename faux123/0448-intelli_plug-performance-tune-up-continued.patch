@@ -1,0 +1,38 @@
+From 909999d6eb3422047f0a724a43937de821a3c0bd Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Wed, 20 Nov 2013 04:00:27 -0600
+Subject: [PATCH 448/507] intelli_plug: performance tune-up continued...
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/intelli_plug.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-msm/intelli_plug.c b/arch/arm/mach-msm/intelli_plug.c
+index 023664c..e47d3ac 100644
+--- a/arch/arm/mach-msm/intelli_plug.c
++++ b/arch/arm/mach-msm/intelli_plug.c
+@@ -32,14 +32,14 @@
+ #define INTELLI_PLUG_MAJOR_VERSION	2
+ #define INTELLI_PLUG_MINOR_VERSION	0
+ 
+-#define DEF_SAMPLING_MS			(500)
+-#define BUSY_SAMPLING_MS		(1000)
++#define DEF_SAMPLING_MS			(1000)
++#define BUSY_SAMPLING_MS		(500)
+ 
+ #define DUAL_CORE_PERSISTENCE		7
+-#define TRI_CORE_PERSISTENCE		4
+-#define QUAD_CORE_PERSISTENCE		4
++#define TRI_CORE_PERSISTENCE		5
++#define QUAD_CORE_PERSISTENCE		3
+ 
+-#define BUSY_PERSISTENCE		5
++#define BUSY_PERSISTENCE		10
+ 
+ #define RUN_QUEUE_THRESHOLD		38
+ 
+-- 
+1.7.9.5
+

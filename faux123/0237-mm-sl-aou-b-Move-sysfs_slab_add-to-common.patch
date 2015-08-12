@@ -1,0 +1,102 @@
+From 47735be4c74cb04824ce5c4a538e27a889be5918 Mon Sep 17 00:00:00 2001
+From: Christoph Lameter <cl@linux.com>
+Date: Wed, 5 Sep 2012 00:18:32 +0000
+Subject: [PATCH 237/338] mm/sl[aou]b: Move sysfs_slab_add to common
+
+Simplify locking by moving the slab_add_sysfs after all locks have been
+dropped. Eases the upcoming move to provide sysfs support for all
+allocators.
+
+Reviewed-by: Glauber Costa <glommer@parallels.com>
+Signed-off-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+---
+ mm/slab.h        |  3 +++
+ mm/slab_common.c |  8 ++++++++
+ mm/slub.c        | 15 ++-------------
+ 3 files changed, 13 insertions(+), 13 deletions(-)
+
+diff --git a/mm/slab.h b/mm/slab.h
+index 84c28f4..ec7b944 100644
+--- a/mm/slab.h
++++ b/mm/slab.h
+@@ -39,10 +39,13 @@ struct kmem_cache *__kmem_cache_create(const char *name, size_t size,
+ #ifdef CONFIG_SLUB
+ struct kmem_cache *__kmem_cache_alias(const char *name, size_t size,
+ 	size_t align, unsigned long flags, void (*ctor)(void *));
++extern int sysfs_slab_add(struct kmem_cache *s);
+ #else
+ static inline struct kmem_cache *__kmem_cache_alias(const char *name, size_t size,
+ 	size_t align, unsigned long flags, void (*ctor)(void *))
+ { return NULL; }
++static inline int sysfs_slab_add(struct kmem_cache *s) { return 0; }
++
+ #endif
+ 
+ 
+diff --git a/mm/slab_common.c b/mm/slab_common.c
+index adc42b0..4f72208 100644
+--- a/mm/slab_common.c
++++ b/mm/slab_common.c
+@@ -152,6 +152,14 @@ out_locked:
+ 		return NULL;
+ 	}
+ 
++	if (s->refcount == 1) {
++		err = sysfs_slab_add(s);
++		if (err)
++			printk(KERN_WARNING "kmem_cache_create(%s) failed to"
++				" create sysfs entry. Error %d\n",
++					name, err);
++	}
++
+ 	return s;
+ }
+ EXPORT_SYMBOL(kmem_cache_create);
+diff --git a/mm/slub.c b/mm/slub.c
+index c1bc86ee..7720ebb 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -202,12 +202,10 @@ struct track {
+ enum track_item { TRACK_ALLOC, TRACK_FREE };
+ 
+ #ifdef CONFIG_SYSFS
+-static int sysfs_slab_add(struct kmem_cache *);
+ static int sysfs_slab_alias(struct kmem_cache *, const char *);
+ static void sysfs_slab_remove(struct kmem_cache *);
+ 
+ #else
+-static inline int sysfs_slab_add(struct kmem_cache *s) { return 0; }
+ static inline int sysfs_slab_alias(struct kmem_cache *s, const char *p)
+ 							{ return 0; }
+ static inline void sysfs_slab_remove(struct kmem_cache *s) { }
+@@ -3959,16 +3957,7 @@ struct kmem_cache *__kmem_cache_create(const char *name, size_t size,
+ 	if (s) {
+ 		if (kmem_cache_open(s, name,
+ 				size, align, flags, ctor)) {
+-			int r;
+-
+-			mutex_unlock(&slab_mutex);
+-			r = sysfs_slab_add(s);
+-			mutex_lock(&slab_mutex);
+-
+-			if (!r)
+-				return s;
+-
+-			kmem_cache_close(s);
++			return s;
+ 		}
+ 		kmem_cache_free(kmem_cache, s);
+ 	}
+@@ -5262,7 +5251,7 @@ static char *create_unique_id(struct kmem_cache *s)
+ 	return name;
+ }
+ 
+-static int sysfs_slab_add(struct kmem_cache *s)
++int sysfs_slab_add(struct kmem_cache *s)
+ {
+ 	int err;
+ 	const char *name;
+-- 
+1.8.1.2
+

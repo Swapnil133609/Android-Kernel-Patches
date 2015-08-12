@@ -1,0 +1,33 @@
+From cb286bb86e341a83296992f0407d82afa505bedc Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Thu, 9 May 2013 15:32:24 -0700
+Subject: [PATCH 123/507] arch/arm/kernel/armksyms: fix merge derp
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+
+Conflicts:
+
+	arch/arm/kernel/armksyms.c
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/kernel/armksyms.c |    4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
+index 7196228..60d3b73 100644
+--- a/arch/arm/kernel/armksyms.c
++++ b/arch/arm/kernel/armksyms.c
+@@ -86,10 +86,6 @@ EXPORT_SYMBOL(memmove);
+ EXPORT_SYMBOL(memchr);
+ EXPORT_SYMBOL(__memzero);
+ 
+-	/* user mem (segment) */
+-EXPORT_SYMBOL(__strnlen_user);
+-EXPORT_SYMBOL(__strncpy_from_user);
+-
+ #ifdef CONFIG_MMU
+ EXPORT_SYMBOL(copy_page);
+ 
+-- 
+1.7.9.5
+

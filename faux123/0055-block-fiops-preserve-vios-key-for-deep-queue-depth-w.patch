@@ -1,0 +1,39 @@
+From 709d88fb653dc607fbde9cabe1ee69060932950d Mon Sep 17 00:00:00 2001
+From: Shaohua Li <shaohua.li@intel.com>
+Date: Sat, 15 Dec 2012 22:36:37 -0800
+Subject: [PATCH 055/338] block: fiops preserve vios key for deep queue depth
+ workload
+
+If the task has running request, even it's added into service tree newly,
+we preserve its vios key, so it will not lost its share. This should work
+for task driving big queue depth. For single depth task, there is no approach
+to preserve its vios key.
+
+Signed-off-by: Shaohua Li <shaohua.li@intel.com>
+---
+ block/fiops-iosched.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/block/fiops-iosched.c b/block/fiops-iosched.c
+index d9ff3d9..84189f3 100644
+--- a/block/fiops-iosched.c
++++ b/block/fiops-iosched.c
+@@ -188,9 +188,12 @@ static void fiops_service_tree_add(struct fiops_data *fiopsd,
+ 	int left;
+ 
+ 	/* New added IOC */
+-	if (RB_EMPTY_NODE(&ioc->rb_node))
+-		vios = max_vios(service_tree->min_vios, ioc->vios);
+-	else {
++	if (RB_EMPTY_NODE(&ioc->rb_node)) {
++		if (ioc->in_flight > 0)
++			vios = ioc->vios;
++		else
++			vios = max_vios(service_tree->min_vios, ioc->vios);
++	} else {
+ 		vios = ioc->vios;
+ 		/* ioc->service_tree might not equal to service_tree */
+ 		fiops_rb_erase(&ioc->rb_node, ioc->service_tree);
+-- 
+1.8.1.2
+

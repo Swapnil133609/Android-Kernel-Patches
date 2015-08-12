@@ -1,0 +1,74 @@
+From 6b7c40f2563437dce5530d0ad0ecc1d3d9a3052a Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Mon, 2 Sep 2013 14:22:25 -0500
+Subject: [PATCH 284/338] Revert "mm: micro-optimise slab to avoid a function
+ call"
+
+This reverts commit 381760eadc393bcb1bb328510ad75cf13431806d.
+---
+ mm/slab.c | 28 ++--------------------------
+ 1 file changed, 2 insertions(+), 26 deletions(-)
+
+diff --git a/mm/slab.c b/mm/slab.c
+index e7c63f8..94726e3 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -117,8 +117,6 @@
+ #include	<linux/memory.h>
+ #include	<linux/prefetch.h>
+ 
+-#include	<net/sock.h>
+-
+ #include	<asm/cacheflush.h>
+ #include	<asm/tlbflush.h>
+ #include	<asm/page.h>
+@@ -963,7 +961,7 @@ out:
+ 	spin_unlock_irqrestore(&l3->list_lock, flags);
+ }
+ 
+-static void *__ac_get_obj(struct kmem_cache *cachep, struct array_cache *ac,
++static void *ac_get_obj(struct kmem_cache *cachep, struct array_cache *ac,
+ 						gfp_t flags, bool force_refill)
+ {
+ 	int i;
+@@ -1010,20 +1008,7 @@ static void *__ac_get_obj(struct kmem_cache *cachep, struct array_cache *ac,
+ 	return objp;
+ }
+ 
+-static inline void *ac_get_obj(struct kmem_cache *cachep,
+-			struct array_cache *ac, gfp_t flags, bool force_refill)
+-{
+-	void *objp;
+-
+-	if (unlikely(sk_memalloc_socks()))
+-		objp = __ac_get_obj(cachep, ac, flags, force_refill);
+-	else
+-		objp = ac->entry[--ac->avail];
+-
+-	return objp;
+-}
+-
+-static void *__ac_put_obj(struct kmem_cache *cachep, struct array_cache *ac,
++static void ac_put_obj(struct kmem_cache *cachep, struct array_cache *ac,
+ 								void *objp)
+ {
+ 	if (unlikely(pfmemalloc_active)) {
+@@ -1033,15 +1018,6 @@ static void *__ac_put_obj(struct kmem_cache *cachep, struct array_cache *ac,
+ 			set_obj_pfmemalloc(&objp);
+ 	}
+ 
+-	return objp;
+-}
+-
+-static inline void ac_put_obj(struct kmem_cache *cachep, struct array_cache *ac,
+-								void *objp)
+-{
+-	if (unlikely(sk_memalloc_socks()))
+-		objp = __ac_put_obj(cachep, ac, objp);
+-
+ 	ac->entry[ac->avail++] = objp;
+ }
+ 
+-- 
+1.8.1.2
+

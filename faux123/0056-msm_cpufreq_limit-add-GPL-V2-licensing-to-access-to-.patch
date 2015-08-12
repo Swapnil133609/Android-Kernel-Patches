@@ -1,0 +1,43 @@
+From 19f67892e2725f655b08f03a0cc032ee085cdf76 Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Thu, 6 Dec 2012 16:52:07 -0600
+Subject: [PATCH 056/507] msm_cpufreq_limit: add GPL V2 licensing to access to
+ GPL symbols
+
+fix Makefile to force no memory relocation
+
+Signed-off-by: faux123 <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ Makefile                          |    2 +-
+ arch/arm/mach-msm/cpufreq_limit.c |    3 +++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/Makefile b/Makefile
+index be32c2f..b16a6d2 100644
+--- a/Makefile
++++ b/Makefile
+@@ -351,7 +351,7 @@ CC		= $(srctree)/scripts/gcc-wrapper.py $(REAL_CC)
+ 
+ CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
+ 		  -Wbitwise -Wno-return-void $(CF)
+-CFLAGS_MODULE   =
++CFLAGS_MODULE   = -fno-pic
+ AFLAGS_MODULE   =
+ LDFLAGS_MODULE  =
+ CFLAGS_KERNEL	=
+diff --git a/arch/arm/mach-msm/cpufreq_limit.c b/arch/arm/mach-msm/cpufreq_limit.c
+index b1745c0..d30c209 100644
+--- a/arch/arm/mach-msm/cpufreq_limit.c
++++ b/arch/arm/mach-msm/cpufreq_limit.c
+@@ -126,4 +126,7 @@ static void msm_cpufreq_limit_exit(void)
+ 
+ module_init(msm_cpufreq_limit_init);
+ module_exit(msm_cpufreq_limit_exit);
++MODULE_LICENSE("GPL v2"); 
++MODULE_AUTHOR("Paul Reioux <reioux@gmail.com>");
++MODULE_DESCRIPTION("Krait CPU frequency Limit Driver");
+ 
+-- 
+1.7.9.5
+

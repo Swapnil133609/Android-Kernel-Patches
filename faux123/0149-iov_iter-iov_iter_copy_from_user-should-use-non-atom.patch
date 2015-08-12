@@ -1,0 +1,64 @@
+From c5565e88f8340057f97f974226eda53a38cc0bd8 Mon Sep 17 00:00:00 2001
+From: Dave Kleikamp <dave.kleikamp@oracle.com>
+Date: Sat, 2 Feb 2013 15:04:23 -0800
+Subject: [PATCH 149/507] iov_iter: iov_iter_copy_from_user() should use
+ non-atomic copy
+
+Signed-off-by: Dave Kleikamp <dave.kleikamp@oracle.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ fs/iov-iter.c |   17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
+
+diff --git a/fs/iov-iter.c b/fs/iov-iter.c
+index 83f7594..5c4f3a5 100644
+--- a/fs/iov-iter.c
++++ b/fs/iov-iter.c
+@@ -6,8 +6,8 @@
+ #include <linux/highmem.h>
+ #include <linux/pagemap.h>
+ 
+-static size_t __iovec_copy_from_user_inatomic(char *vaddr,
+-			const struct iovec *iov, size_t base, size_t bytes)
++static size_t __iovec_copy_from_user(char *vaddr, const struct iovec *iov,
++				     size_t base, size_t bytes, int atomic)
+ {
+ 	size_t copied = 0, left = 0;
+ 
+@@ -16,7 +16,10 @@ static size_t __iovec_copy_from_user_inatomic(char *vaddr,
+ 		int copy = min(bytes, iov->iov_len - base);
+ 
+ 		base = 0;
+-		left = __copy_from_user_inatomic(vaddr, buf, copy);
++		if (atomic)
++			left = __copy_from_user_inatomic(vaddr, buf, copy);
++		else
++			left = __copy_from_user(vaddr, buf, copy);
+ 		copied += copy;
+ 		bytes -= copy;
+ 		vaddr += copy;
+@@ -47,8 +50,8 @@ size_t iov_iter_copy_from_user_atomic(struct page *page,
+ 		left = __copy_from_user_inatomic(kaddr + offset, buf, bytes);
+ 		copied = bytes - left;
+ 	} else {
+-		copied = __iovec_copy_from_user_inatomic(kaddr + offset,
+-						i->iov, i->iov_offset, bytes);
++		copied = __iovec_copy_from_user(kaddr + offset, i->iov,
++						i->iov_offset, bytes, 1);
+ 	}
+ 	kunmap_atomic(kaddr);
+ 
+@@ -75,8 +78,8 @@ size_t iov_iter_copy_from_user(struct page *page,
+ 		left = __copy_from_user(kaddr + offset, buf, bytes);
+ 		copied = bytes - left;
+ 	} else {
+-		copied = __iovec_copy_from_user_inatomic(kaddr + offset,
+-						i->iov, i->iov_offset, bytes);
++		copied = __iovec_copy_from_user(kaddr + offset, i->iov,
++						i->iov_offset, bytes, 0);
+ 	}
+ 	kunmap(page);
+ 	return copied;
+-- 
+1.7.9.5
+

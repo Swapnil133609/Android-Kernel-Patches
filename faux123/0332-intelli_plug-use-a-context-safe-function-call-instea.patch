@@ -1,0 +1,28 @@
+From 896da4968d78ec18514450b6caf6ec2949b88e4e Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Tue, 12 Nov 2013 19:03:28 -0600
+Subject: [PATCH 332/338] intelli_plug: use a context safe function call
+ instead
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ arch/arm/mach-msm/intelli_plug.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-msm/intelli_plug.c b/arch/arm/mach-msm/intelli_plug.c
+index 95337aa..023664c 100644
+--- a/arch/arm/mach-msm/intelli_plug.c
++++ b/arch/arm/mach-msm/intelli_plug.c
+@@ -344,7 +344,8 @@ static void intelli_plug_input_event(struct input_handle *handle,
+ #ifdef DEBUG_INTELLI_PLUG
+ 	pr_info("intelli_plug touched!\n");
+ #endif
+-	cancel_delayed_work_sync(&intelli_plug_work);
++
++	cancel_delayed_work(&intelli_plug_work);
+ 
+ 	sampling_time = BUSY_SAMPLING_MS;
+ 	busy_persist_count = BUSY_PERSISTENCE;
+-- 
+1.8.1.2
+

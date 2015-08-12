@@ -1,0 +1,38 @@
+From f8b1f6c6149632cc5f205dde77e5ac1fd241c63b Mon Sep 17 00:00:00 2001
+From: Joonsoo Kim <js1304@gmail.com>
+Date: Sat, 23 Jun 2012 03:22:38 +0900
+Subject: [PATCH 249/507] slub: reduce failure of this_cpu_cmpxchg in
+ put_cpu_partial() after unfreezing
+
+In current implementation, after unfreezing, we doesn't touch oldpage,
+so it remain 'NOT NULL'. When we call this_cpu_cmpxchg()
+with this old oldpage, this_cpu_cmpxchg() is mostly be failed.
+
+We can change value of oldpage to NULL after unfreezing,
+because unfreeze_partial() ensure that all the cpu partial slabs is removed
+from cpu partial list. In this time, we could expect that
+this_cpu_cmpxchg is mostly succeed.
+
+Acked-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Joonsoo Kim <js1304@gmail.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slub.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/mm/slub.c b/mm/slub.c
+index 68afe64..5a1537c 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -1960,6 +1960,7 @@ int put_cpu_partial(struct kmem_cache *s, struct page *page, int drain)
+ 				local_irq_save(flags);
+ 				unfreeze_partials(s);
+ 				local_irq_restore(flags);
++				oldpage = NULL;
+ 				pobjects = 0;
+ 				pages = 0;
+ 				stat(s, CPU_PARTIAL_DRAIN);
+-- 
+1.7.9.5
+

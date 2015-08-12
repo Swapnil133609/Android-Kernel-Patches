@@ -1,0 +1,31 @@
+From ca2aea4b04166c02b97e882f8c307abd91ee7a84 Mon Sep 17 00:00:00 2001
+From: Joonsoo Kim <js1304@gmail.com>
+Date: Fri, 18 May 2012 00:47:47 +0900
+Subject: [PATCH 214/507] slub: use __SetPageSlab function to set PG_slab flag
+
+To set page-flag, using SetPageXXXX() and __SetPageXXXX() is more
+understandable and maintainable. So change it.
+
+Signed-off-by: Joonsoo Kim <js1304@gmail.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slub.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mm/slub.c b/mm/slub.c
+index 931c8eb..61b771b 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -1369,7 +1369,7 @@ static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
+ 
+ 	inc_slabs_node(s, page_to_nid(page), page->objects);
+ 	page->slab = s;
+-	page->flags |= 1 << PG_slab;
++	__SetPageSlab(page);
+ 
+ 	start = page_address(page);
+ 
+-- 
+1.7.9.5
+

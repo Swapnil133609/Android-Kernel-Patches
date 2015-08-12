@@ -1,0 +1,37 @@
+From 45910b6620bd12d824078c7324fd67d1b0f0f31a Mon Sep 17 00:00:00 2001
+From: Ecco Park <eccopark@broadcom.com>
+Date: Wed, 30 Oct 2013 10:31:36 +0900
+Subject: [PATCH 387/507] net: wireless: bcmdhd:  clear p2p scan state if PNO
+ scan will start
+
+	Problem : if PNO scan occurs in Driver after p2p scan,
+		  we failed to do PNO scan
+	Root cause : In the wl_run_escan function, we still goes into
+	p2p scan code even though current scan is PNO which is kind of
+	legacy scan.
+
+	Solution : we need to clear the staus of P2P scan before doing
+	PNO SCAN.
+	Bug : 11190960
+
+Signed-off-by: Ecco Park <eccopark@broadcom.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/net/wireless/bcmdhd/wl_cfg80211.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/net/wireless/bcmdhd/wl_cfg80211.c b/drivers/net/wireless/bcmdhd/wl_cfg80211.c
+index 0bdaf4e..cc2a0e8 100644
+--- a/drivers/net/wireless/bcmdhd/wl_cfg80211.c
++++ b/drivers/net/wireless/bcmdhd/wl_cfg80211.c
+@@ -8084,6 +8084,7 @@ wl_notify_sched_scan_results(struct wl_priv *wl, struct net_device *ndev,
+ 				wl_clr_drv_status(wl, SCANNING, ndev);
+ 				goto out_err;
+ 			}
++			p2p_scan(wl) = false;
+ 		}
+ 
+ 		wl_set_drv_status(wl, SCANNING, ndev);
+-- 
+1.7.9.5
+

@@ -1,0 +1,104 @@
+From 87f8d03082fae0f09e1300489d413714cce4bad9 Mon Sep 17 00:00:00 2001
+From: Davidlohr Bueso <davidlohr@hp.com>
+Date: Sat, 4 Jan 2014 10:47:26 -0800
+Subject: [PATCH 505/507] futex: Document ordering guarantees
+
+Date	Thu, 2 Jan 2014 07:05:19 -0800
+
+From: Thomas Gleixner <tglx@linutronix.de>
+
+That's essential, if you want to hack on futexes.
+
+Cc: Ingo Molnar <mingo@kernel.org>
+Cc: Darren Hart <dvhart@linux.intel.com>
+Acked-by: Peter Zijlstra <peterz@infradead.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+Cc: Mike Galbraith <efault@gmx.de>
+Cc: Jeff Mahoney <jeffm@suse.com>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Randy Dunlap <rdunlap@infradead.org>
+Cc: Scott Norton <scott.norton@hp.com>
+Cc: Tom Vaden <tom.vaden@hp.com>
+Cc: Aswin Chandramouleeswaran <aswin@hp.com>
+Cc: Waiman Long <Waiman.Long@hp.com>
+Cc: Jason Low <jason.low2@hp.com>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Davidlohr Bueso <davidlohr@hp.com>
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/futex.c |   57 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
+
+diff --git a/kernel/futex.c b/kernel/futex.c
+index 94b0378..60a1029 100644
+--- a/kernel/futex.c
++++ b/kernel/futex.c
+@@ -67,6 +67,63 @@
+ 
+ #include "rtmutex_common.h"
+ 
++/*
++ * Basic futex operation and ordering guarantees:
++ *
++ * The waiter reads the futex value in user space and calls
++ * futex_wait(). This function computes the hash bucket and acquires
++ * the hash bucket lock. After that it reads the futex user space value
++ * again and verifies that the data has not changed. If it has not
++ * changed it enqueues itself into the hash bucket, releases the hash
++ * bucket lock and schedules.
++ *
++ * The waker side modifies the user space value of the futex and calls
++ * futex_wake(). This functions computes the hash bucket and acquires
++ * the hash bucket lock. Then it looks for waiters on that futex in the
++ * hash bucket and wakes them.
++ *
++ * Note that the spin_lock serializes waiters and wakers, so that the
++ * following scenario is avoided:
++ *
++ * CPU 0                               CPU 1
++ * val = *futex;
++ * sys_futex(WAIT, futex, val);
++ *   futex_wait(futex, val);
++ *   uval = *futex;
++ *                                     *futex = newval;
++ *                                     sys_futex(WAKE, futex);
++ *                                       futex_wake(futex);
++ *                                       if (queue_empty())
++ *                                         return;
++ *   if (uval == val)
++ *      lock(hash_bucket(futex));
++ *      queue();
++ *     unlock(hash_bucket(futex));
++ *     schedule();
++ *
++ * This would cause the waiter on CPU 0 to wait forever because it
++ * missed the transition of the user space value from val to newval
++ * and the waker did not find the waiter in the hash bucket queue.
++ * The spinlock serializes that:
++ *
++ * CPU 0                               CPU 1
++ * val = *futex;
++ * sys_futex(WAIT, futex, val);
++ *   futex_wait(futex, val);
++ *   lock(hash_bucket(futex));
++ *   uval = *futex;
++ *                                     *futex = newval;
++ *                                     sys_futex(WAKE, futex);
++ *                                       futex_wake(futex);
++ *                                       lock(hash_bucket(futex));
++ *   if (uval == val)
++ *      queue();
++ *     unlock(hash_bucket(futex));
++ *     schedule();                       if (!queue_empty())
++ *                                         wake_waiters(futex);
++ *                                       unlock(hash_bucket(futex));
++ */
++
+ int __read_mostly futex_cmpxchg_enabled;
+ 
+ /*
+-- 
+1.7.9.5
+

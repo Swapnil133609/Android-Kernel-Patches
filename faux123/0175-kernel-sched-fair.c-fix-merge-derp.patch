@@ -1,0 +1,28 @@
+From 8ccb8403f14ba6d0d9ab2e4a4faa01fdb33e43dc Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sun, 8 Sep 2013 18:29:35 -0500
+Subject: [PATCH 175/338] kernel/sched/fair.c: fix merge derp
+
+ from patch sched: change load balance number to h_nr_running of run queue
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ kernel/sched/fair.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 6eb5558..0f46f63 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -4485,7 +4485,7 @@ redo:
+ 		env.load_move	= imbalance;
+ 		env.src_cpu	= busiest->cpu;
+ 		env.src_rq	= busiest;
+-		env.loop_max  = min(sysctl_sched_nr_migrate,
++		env.loop_max  = min_t(unsigned long, sysctl_sched_nr_migrate,
+ 					busiest->cfs.h_nr_running);
+ 
+ more_balance:
+-- 
+1.8.1.2
+

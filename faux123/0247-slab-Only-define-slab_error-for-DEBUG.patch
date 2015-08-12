@@ -1,0 +1,46 @@
+From 24f1ecd52f3e849499383918bd4af936d674628a Mon Sep 17 00:00:00 2001
+From: Christoph Lameter <cl@linux.com>
+Date: Tue, 11 Sep 2012 19:49:38 +0000
+Subject: [PATCH 247/338] slab: Only define slab_error for DEBUG
+
+On Tue, 11 Sep 2012, Stephen Rothwell wrote:
+> After merging the final tree, today's linux-next build (sparc64 defconfig)
+> produced this warning:
+>
+> mm/slab.c:808:13: warning: '__slab_error' defined but not used [-Wunused-function]
+>
+> Introduced by commit 945cf2b6199b ("mm/sl[aou]b: Extract a common
+> function for kmem_cache_destroy").  All uses of slab_error() are now
+> guarded by DEBUG.
+
+There is no use case left for slab builds without DEBUG.
+
+Signed-off-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+---
+ mm/slab.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/mm/slab.c b/mm/slab.c
+index c5a750d..5fc76ac 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -803,6 +803,7 @@ static void cache_estimate(unsigned long gfporder, size_t buffer_size,
+ 	*left_over = slab_size - nr_objs*buffer_size - mgmt_size;
+ }
+ 
++#if DEBUG
+ #define slab_error(cachep, msg) __slab_error(__func__, cachep, msg)
+ 
+ static void __slab_error(const char *function, struct kmem_cache *cachep,
+@@ -812,6 +813,7 @@ static void __slab_error(const char *function, struct kmem_cache *cachep,
+ 	       function, cachep->name, msg);
+ 	dump_stack();
+ }
++#endif
+ 
+ /*
+  * By default on NUMA we use alien caches to stage the freeing of
+-- 
+1.8.1.2
+

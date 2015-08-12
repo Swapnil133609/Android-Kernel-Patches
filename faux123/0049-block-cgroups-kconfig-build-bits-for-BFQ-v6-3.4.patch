@@ -1,0 +1,97 @@
+From fa44646e6fc795b9d8a46121d2cc21fda486bdb3 Mon Sep 17 00:00:00 2001
+From: Paolo Valente <paolo.valente@unimore.it>
+Date: Sun, 20 Oct 2013 22:41:23 -0500
+Subject: [PATCH 049/338] block: cgroups, kconfig, build bits for BFQ-v6-3.4
+
+Update Kconfig.iosched and do the related Makefile changes to include
+kernel configuration options for BFQ. Also add the bfqio controller
+to the cgroups subsystem.
+
+Signed-off-by: Paolo Valente <paolo.valente@unimore.it>
+Signed-off-by: Arianna Avanzini <avanzini.arianna@gmail.com>
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ block/Kconfig.iosched         | 26 ++++++++++++++++++++++++++
+ block/Makefile                |  1 +
+ include/linux/cgroup_subsys.h |  4 ++++
+ 3 files changed, 31 insertions(+)
+
+diff --git a/block/Kconfig.iosched b/block/Kconfig.iosched
+index 5fd98ea..97a0bc9 100644
+--- a/block/Kconfig.iosched
++++ b/block/Kconfig.iosched
+@@ -65,6 +65,28 @@ config CFQ_GROUP_IOSCHED
+ 	---help---
+ 	  Enable group IO scheduling in CFQ.
+ 
++config IOSCHED_BFQ
++	tristate "BFQ I/O scheduler"
++	depends on EXPERIMENTAL
++	default n
++	---help---
++	  The BFQ I/O scheduler tries to distribute bandwidth among
++	  all processes according to their weights.
++	  It aims at distributing the bandwidth as desired, independently of
++	  the disk parameters and with any workload. It also tries to
++	  guarantee low latency to interactive and soft real-time
++	  applications.  If compiled built-in (saying Y here), BFQ can
++	  be configured to support hierarchical scheduling.
++
++config CGROUP_BFQIO
++	bool "BFQ hierarchical scheduling support"
++	depends on CGROUPS && IOSCHED_BFQ=y
++	default n
++	---help---
++	  Enable hierarchical scheduling in BFQ, using the cgroups
++	  filesystem interface.  The name of the subsystem will be
++	  bfqio.
++
+ choice
+ 	prompt "Default I/O scheduler"
+ 	default DEFAULT_CFQ
+@@ -88,6 +110,9 @@ choice
+ 	config DEFAULT_CFQ
+ 		bool "CFQ" if IOSCHED_CFQ=y
+ 
++	config DEFAULT_BFQ
++		bool "BFQ" if IOSCHED_BFQ=y
++
+ 	config DEFAULT_NOOP
+ 		bool "No-op"
+ 
+@@ -98,6 +123,7 @@ config DEFAULT_IOSCHED
+ 	default "deadline" if DEFAULT_DEADLINE
+ 	default "row" if DEFAULT_ROW
+ 	default "cfq" if DEFAULT_CFQ
++	default "bfq" if DEFAULT_BFQ
+ 	default "noop" if DEFAULT_NOOP
+ 
+ endmenu
+diff --git a/block/Makefile b/block/Makefile
+index b5e6637..a09bb26 100644
+--- a/block/Makefile
++++ b/block/Makefile
+@@ -16,6 +16,7 @@ obj-$(CONFIG_IOSCHED_NOOP)	+= noop-iosched.o
+ obj-$(CONFIG_IOSCHED_DEADLINE)	+= deadline-iosched.o
+ obj-$(CONFIG_IOSCHED_ROW)	+= row-iosched.o
+ obj-$(CONFIG_IOSCHED_CFQ)	+= cfq-iosched.o
++obj-$(CONFIG_IOSCHED_BFQ)	+= bfq-iosched.o
+ obj-$(CONFIG_IOSCHED_TEST)	+= test-iosched.o
+ 
+ obj-$(CONFIG_BLOCK_COMPAT)	+= compat_ioctl.o
+diff --git a/include/linux/cgroup_subsys.h b/include/linux/cgroup_subsys.h
+index 0bd390c..a25ddbb 100644
+--- a/include/linux/cgroup_subsys.h
++++ b/include/linux/cgroup_subsys.h
+@@ -72,3 +72,7 @@ SUBSYS(net_prio)
+ #endif
+ 
+ /* */
++#ifdef CONFIG_CGROUP_BFQIO
++SUBSYS(bfqio)
++#endif
++
+-- 
+1.8.1.2
+

@@ -1,0 +1,53 @@
+From 7b5f7029ba8eb6cf4cbea28f4f50658806418ee4 Mon Sep 17 00:00:00 2001
+From: Christoph Lameter <cl@linux.com>
+Date: Wed, 9 May 2012 10:09:55 -0500
+Subject: [PATCH 187/338] slub: new_slab_objects() can also get objects from
+ partial list
+
+Moving the attempt to get a slab page from the partial lists simplifies
+__slab_alloc which is rather complicated.
+
+Signed-off-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+---
+ mm/slub.c | 16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
+
+diff --git a/mm/slub.c b/mm/slub.c
+index 8559b7e..a786e68 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -2130,9 +2130,15 @@ static inline void *new_slab_objects(struct kmem_cache *s, gfp_t flags,
+ 			int node, struct kmem_cache_cpu **pc)
+ {
+ 	void *freelist;
+-	struct kmem_cache_cpu *c;
+-	struct page *page = new_slab(s, flags, node);
++	struct kmem_cache_cpu *c = *pc;
++	struct page *page;
++
++	freelist = get_partial(s, flags, node, c);
+ 
++	if (freelist)
++		return freelist;
++
++	page = new_slab(s, flags, node);
+ 	if (page) {
+ 		c = __this_cpu_ptr(s->cpu_slab);
+ 		if (c->page)
+@@ -2269,11 +2275,7 @@ new_slab:
+ 		goto redo;
+ 	}
+ 
+-	/* Then do expensive stuff like retrieving pages from the partial lists */
+-	freelist = get_partial(s, gfpflags, node, c);
+-
+-	if (!freelist)
+-		freelist = new_slab_objects(s, gfpflags, node, &c);
++	freelist = new_slab_objects(s, gfpflags, node, &c);
+ 
+ 	if (unlikely(!freelist)) {
+ 		if (!(gfpflags & __GFP_NOWARN) && printk_ratelimit())
+-- 
+1.8.1.2
+

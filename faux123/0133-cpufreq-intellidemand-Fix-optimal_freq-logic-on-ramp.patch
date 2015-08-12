@@ -1,0 +1,39 @@
+From 7bfbaea1e1941a6268448a2b121b19d221135379 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Mon, 20 May 2013 01:43:57 -0500
+Subject: [PATCH 133/507] cpufreq: intellidemand: Fix optimal_freq logic on
+ ramp down
+
+When ondemand governor decides to ramp down the frequency, the missing
+check for frequency being lower than optimal_freq was causing frequency
+to be ramped down to optimal_freq even if the frequency decided by ondemand
+governor was higher.
+
+Change-Id: I00f9ae4c61ccda4039f3338dee2c29b8cb790be4
+Signed-off-by: Veena Sambasivan <veenas@codeaurora.org>
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_intellidemand.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_intellidemand.c b/drivers/cpufreq/cpufreq_intellidemand.c
+index 6f7e3ce..e4f0b26 100644
+--- a/drivers/cpufreq/cpufreq_intellidemand.c
++++ b/drivers/cpufreq/cpufreq_intellidemand.c
+@@ -1205,9 +1205,10 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
+ 				freq_next = dbs_tuners_ins.sync_freq;
+ 
+ 			if (max_load_freq >
+-				 (dbs_tuners_ins.up_threshold_multi_core -
++				 ((dbs_tuners_ins.up_threshold_multi_core -
+ 				  dbs_tuners_ins.down_differential_multi_core) *
+-				  policy->cur)
++				  policy->cur) &&
++				freq_next < dbs_tuners_ins.optimal_freq)
+ 				freq_next = dbs_tuners_ins.optimal_freq;
+ 
+ 		}
+-- 
+1.7.9.5
+

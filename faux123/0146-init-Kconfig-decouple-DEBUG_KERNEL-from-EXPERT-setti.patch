@@ -1,0 +1,27 @@
+From 8bec13d2ff258fcc0c2953b40184ccaf89e02848 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Thu, 23 May 2013 20:52:12 -0500
+Subject: [PATCH 146/507] init/Kconfig: decouple DEBUG_KERNEL from EXPERT
+ settings
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ init/Kconfig |    1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/init/Kconfig b/init/Kconfig
+index e4b67a1..5cb5c07 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -962,7 +962,6 @@ config PANIC_TIMEOUT
+ menuconfig EXPERT
+ 	bool "Configure standard kernel features (expert users)"
+ 	# Unhide debug options, to make the on-by-default options visible
+-	select DEBUG_KERNEL
+ 	help
+ 	  This option allows certain base kernel options and settings
+           to be disabled or tweaked. This is for specialized
+-- 
+1.7.9.5
+

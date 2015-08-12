@@ -1,0 +1,45 @@
+From c9951151964252e668ce36c61ab78146fa94510a Mon Sep 17 00:00:00 2001
+From: Christoph Lameter <cl@linux.com>
+Date: Wed, 9 May 2012 10:09:54 -0500
+Subject: [PATCH 218/507] slub: Simplify control flow in __slab_alloc()
+
+Simplify control flow a bit avoiding nesting.
+
+Signed-off-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slub.c |   14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
+
+diff --git a/mm/slub.c b/mm/slub.c
+index de2dda9..8559b7e 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -2272,17 +2272,15 @@ new_slab:
+ 	/* Then do expensive stuff like retrieving pages from the partial lists */
+ 	freelist = get_partial(s, gfpflags, node, c);
+ 
+-	if (unlikely(!freelist)) {
+-
++	if (!freelist)
+ 		freelist = new_slab_objects(s, gfpflags, node, &c);
+ 
+-		if (unlikely(!freelist)) {
+-			if (!(gfpflags & __GFP_NOWARN) && printk_ratelimit())
+-				slab_out_of_memory(s, gfpflags, node);
++	if (unlikely(!freelist)) {
++		if (!(gfpflags & __GFP_NOWARN) && printk_ratelimit())
++			slab_out_of_memory(s, gfpflags, node);
+ 
+-			local_irq_restore(flags);
+-			return NULL;
+-		}
++		local_irq_restore(flags);
++		return NULL;
+ 	}
+ 
+ 	if (likely(!kmem_cache_debug(s)))
+-- 
+1.7.9.5
+

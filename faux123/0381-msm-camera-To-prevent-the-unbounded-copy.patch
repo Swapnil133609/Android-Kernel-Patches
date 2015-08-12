@@ -1,0 +1,39 @@
+From ca7e0c07ea8bcdf97e007ef1b6fef867281c3cc9 Mon Sep 17 00:00:00 2001
+From: Ajay Dudani <adudani@codeaurora.org>
+Date: Sat, 12 Oct 2013 20:49:00 -0700
+Subject: [PATCH 381/507] msm: camera: To prevent the unbounded copy
+
+To prevent the unbounded copy in EEPROM driver
+to avoid kernel memory disclosure
+
+Change-Id: Ib7f8719351ff72720c55394fdd0fcd5e876e2c09
+CRs-fixed: 553389
+Signed-off-by: Cherian Deepak <dcheri@codeaurora.org>
+Signed-off-by: Ajay Dudani <adudani@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ .../msm/camera_v2/sensor/eeprom/msm_eeprom.c       |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/media/platform/msm/camera_v2/sensor/eeprom/msm_eeprom.c b/drivers/media/platform/msm/camera_v2/sensor/eeprom/msm_eeprom.c
+index 4e26514..84222da 100644
+--- a/drivers/media/platform/msm/camera_v2/sensor/eeprom/msm_eeprom.c
++++ b/drivers/media/platform/msm/camera_v2/sensor/eeprom/msm_eeprom.c
+@@ -48,10 +48,12 @@ int32_t msm_eeprom_config(struct msm_eeprom_ctrl_t *e_ctrl,
+ 			e_ctrl->num_bytes;
+ 		break;
+ 	case CFG_EEPROM_READ_CAL_DATA:
+-		CDBG("%s E CFG_EEPROM_READ_CAL_DATA\n", __func__);
+-		rc = copy_to_user(cdata->cfg.read_data.dbuffer,
++		if (cdata->cfg.read_data.num_bytes <= e_ctrl->num_bytes) {
++			CDBG("%s E CFG_EEPROM_READ_CAL_DATA\n", __func__);
++			rc = copy_to_user(cdata->cfg.read_data.dbuffer,
+ 			e_ctrl->memory_data,
+ 			cdata->cfg.read_data.num_bytes);
++		}
+ 		break;
+ 	default:
+ 		break;
+-- 
+1.7.9.5
+

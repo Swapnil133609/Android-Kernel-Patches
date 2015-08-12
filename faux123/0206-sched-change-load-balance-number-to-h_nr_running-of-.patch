@@ -1,0 +1,54 @@
+From 552b6322bed2e93233c5ef9692f199a282bd61f0 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sun, 8 Sep 2013 17:14:16 -0500
+Subject: [PATCH 206/507] sched: change load balance number to h_nr_running of
+ run queue
+
+Date    Sun, 18 Aug 2013 16:25:15 +0800
+
+Since rq->nr_running would include both migration and rt task, it is not
+reasonable to seek to move nr_running number of task in the load_balance
+function, since it only apply to cfs type.
+
+Change it to cfs's h_nr_running, which could well present the task
+number in current cfs queue.
+
+Signed-off-by: Lei Wen <leiwen@marvell.com>
+backported to Linux 3.4 by faux123
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/sched/fair.c |    8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index b71f8e0..6eb5558 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -4473,10 +4473,11 @@ redo:
+ 	schedstat_add(sd, lb_imbalance[idle], imbalance);
+ 
+ 	ld_moved = 0;
+-	if (busiest->nr_running > 1) {
++	/* load balance only apply to CFS task, we use h_nr_running here */
++	if (busiest->cfs.h_nr_running > 1) {
+ 		/*
+ 		 * Attempt to move tasks. If find_busiest_group has found
+-		 * an imbalance but busiest->nr_running <= 1, the group is
++		 * an imbalance but busiest->cfs.h_nr_running <= 1, the group is
+ 		 * still unbalanced. ld_moved simply stays zero, so it is
+ 		 * correctly treated as an imbalance.
+ 		 */
+@@ -4484,7 +4485,8 @@ redo:
+ 		env.load_move	= imbalance;
+ 		env.src_cpu	= busiest->cpu;
+ 		env.src_rq	= busiest;
+-		env.loop_max	= min_t(unsigned long, sysctl_sched_nr_migrate, busiest->nr_running);
++		env.loop_max  = min(sysctl_sched_nr_migrate,
++					busiest->cfs.h_nr_running);
+ 
+ more_balance:
+ 		local_irq_save(flags);
+-- 
+1.7.9.5
+

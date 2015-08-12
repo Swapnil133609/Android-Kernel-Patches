@@ -1,0 +1,46 @@
+From f7ecf4b07af02c01ed1781653bec1d63773737f2 Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@xxxxxx>
+Date: Thu, 26 Dec 2013 18:23:08 -0800
+Subject: [PATCH 497/507] ARM: mm: update __v7_setup() to the new LoUIS cache
+ maintenance API
+
+The ARMv7 processor setup function __v7_setup() cleans and invalidates the
+CPU cache before enabling MMU to start the CPU with a clean CPU local cache.
+
+But on ARMv7 architectures like Cortex-[A15/A8], this code will end
+up flushing the L2 caches(up to level of Coherency) which is undesirable
+and expensive. The setup functions are used in the CPU hotplug scenario too
+and hence flushing all cache levels should be avoided.
+
+This patch replaces the cache flushing call with the newly introduced
+v7 dcache LoUIS API where only cache levels up to LoUIS are cleaned and
+invalidated when a processors executes __v7_setup which is the expected
+behavior.
+
+For processors like A9 and A5 where the L2 cache is an outer one the
+behavior should be unchanged.
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@xxxxxx>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@xxxxxxx>
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mm/proc-v7.S |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index ba93e68..ce5045c 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -175,7 +175,7 @@ __v7_ca15mp_setup:
+ __v7_setup:
+ 	adr	r12, __v7_setup_stack		@ the local stack
+ 	stmia	r12, {r0-r5, r7, r9, r11, lr}
+-	bl	v7_flush_dcache_all
++	bl      v7_flush_dcache_louis
+ 	ldmia	r12, {r0-r5, r7, r9, r11, lr}
+ 
+ 	mrc	p15, 0, r0, c0, c0, 0		@ read main ID register
+-- 
+1.7.9.5
+

@@ -1,0 +1,37 @@
+From 0cb305b7d8a71dea8de003f1be488fdf40cb3f57 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Wed, 4 Sep 2013 21:42:07 -0500
+Subject: [PATCH 289/338] drivers/cpufreq/cpufreq.c: re-enable cpu policy
+ restore
+
+original bug FINALLY fixed by:
+  cpufreq: Save user policy min/max instead of policy min/max during hotplug
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ drivers/cpufreq/cpufreq.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+index d121179..005951f 100644
+--- a/drivers/cpufreq/cpufreq.c
++++ b/drivers/cpufreq/cpufreq.c
+@@ -819,7 +819,6 @@ static int cpufreq_add_dev_policy(unsigned int cpu,
+ #ifdef CONFIG_SMP
+ 	unsigned long flags;
+ 	unsigned int j;
+-/*
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	struct cpufreq_governor *gov;
+ 
+@@ -840,7 +839,6 @@ static int cpufreq_add_dev_policy(unsigned int cpu,
+ 	pr_debug("Restoring CPU%d min %d and max %d\n",
+ 		cpu, policy->min, policy->max);
+ #endif
+-*/
+ 	for_each_cpu(j, policy->cpus) {
+ 		struct cpufreq_policy *managed_policy;
+ 
+-- 
+1.8.1.2
+

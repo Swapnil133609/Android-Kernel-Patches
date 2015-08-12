@@ -1,0 +1,53 @@
+From ae48575630b8a07e1a3c02bad057081d646fc982 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sun, 27 Oct 2013 02:45:01 -0500
+Subject: [PATCH 315/338] acpuclock-8974.c: fix derpy #ifdef
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ arch/arm/mach-msm/acpuclock-8974.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-msm/acpuclock-8974.c b/arch/arm/mach-msm/acpuclock-8974.c
+index f648642..97cb774 100644
+--- a/arch/arm/mach-msm/acpuclock-8974.c
++++ b/arch/arm/mach-msm/acpuclock-8974.c
+@@ -55,7 +55,7 @@ static struct scalable scalable[] __initdata = {
+ 		.hfpll_phys_base = 0xF908A000,
+ 		.l2cpmr_iaddr = 0x4501,
+ 		.sec_clk_sel = 2,
+-#if CONFIG_CPU_OVERCLOCK
++#ifdef CONFIG_CPU_OVERCLOCK
+ 		.vreg[VREG_CORE] = { "krait0",     1200000 },
+ #else
+ 		.vreg[VREG_CORE] = { "krait0",     1100000 },
+@@ -68,7 +68,7 @@ static struct scalable scalable[] __initdata = {
+ 		.hfpll_phys_base = 0xF909A000,
+ 		.l2cpmr_iaddr = 0x5501,
+ 		.sec_clk_sel = 2,
+-#if CONFIG_CPU_OVERCLOCK
++#ifdef CONFIG_CPU_OVERCLOCK
+ 		.vreg[VREG_CORE] = { "krait1",     1200000 },
+ #else
+ 		.vreg[VREG_CORE] = { "krait1",     1100000 },
+@@ -81,7 +81,7 @@ static struct scalable scalable[] __initdata = {
+ 		.hfpll_phys_base = 0xF90AA000,
+ 		.l2cpmr_iaddr = 0x6501,
+ 		.sec_clk_sel = 2,
+-#if CONFIG_CPU_OVERCLOCK
++#ifdef CONFIG_CPU_OVERCLOCK
+ 		.vreg[VREG_CORE] = { "krait2",     1200000 },
+ #else
+ 		.vreg[VREG_CORE] = { "krait2",     1100000 },
+@@ -94,7 +94,7 @@ static struct scalable scalable[] __initdata = {
+ 		.hfpll_phys_base = 0xF90BA000,
+ 		.l2cpmr_iaddr = 0x7501,
+ 		.sec_clk_sel = 2,
+-#if CONFIG_CPU_OVERCLOCK
++#ifdef CONFIG_CPU_OVERCLOCK
+ 		.vreg[VREG_CORE] = { "krait3",     1200000 },
+ #else
+ 		.vreg[VREG_CORE] = { "krait3",     1100000 },
+-- 
+1.8.1.2
+

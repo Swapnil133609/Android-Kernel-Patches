@@ -1,0 +1,36 @@
+From d7ab7ead64b5c8ff2995b43b9ad42ae4810c37e0 Mon Sep 17 00:00:00 2001
+From: David Rientjes <rientjes@google.com>
+Date: Tue, 28 Aug 2012 19:57:21 -0700
+Subject: [PATCH 256/507] mm, slab: lock the correct nodelist after reenabling
+ irqs
+
+cache_grow() can reenable irqs so the cpu (and node) can change, so ensure
+that we take list_lock on the correct nodelist.
+
+This fixes an issue with commit 072bb0aa5e06 ("mm: sl[au]b: add
+knowledge of PFMEMALLOC reserve pages") where list_lock for the wrong
+node was taken after growing the cache.
+
+Reported-and-tested-by: Haggai Eran <haggaie@mellanox.com>
+Signed-off-by: David Rientjes <rientjes@google.com>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slab.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/mm/slab.c b/mm/slab.c
+index 3b4587b..aa82b3b 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -3253,6 +3253,7 @@ force_grow:
+ 
+ 		/* cache_grow can reenable interrupts, then ac could change. */
+ 		ac = cpu_cache_get(cachep);
++		node = numa_mem_id();
+ 
+ 		/* no objects in sight? abort */
+ 		if (!x && (ac->avail == 0 || force_refill))
+-- 
+1.7.9.5
+

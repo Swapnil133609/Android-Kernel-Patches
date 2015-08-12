@@ -1,0 +1,27 @@
+From 435c5dc0649ab11b493bc255fb4bddd7e7f06164 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sat, 4 Jan 2014 10:54:24 -0800
+Subject: [PATCH 507/507] kernel/futex.c: Linux 3.4 compatibility fix up
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/futex.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/futex.c b/kernel/futex.c
+index 84bce3b..fd0f242 100644
+--- a/kernel/futex.c
++++ b/kernel/futex.c
+@@ -2832,7 +2832,7 @@ static int __init futex_init(void)
+ 	futex_queues = alloc_large_system_hash("futex", sizeof(*futex_queues),
+ 					       futex_hashsize, 0,
+ 					       futex_hashsize < 256 ? HASH_SMALL : 0,
+-					       NULL, NULL, futex_hashsize, futex_hashsize);
++					       NULL, NULL, futex_hashsize);
+ 
+ 	/*
+ 	 * This will fail and we want it. Some arch implementations do
+-- 
+1.7.9.5
+

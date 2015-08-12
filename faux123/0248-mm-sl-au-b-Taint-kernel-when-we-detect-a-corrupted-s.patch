@@ -1,0 +1,46 @@
+From f3208b16bab2b7d422bc81b6e8057b76a961b558 Mon Sep 17 00:00:00 2001
+From: Dave Jones <davej@redhat.com>
+Date: Tue, 18 Sep 2012 15:54:12 -0400
+Subject: [PATCH 248/338] mm, sl[au]b: Taint kernel when we detect a corrupted
+ slab
+
+It doesn't seem worth adding a new taint flag for this, so just re-use
+the one from 'bad page'
+
+Acked-by: Christoph Lameter <cl@linux.com> # SLUB
+Acked-by: David Rientjes <rientjes@google.com>
+Signed-off-by: Dave Jones <davej@redhat.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+---
+ mm/slab.c | 1 +
+ mm/slub.c | 2 ++
+ 2 files changed, 3 insertions(+)
+
+diff --git a/mm/slab.c b/mm/slab.c
+index 5fc76ac..d11362f 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -812,6 +812,7 @@ static void __slab_error(const char *function, struct kmem_cache *cachep,
+ 	printk(KERN_ERR "slab error in %s(): cache `%s': %s\n",
+ 	       function, cachep->name, msg);
+ 	dump_stack();
++	add_taint(TAINT_BAD_PAGE);
+ }
+ #endif
+ 
+diff --git a/mm/slub.c b/mm/slub.c
+index 7cdca61..2e36e99 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -564,6 +564,8 @@ static void slab_bug(struct kmem_cache *s, char *fmt, ...)
+ 	printk(KERN_ERR "BUG %s (%s): %s\n", s->name, print_tainted(), buf);
+ 	printk(KERN_ERR "----------------------------------------"
+ 			"-------------------------------------\n\n");
++
++	add_taint(TAINT_BAD_PAGE);
+ }
+ 
+ static void slab_fix(struct kmem_cache *s, char *fmt, ...)
+-- 
+1.8.1.2
+

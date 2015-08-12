@@ -1,0 +1,87 @@
+From ffa328f4ad246a10a5fcc4b8f7dff1d42cbf7706 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Mon, 17 Jun 2013 12:49:48 -0500
+Subject: [PATCH 187/507] sched: scale cpu load for judgment of group
+ imbalance
+
+Date	Mon, 17 Jun 2013 21:00:24 +0800
+
+We cannot compare two load directly from two cpus, since the cpu power
+over two cpu may vary largely.
+
+Suppose we meet such two kind of cpus.
+CPU A:
+	No real time work, and there are 3 task, with rq->load.weight
+being 512.
+CPU B:
+	Has real time work, and it take 3/4 of the cpu power, which
+makes CFS only take 1/4, that is 1024/4=256 cpu power. And over its CFS
+runqueue, there is only one task with weight as 128.
+
+Since both cpu's CFS task take for half of the CFS's cpu power, it
+should be considered as balanced in such case.
+
+But original judgment like:
+        if ((max_cpu_load - min_cpu_load) >= avg_load_per_task &&
+            (max_nr_running - min_nr_running) > 1)
+It makes (512-128)>=((512+128)/4), and lead to imbalance conclusion...
+Make the load as scaled, to avoid such case.
+
+Signed-off-by: Lei Wen <leiwen@marvell.com>
+
+modified for Mako kernel from LKML reference
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/sched/fair.c |   19 ++++++++++++-------
+ 1 file changed, 12 insertions(+), 7 deletions(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 6a71638..eda6ff0 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -3801,7 +3801,7 @@ static inline void update_sg_lb_stats(struct sched_domain *sd,
+ 			int local_group, const struct cpumask *cpus,
+ 			int *balance, struct sg_lb_stats *sgs)
+ {
+-	unsigned long load, max_cpu_load, min_cpu_load, max_nr_running;
++	unsigned long scaled_load, load, max_cpu_load, min_cpu_load, max_nr_running;
+ 	int i;
+ 	unsigned int balance_cpu = -1, first_idle_cpu = 0;
+ 	unsigned long avg_load_per_task = 0;
+@@ -3827,12 +3827,14 @@ static inline void update_sg_lb_stats(struct sched_domain *sd,
+ 			load = target_load(i, load_idx);
+ 		} else {
+ 			load = source_load(i, load_idx);
+-			if (load > max_cpu_load) {
+-				max_cpu_load = load;
++			scaled_load = load * SCHED_POWER_SCALE
++					/ cpu_rq(i)->cpu_power;
++			if (scaled_load > max_cpu_load) {
++				max_cpu_load = scaled_load;
+ 				max_nr_running = rq->nr_running;
+ 			}
+-			if (min_cpu_load > load)
+-				min_cpu_load = load;
++			if (min_cpu_load > scaled_load)
++				min_cpu_load = scaled_load;
+ 		}
+ 
+ 		sgs->group_load += load;
+@@ -3871,8 +3873,11 @@ static inline void update_sg_lb_stats(struct sched_domain *sd,
+ 	 *      normalized nr_running number somewhere that negates
+ 	 *      the hierarchy?
+ 	 */
+-	if (sgs->sum_nr_running)
+-		avg_load_per_task = sgs->sum_weighted_load / sgs->sum_nr_running;
++	if (sgs->sum_nr_running) {
++		avg_load_per_task = sgs->sum_weighted_load * SCHED_POWER_SCALE
++					/ group->sgp->power;
++		avg_load_per_task /= sgs->sum_nr_running;
++	}
+ 
+ 	if ((max_cpu_load - min_cpu_load) >= avg_load_per_task && max_nr_running > 1)
+ 		sgs->group_imb = 1;
+-- 
+1.7.9.5
+

@@ -1,0 +1,37 @@
+From 956ac30a6ad95dcf77edf776b45aec6648a647ae Mon Sep 17 00:00:00 2001
+From: JP Abgrall <jpa@google.com>
+Date: Mon, 29 Apr 2013 16:07:00 -0700
+Subject: [PATCH 146/338] ARM: fault: assume no context when IRQs are disabled
+ during data abort.
+
+Bail out early if IRQs are disabled in do_page_fault or else
+  [14415.157266] BUG: sleeping function called from invalid context at arch/arm/mm/fault.c:301
+
+Russell King's idea from
+  http://comments.gmane.org/gmane.linux.ports.arm.omap/59256
+
+Signed-off-by: JP Abgrall <jpa@google.com>
+---
+ arch/arm/mm/fault.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index 235c386..be99f57 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -286,10 +286,10 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 		local_irq_enable();
+ 
+ 	/*
+-	 * If we're in an interrupt or have no user
++	 * If we're in an interrupt, or have no irqs, or have no user
+ 	 * context, we must not take the fault..
+ 	 */
+-	if (in_atomic() || !mm)
++	if (in_atomic() || irqs_disabled() || !mm)
+ 		goto no_context;
+ 
+ 	/*
+-- 
+1.8.1.2
+

@@ -1,0 +1,37 @@
+From 1d77f0bf74129264da42e50f237900339718782d Mon Sep 17 00:00:00 2001
+From: Lei Wen <leiwen@marvell.com>
+Date: Sun, 1 Sep 2013 18:00:30 -0500
+Subject: [PATCH 212/507] sched: change active_load_balance_cpu_stop to use
+ h_nr_running
+
+Date	Sun, 18 Aug 2013 16:25:21 +0800
+
+We should only avoid do the active load balance when there is no
+cfs type task. If just use rq->nr_running, it is possible for the
+source cpu has multiple rt task, while zero cfs task, so that it
+would confuse the active load balance function that try to move,
+but find no task it could move.
+
+Signed-off-by: Lei Wen <leiwen@marvell.com>
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/sched/fair.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index e88c757..9c8a4c2 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -4703,7 +4703,7 @@ static int active_load_balance_cpu_stop(void *data)
+ 		goto out_unlock;
+ 
+ 	/* Is there any task to move? */
+-	if (busiest_rq->nr_running <= 1)
++	if (busiest_rq->cfs.h_nr_running == 0)
+ 		goto out_unlock;
+ 
+ 	/*
+-- 
+1.7.9.5
+

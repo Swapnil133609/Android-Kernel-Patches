@@ -1,0 +1,72 @@
+From addbcf4bf0cd12adbb908c18a3f1cad1984e174e Mon Sep 17 00:00:00 2001
+From: Dave Martin <dave.martin@linaro.org>
+Date: Thu, 31 Jan 2013 14:06:35 -0600
+Subject: [PATCH 064/338] ARM: 7583/1: decompressor: Enable unaligned memory
+ access for v6 and above
+
+Modern GCC can generate code which makes use of the CPU's native
+unaligned memory access capabilities.  This is useful for the C
+decompressor implementations used for unpacking compressed kernels.
+
+This patch disables alignment faults and enables the v6 unaligned
+access model on CPUs which support these features (i.e., v6 and
+later), allowing full unaligned access support for C code in the
+decompressor.
+
+The decompressor C code must not be built to assume that unaligned
+access works if support for v5 or older platforms is included in
+the kernel.
+
+For correct code generation, C decompressor code must always use
+the get_unaligned and put_unaligned accessors when dealing with
+unaligned pointers, regardless of this patch.
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/boot/compressed/head.S | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 64a6d6f..6362aad 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -614,6 +614,15 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
+ 		mov	pc, lr
+ ENDPROC(__setup_mmu)
+ 
++@ Enable unaligned access on v6, to allow better code generation
++@ for the decompressor C code:
++__armv6_mmu_cache_on:
++		mrc	p15, 0, r0, c1, c0, 0	@ read SCTLR
++		bic	r0, r0, #2		@ A (no unaligned access fault)
++		orr	r0, r0, #1 << 22	@ U (v6 unaligned access model)
++		mcr	p15, 0, r0, c1, c0, 0	@ write SCTLR
++		b	__armv4_mmu_cache_on
++
+ __arm926ejs_mmu_cache_on:
+ #ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+ 		mov	r0, #4			@ put dcache in WT mode
+@@ -655,6 +664,9 @@ __armv7_mmu_cache_on:
+ 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
+ 		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
+ 		orr	r0, r0, #0x003c		@ write buffer
++		bic	r0, r0, #2		@ A (no unaligned access fault)
++		orr	r0, r0, #1 << 22	@ U (v6 unaligned access model)
++						@ (needed for ARM1176)
+ #ifdef CONFIG_MMU
+ #ifdef CONFIG_CPU_ENDIAN_BE8
+ 		orr	r0, r0, #1 << 25	@ big-endian page tables
+@@ -895,7 +907,7 @@ proc_types:
+ 
+ 		.word	0x0007b000		@ ARMv6
+ 		.word	0x000ff000
+-		W(b)	__armv4_mmu_cache_on
++		W(b)	__armv6_mmu_cache_on
+ 		W(b)	__armv4_mmu_cache_off
+ 		W(b)	__armv6_mmu_cache_flush
+ 
+-- 
+1.8.1.2
+

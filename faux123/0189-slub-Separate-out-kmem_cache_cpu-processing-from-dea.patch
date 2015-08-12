@@ -1,0 +1,87 @@
+From 6da175927dcbfcddd1726d2be3f357853151cd1f Mon Sep 17 00:00:00 2001
+From: Christoph Lameter <cl@linux.com>
+Date: Wed, 9 May 2012 10:09:57 -0500
+Subject: [PATCH 189/338] slub: Separate out kmem_cache_cpu processing from
+ deactivate_slab
+
+Processing on fields of kmem_cache_cpu is cleaner if code working on fields
+of this struct is taken out of deactivate_slab().
+
+Acked-by: David Rientjes <rientjes@google.com>
+Signed-off-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+---
+ mm/slub.c | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/mm/slub.c b/mm/slub.c
+index e1d4e23..f3d454a 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -1729,14 +1729,12 @@ void init_kmem_cache_cpus(struct kmem_cache *s)
+ /*
+  * Remove the cpu slab
+  */
+-static void deactivate_slab(struct kmem_cache *s, struct kmem_cache_cpu *c)
++static void deactivate_slab(struct kmem_cache *s, struct page *page, void *freelist)
+ {
+ 	enum slab_modes { M_NONE, M_PARTIAL, M_FULL, M_FREE };
+-	struct page *page = c->page;
+ 	struct kmem_cache_node *n = get_node(s, page_to_nid(page));
+ 	int lock = 0;
+ 	enum slab_modes l = M_NONE, m = M_NONE;
+-	void *freelist;
+ 	void *nextfree;
+ 	int tail = DEACTIVATE_TO_HEAD;
+ 	struct page new;
+@@ -1747,11 +1745,6 @@ static void deactivate_slab(struct kmem_cache *s, struct kmem_cache_cpu *c)
+ 		tail = DEACTIVATE_TO_TAIL;
+ 	}
+ 
+-	c->tid = next_tid(c->tid);
+-	c->page = NULL;
+-	freelist = c->freelist;
+-	c->freelist = NULL;
+-
+ 	/*
+ 	 * Stage one: Free all available per cpu objects back
+ 	 * to the page freelist while it is still frozen. Leave the
+@@ -2009,7 +2002,11 @@ int put_cpu_partial(struct kmem_cache *s, struct page *page, int drain)
+ static inline void flush_slab(struct kmem_cache *s, struct kmem_cache_cpu *c)
+ {
+ 	stat(s, CPUSLAB_FLUSH);
+-	deactivate_slab(s, c);
++	deactivate_slab(s, c->page, c->freelist);
++
++	c->tid = next_tid(c->tid);
++	c->page = NULL;
++	c->freelist = NULL;
+ }
+ 
+ /*
+@@ -2229,7 +2226,9 @@ redo:
+ 
+ 	if (unlikely(!node_match(c, node))) {
+ 		stat(s, ALLOC_NODE_MISMATCH);
+-		deactivate_slab(s, c);
++		deactivate_slab(s, c->page, c->freelist);
++		c->page = NULL;
++		c->freelist = NULL;
+ 		goto new_slab;
+ 	}
+ 
+@@ -2289,8 +2288,9 @@ new_slab:
+ 	if (!alloc_debug_processing(s, c->page, freelist, addr))
+ 		goto new_slab;	/* Slab failed checks. Next slab needed */
+ 
+-	c->freelist = get_freepointer(s, freelist);
+-	deactivate_slab(s, c);
++	deactivate_slab(s, c->page, get_freepointer(s, freelist));
++	c->page = NULL;
++	c->freelist = NULL;
+ 	local_irq_restore(flags);
+ 	return freelist;
+ }
+-- 
+1.8.1.2
+

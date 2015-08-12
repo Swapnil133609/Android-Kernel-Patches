@@ -1,0 +1,60 @@
+From e43e745d51cb22fc57cd142817d1da27651fa4ae Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sun, 28 Apr 2013 17:09:24 -0500
+Subject: [PATCH 070/507] arch/arm/mach-msm/cpufreq: remove deprecated logic
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/cpufreq.c |   17 -----------------
+ 1 file changed, 17 deletions(-)
+
+diff --git a/arch/arm/mach-msm/cpufreq.c b/arch/arm/mach-msm/cpufreq.c
+index a7fc5f9..2f65fda 100644
+--- a/arch/arm/mach-msm/cpufreq.c
++++ b/arch/arm/mach-msm/cpufreq.c
+@@ -312,32 +312,17 @@ extern bool lmf_screen_state;
+ static void msm_cpu_early_suspend(struct early_suspend *h)
+ {
+ 
+-#ifdef CONFIG_CPU_FREQ_GOV_INTELLIDEMAND
+ 	int cpu = 0;
+ 
+ 	for_each_possible_cpu(cpu) {
+-
+ 		mutex_lock(&per_cpu(cpufreq_suspend, cpu).suspend_mutex);
+ 		lmf_screen_state = false;
+-		// put rest of the cores to sleep!
+-		switch (num_online_cpus()) {
+-		case 4:
+-			cpu_down(3);
+-		case 3:
+-			cpu_down(2);
+-		case 2:
+-			cpu_down(1);
+-		}
+ 		mutex_unlock(&per_cpu(cpufreq_suspend, cpu).suspend_mutex);
+ 	}
+-#endif
+-
+ }
+ 
+ static void msm_cpu_late_resume(struct early_suspend *h)
+ {
+-
+-#ifdef CONFIG_CPU_FREQ_GOV_INTELLIDEMAND
+ 	int cpu = 0;
+ 
+ 	for_each_possible_cpu(cpu) {
+@@ -346,8 +331,6 @@ static void msm_cpu_late_resume(struct early_suspend *h)
+ 		lmf_screen_state = true;
+ 		mutex_unlock(&per_cpu(cpufreq_suspend, cpu).suspend_mutex);
+ 	}
+-#endif
+-
+ }
+ 
+ static struct early_suspend msm_cpu_early_suspend_handler = {
+-- 
+1.7.9.5
+

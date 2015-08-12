@@ -1,0 +1,37 @@
+From 3f250973fb2a025309e68562a9f1f4f239d1a8e1 Mon Sep 17 00:00:00 2001
+From: Theodore Ts'o <tytso@mit.edu>
+Date: Fri, 6 Jul 2012 14:03:18 -0400
+Subject: [PATCH 139/507] random: fix up sparse warnings
+
+Add extern and static declarations to suppress sparse warnings
+
+Signed-off-by: "Theodore Ts'o" <tytso@mit.edu>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/char/random.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/char/random.c b/drivers/char/random.c
+index 4d8458f..dc74b51 100644
+--- a/drivers/char/random.c
++++ b/drivers/char/random.c
+@@ -1347,6 +1347,7 @@ static int proc_do_uuid(ctl_table *table, int write,
+ }
+ 
+ static int sysctl_poolsize = INPUT_POOL_WORDS * 32;
++extern ctl_table random_table[];
+ ctl_table random_table[] = {
+ 	{
+ 		.procname	= "poolsize",
+@@ -1412,7 +1413,7 @@ late_initcall(random_int_secret_init);
+  * value is not cryptographically secure but for several uses the cost of
+  * depleting entropy is too high
+  */
+-DEFINE_PER_CPU(__u32 [MD5_DIGEST_WORDS], get_random_int_hash);
++static DEFINE_PER_CPU(__u32 [MD5_DIGEST_WORDS], get_random_int_hash);
+ unsigned int get_random_int(void)
+ {
+ 	__u32 *hash;
+-- 
+1.7.9.5
+

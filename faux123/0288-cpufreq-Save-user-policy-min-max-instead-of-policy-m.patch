@@ -1,0 +1,63 @@
+From 07751905c7a03881181cb10802a9f4ec4ea0d1b5 Mon Sep 17 00:00:00 2001
+From: Saravana Kannan <skannan@codeaurora.org>
+Date: Wed, 4 Sep 2013 16:04:30 -0500
+Subject: [PATCH 288/338] cpufreq: Save user policy min/max instead of policy
+ min/max during hotplug
+
+When a CPU is hotplugged off, various fields of the policy are saved so
+that they can be restored when the CPU is hotplugged back in.
+
+The existing code saves the policy min/max field during hotplug remove and
+restores it into user policy min/max during hotplug add. This results in
+the loss of the user policy min/max values across a hotplug remove/add.
+
+Fix it by saving the user policy min/max instead of policy min/max during
+hotplug remove. During a hotplug add, after user policy min/max is
+restored, the policy min/max is already recomputed. So, there's no risk of
+going beyound any limits imposed by the CPUFREQ_ADJUST/INCOMPATIBLE
+notifiers.
+
+Change-Id: Ib8e09fa324c1f80f095c5754b5dcf2685e8e4a66
+Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ drivers/cpufreq/cpufreq.c | 16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+index bebab8e..d121179 100644
+--- a/drivers/cpufreq/cpufreq.c
++++ b/drivers/cpufreq/cpufreq.c
+@@ -1197,10 +1197,10 @@ static int __cpufreq_remove_dev(struct device *dev, struct subsys_interface *sif
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	strncpy(per_cpu(cpufreq_policy_save, cpu).gov, data->governor->name,
+ 			CPUFREQ_NAME_LEN);
+-	per_cpu(cpufreq_policy_save, cpu).min = data->min;
+-	per_cpu(cpufreq_policy_save, cpu).max = data->max;
+-	pr_debug("Saving CPU%d policy min %d and max %d\n",
+-			cpu, data->min, data->max);
++	per_cpu(cpufreq_policy_save, cpu).min = data->user_policy.min;
++	per_cpu(cpufreq_policy_save, cpu).max = data->user_policy.max;
++	pr_debug("Saving CPU%d user policy min %d and max %d\n",
++			cpu, data->user_policy.min, data->user_policy.max);
+ #endif
+ 
+ 	/* if we have other CPUs still registered, we need to unlink them,
+@@ -1226,9 +1226,11 @@ static int __cpufreq_remove_dev(struct device *dev, struct subsys_interface *sif
+ #ifdef CONFIG_HOTPLUG_CPU
+ 			strncpy(per_cpu(cpufreq_policy_save, j).gov,
+ 				data->governor->name, CPUFREQ_NAME_LEN);
+-			per_cpu(cpufreq_policy_save, j).min = data->min;
+-			per_cpu(cpufreq_policy_save, j).max = data->max;
+-			pr_debug("Saving CPU%d policy min %d and max %d\n",
++			per_cpu(cpufreq_policy_save, j).min
++						= data->user_policy.min;
++			per_cpu(cpufreq_policy_save, j).max
++						= data->user_policy.max;
++			pr_debug("Saving CPU%d user policy min %d and max %d\n",
+ 					j, data->min, data->max);
+ #endif
+ 			cpu_dev = get_cpu_device(j);
+-- 
+1.8.1.2
+

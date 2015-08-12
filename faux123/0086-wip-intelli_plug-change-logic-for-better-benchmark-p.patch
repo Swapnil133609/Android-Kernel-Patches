@@ -1,0 +1,38 @@
+From 526c3b6cfb1836bc9e6fcd1f804d373b8443433b Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Wed, 20 Feb 2013 20:43:39 -0600
+Subject: [PATCH 086/338] wip: intelli_plug: change logic for better benchmark
+ performance
+
+Signed-off-by: faux123 <reioux@gmail.com>
+---
+ arch/arm/mach-msm/intelli_plug.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-msm/intelli_plug.c b/arch/arm/mach-msm/intelli_plug.c
+index 3c5b413..4748b49 100644
+--- a/arch/arm/mach-msm/intelli_plug.c
++++ b/arch/arm/mach-msm/intelli_plug.c
+@@ -161,16 +161,16 @@ static void __cpuinit intelli_plug_work_fn(struct work_struct *work)
+ 		cpu_count = nr_run_stat;
+ 		// detect artificial loads or constant loads
+ 		// using msm rqstats
+-		if (!eco_mode_active && nr_run_stat > 1) {
++		if (!eco_mode_active && num_online_cpus() >= 2) {
+ 			if (mp_decision()) {
+ 				switch (num_online_cpus()) {
+ 					case 2:
+ 						cpu_count = 3;
+-						//pr_info("nr_run => %u\n", nr_run_stat);
++						pr_info("nr_run(2) => %u\n", nr_run_stat);
+ 						break;
+ 					case 3:
+ 						cpu_count = 4;
+-						//pr_info("nr_run => %u\n", nr_run_stat);
++						pr_info("nr_run(3) => %u\n", nr_run_stat);
+ 						break;
+ 				}
+ 			}
+-- 
+1.8.1.2
+

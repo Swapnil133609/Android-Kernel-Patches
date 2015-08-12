@@ -1,0 +1,96 @@
+From 89d4c753c872cd98be088a4d0e8ed3dddda5a7c0 Mon Sep 17 00:00:00 2001
+From: Shivaraj Shetty <shivaraj@codeaurora.org>
+Date: Mon, 16 Sep 2013 14:59:59 +0530
+Subject: [PATCH 334/338] msm: mdss: Fix possible buffer overflow in ppp
+
+Correct the limit check for the buffer format and avoid the
+possible buffer overflow.
+
+CRs-Fixed: 542730
+Signed-off-by: Shivaraj Shetty <shivaraj@codeaurora.org>
+Change-Id: I78f86cf8e7dcd0b3f4e124fbbf70353796583a47
+---
+ drivers/video/msm/mdss/mdp3_ppp_data.c | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/video/msm/mdss/mdp3_ppp_data.c b/drivers/video/msm/mdss/mdp3_ppp_data.c
+index d68faad..d486bff 100644
+--- a/drivers/video/msm/mdss/mdp3_ppp_data.c
++++ b/drivers/video/msm/mdss/mdp3_ppp_data.c
+@@ -16,6 +16,8 @@
+ #include "mdss_fb.h"
+ #include "mdp3_ppp.h"
+ 
++#define MDP_IS_IMGTYPE_BAD(x) ((x) >= MDP_IMGTYPE_LIMIT)
++
+ /* bg_config_lut not needed since it is same as src */
+ const uint32_t src_cfg_lut[MDP_IMGTYPE_LIMIT] = {
+ 	[MDP_RGB_565] = MDP_RGB_565_SRC_REG,
+@@ -1497,56 +1499,56 @@ void ppp_load_y_scale_table(int idx)
+ 
+ uint32_t ppp_bpp(uint32_t type)
+ {
+-	if (type > MDP_IMGTYPE_LIMIT)
++	if (MDP_IS_IMGTYPE_BAD(type))
+ 		return 0;
+ 	return bytes_per_pixel[type];
+ }
+ 
+ uint32_t ppp_src_config(uint32_t type)
+ {
+-	if (type > MDP_IMGTYPE_LIMIT)
++	if (MDP_IS_IMGTYPE_BAD(type))
+ 		return 0;
+ 	return src_cfg_lut[type];
+ }
+ 
+ uint32_t ppp_out_config(uint32_t type)
+ {
+-	if (type > MDP_IMGTYPE_LIMIT)
++	if (MDP_IS_IMGTYPE_BAD(type))
+ 		return 0;
+ 	return out_cfg_lut[type];
+ }
+ 
+ uint32_t ppp_pack_pattern(uint32_t type)
+ {
+-	if (type > MDP_IMGTYPE_LIMIT)
++	if (MDP_IS_IMGTYPE_BAD(type))
+ 		return 0;
+ 	return pack_patt_lut[type];
+ }
+ 
+ uint32_t ppp_dst_op_reg(uint32_t type)
+ {
+-	if (type > MDP_IMGTYPE_LIMIT)
++	if (MDP_IS_IMGTYPE_BAD(type))
+ 		return 0;
+ 	return dst_op_reg[type];
+ }
+ 
+ uint32_t ppp_src_op_reg(uint32_t type)
+ {
+-	if (type > MDP_IMGTYPE_LIMIT)
++	if (MDP_IS_IMGTYPE_BAD(type))
+ 		return 0;
+ 	return src_op_reg[type];
+ }
+ 
+ bool ppp_per_p_alpha(uint32_t type)
+ {
+-	if (type > MDP_IMGTYPE_LIMIT)
++	if (MDP_IS_IMGTYPE_BAD(type))
+ 		return 0;
+ 	return per_pixel_alpha[type];
+ }
+ 
+ bool ppp_multi_plane(uint32_t type)
+ {
+-	if (type > MDP_IMGTYPE_LIMIT)
++	if (MDP_IS_IMGTYPE_BAD(type))
+ 		return 0;
+ 	return multi_plane[type];
+ }
+-- 
+1.8.1.2
+

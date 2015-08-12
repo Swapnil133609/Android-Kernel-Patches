@@ -1,0 +1,97 @@
+From c0ccc0e48c29c849cc9916900f9eb612472aa2dd Mon Sep 17 00:00:00 2001
+From: Adrian Salido-Moreno <adrianm@codeaurora.org>
+Date: Tue, 10 Sep 2013 19:09:57 -0700
+Subject: [PATCH 018/507] msm: mdss: unmap user writeback buffers after
+ session is terminated
+
+Currently if buffers are provided to writeback driver through user space
+ioctl, these are never unmapped and may cause leaks in memory. Also, we
+can reuse the nodes which are already mapped until session is
+terminated.
+
+Change-Id: Ic786dfa735af529998bfc9467ac872b2badc0e31
+Signed-off-by: Adrian Salido-Moreno <adrianm@codeaurora.org>
+Signed-off-by: Iliyan Malchev <malchev@google.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_mdp_wb.c |   32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/drivers/video/msm/mdss/mdss_mdp_wb.c b/drivers/video/msm/mdss/mdss_mdp_wb.c
+index 53e9521..b9aca69 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_wb.c
++++ b/drivers/video/msm/mdss/mdss_mdp_wb.c
+@@ -60,11 +60,14 @@ struct mdss_mdp_wb_data {
+ 	struct msmfb_data buf_info;
+ 	struct mdss_mdp_data buf_data;
+ 	int state;
++	bool user_alloc;
+ };
+ 
+ static DEFINE_MUTEX(mdss_mdp_wb_buf_lock);
+ static struct mdss_mdp_wb mdss_mdp_wb_info;
+ 
++static void mdss_mdp_wb_free_node(struct mdss_mdp_wb_data *node);
++
+ #ifdef DEBUG_WRITEBACK
+ /* for debugging: writeback output buffer to allocated memory */
+ static inline
+@@ -242,6 +245,7 @@ static int mdss_mdp_wb_terminate(struct msm_fb_data_type *mfd)
+ 		struct mdss_mdp_wb_data *node, *temp;
+ 		list_for_each_entry_safe(node, temp, &wb->register_queue,
+ 					 registered_entry) {
++			mdss_mdp_wb_free_node(node);
+ 			list_del(&node->registered_entry);
+ 			kfree(node);
+ 		}
+@@ -358,12 +362,24 @@ static struct mdss_mdp_wb_data *get_user_node(struct msm_fb_data_type *mfd,
+ 	struct mdss_mdp_img_data *buf;
+ 	int ret;
+ 
++	if (!list_empty(&wb->register_queue)) {
++		list_for_each_entry(node, &wb->register_queue, registered_entry)
++			if ((node->buf_info.memory_id == data->memory_id) &&
++				    (node->buf_info.offset == data->offset)) {
++				pr_debug("found node fd=%x off=%x addr=%x\n",
++						data->memory_id, data->offset,
++						node->buf_data.p[0].addr);
++				return node;
++			}
++	}
++
+ 	node = kzalloc(sizeof(struct mdss_mdp_wb_data), GFP_KERNEL);
+ 	if (node == NULL) {
+ 		pr_err("out of memory\n");
+ 		return NULL;
+ 	}
+ 
++	node->user_alloc = true;
+ 	node->buf_data.num_planes = 1;
+ 	buf = &node->buf_data.p[0];
+ 	if (wb->is_secure)
+@@ -391,6 +407,22 @@ register_fail:
+ 	return NULL;
+ }
+ 
++static void mdss_mdp_wb_free_node(struct mdss_mdp_wb_data *node)
++{
++	struct mdss_mdp_img_data *buf;
++
++	if (node->user_alloc) {
++		buf = &node->buf_data.p[0];
++		pr_debug("free user node mem_id=%d offset=%u addr=0x%x\n",
++				node->buf_info.memory_id,
++				node->buf_info.offset,
++				buf->addr);
++
++		mdss_mdp_put_img(&node->buf_data.p[0]);
++		node->user_alloc = false;
++	}
++}
++
+ static int mdss_mdp_wb_queue(struct msm_fb_data_type *mfd,
+ 				struct msmfb_data *data, int local)
+ {
+-- 
+1.7.9.5
+

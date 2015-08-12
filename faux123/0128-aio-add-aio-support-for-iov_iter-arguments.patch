@@ -1,0 +1,154 @@
+From 544f99ea662b3f678ade72b01943e8faee142469 Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Sat, 2 Feb 2013 17:10:09 -0800
+Subject: [PATCH 128/338] aio: add aio support for iov_iter arguments
+
+This adds iocb cmds which specify that memory is held in iov_iter
+structures.  This lets kernel callers specify memory that can be
+expressed in an iov_iter, which includes pages in bio_vec arrays.
+
+Only kernel callers can provide an iov_iter so it doesn't make a lot of
+sense to expose the IOCB_CMD values for this as part of the user space
+ABI.
+
+But kernel callers should also be able to perform the usual aio
+operations which suggests using the the existing operation namespace and
+support code.
+
+Signed-off-by: Dave Kleikamp <dave.kleikamp@oracle.com>
+Cc: Zach Brown <zab@zabbo.net>
+modified for Mako from LKML reference
+
+Signed-off-by: faux123 <reioux@gmail.com>
+---
+ fs/aio.c                | 64 +++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/aio.h     |  3 +++
+ include/linux/aio_abi.h |  2 ++
+ 3 files changed, 69 insertions(+)
+
+diff --git a/fs/aio.c b/fs/aio.c
+index e70466e..d9909f0 100644
+--- a/fs/aio.c
++++ b/fs/aio.c
+@@ -1481,6 +1481,26 @@ static ssize_t aio_setup_single_vector(struct kiocb *kiocb)
+ 	return 0;
+ }
+ 
++static ssize_t aio_read_iter(struct kiocb *iocb)
++{
++	struct file *file = iocb->ki_filp;
++	ssize_t ret = -EINVAL;
++
++	if (file->f_op->read_iter)
++		ret = file->f_op->read_iter(iocb, iocb->ki_iter, iocb->ki_pos);
++	return ret;
++}
++
++static ssize_t aio_write_iter(struct kiocb *iocb)
++{
++	struct file *file = iocb->ki_filp;
++	ssize_t ret = -EINVAL;
++
++	if (file->f_op->write_iter)
++		ret = file->f_op->write_iter(iocb, iocb->ki_iter, iocb->ki_pos);
++	return ret;
++}
++
+ /*
+  * aio_setup_iocb:
+  *	Performs the initial checks and aio retry method
+@@ -1556,6 +1576,34 @@ static ssize_t aio_setup_iocb(struct kiocb *kiocb, bool compat)
+ 		if (file->f_op->aio_write)
+ 			kiocb->ki_retry = aio_rw_vect_retry;
+ 		break;
++	case IOCB_CMD_READ_ITER:
++		ret = -EINVAL;
++		if (unlikely(!is_kernel_kiocb(kiocb)))
++			break;
++		ret = -EBADF;
++		if (unlikely(!(file->f_mode & FMODE_READ)))
++			break;
++		ret = security_file_permission(file, MAY_READ);
++		if (unlikely(ret))
++			break;
++		ret = -EINVAL;
++		if (file->f_op->read_iter)
++			kiocb->ki_retry = aio_read_iter;
++		break;
++	case IOCB_CMD_WRITE_ITER:
++		ret = -EINVAL;
++		if (unlikely(!is_kernel_kiocb(kiocb)))
++			break;
++		ret = -EBADF;
++		if (unlikely(!(file->f_mode & FMODE_WRITE)))
++			break;
++		ret = security_file_permission(file, MAY_WRITE);
++		if (unlikely(ret))
++			break;
++		ret = -EINVAL;
++		if (file->f_op->write_iter)
++			kiocb->ki_retry = aio_write_iter;
++		break;
+ 	case IOCB_CMD_FDSYNC:
+ 		ret = -EINVAL;
+ 		if (file->f_op->aio_fsync)
+@@ -1622,6 +1670,22 @@ void aio_kernel_init_rw(struct kiocb *iocb, struct file *filp,
+ }
+ EXPORT_SYMBOL_GPL(aio_kernel_init_rw);
+ 
++/*
++ * The iter count must be set before calling here.  Some filesystems uses
++ * iocb->ki_left as an indicator of the size of an IO.
++ */
++void aio_kernel_init_iter(struct kiocb *iocb, struct file *filp,
++			  unsigned short op, struct iov_iter *iter, loff_t off)
++{
++	iocb->ki_filp = filp;
++	iocb->ki_iter = iter;
++	iocb->ki_opcode = op;
++	iocb->ki_pos = off;
++	iocb->ki_nbytes = iov_iter_count(iter);
++	iocb->ki_left = iocb->ki_nbytes;
++}
++EXPORT_SYMBOL_GPL(aio_kernel_init_iter);
++
+ void aio_kernel_init_callback(struct kiocb *iocb,
+ 			      void (*complete)(u64 user_data, long res),
+ 			      u64 user_data)
+diff --git a/include/linux/aio.h b/include/linux/aio.h
+index 7ed1881..9ee999d 100644
+--- a/include/linux/aio.h
++++ b/include/linux/aio.h
+@@ -126,6 +126,7 @@ struct kiocb {
+ 	 * this is the underlying eventfd context to deliver events to.
+ 	 */
+ 	struct eventfd_ctx	*ki_eventfd;
++	struct iov_iter		*ki_iter;
+ };
+ 
+ #define is_sync_kiocb(iocb)	((iocb)->ki_key == KIOCB_SYNC_KEY)
+@@ -221,6 +222,8 @@ struct kiocb *aio_kernel_alloc(gfp_t gfp);
+ void aio_kernel_free(struct kiocb *iocb);
+ void aio_kernel_init_rw(struct kiocb *iocb, struct file *filp,
+ 			unsigned short op, void *ptr, size_t nr, loff_t off);
++void aio_kernel_init_iter(struct kiocb *iocb, struct file *filp,
++			  unsigned short op, struct iov_iter *iter, loff_t off);
+ void aio_kernel_init_callback(struct kiocb *iocb,
+ 			      void (*complete)(u64 user_data, long res),
+ 			      u64 user_data);
+diff --git a/include/linux/aio_abi.h b/include/linux/aio_abi.h
+index 86fa7a7..bd39bb2 100644
+--- a/include/linux/aio_abi.h
++++ b/include/linux/aio_abi.h
+@@ -44,6 +44,8 @@ enum {
+ 	IOCB_CMD_NOOP = 6,
+ 	IOCB_CMD_PREADV = 7,
+ 	IOCB_CMD_PWRITEV = 8,
++	IOCB_CMD_READ_ITER = 9,
++	IOCB_CMD_WRITE_ITER = 10,
+ };
+ 
+ /*
+-- 
+1.8.1.2
+

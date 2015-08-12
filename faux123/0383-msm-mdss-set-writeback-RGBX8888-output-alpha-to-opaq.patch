@@ -1,0 +1,32 @@
+From bb643a030fb891ae9ec0ec7da0e859036a971c47 Mon Sep 17 00:00:00 2001
+From: Adrian Salido-Moreno <adrianm@codeaurora.org>
+Date: Wed, 6 Nov 2013 14:41:53 -0800
+Subject: [PATCH 383/507] msm: mdss: set writeback RGBX8888 output alpha to
+ opaque
+
+Even though the alpha channel on RGBX format should be ignored, even if
+the pixel is picked up it should still have full alpha value so that
+all pixels are shown. For this reason set the alpha value to 0xFF.
+
+Change-Id: I2db531b1f6fb3035831195546645d58718cff87a
+Signed-off-by: Adrian Salido-Moreno <adrianm@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_mdp_intf_writeback.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/video/msm/mdss/mdss_mdp_intf_writeback.c b/drivers/video/msm/mdss/mdss_mdp_intf_writeback.c
+index 21170d9..6214d6d 100644
+--- a/drivers/video/msm/mdss/mdss_mdp_intf_writeback.c
++++ b/drivers/video/msm/mdss/mdss_mdp_intf_writeback.c
+@@ -199,6 +199,7 @@ static int mdss_mdp_writeback_format_setup(struct mdss_mdp_writeback_ctx *ctx,
+ 		   (ctx->dst_planes.ystride[3] << 16);
+ 	outsize = (ctx->dst_rect.h << 16) | ctx->dst_rect.w;
+ 
++	mdp_wb_write(ctx, MDSS_MDP_REG_WB_ALPHA_X_VALUE, 0xFF);
+ 	mdp_wb_write(ctx, MDSS_MDP_REG_WB_DST_FORMAT, dst_format);
+ 	mdp_wb_write(ctx, MDSS_MDP_REG_WB_DST_OP_MODE, opmode);
+ 	mdp_wb_write(ctx, MDSS_MDP_REG_WB_DST_PACK_PATTERN, pattern);
+-- 
+1.7.9.5
+

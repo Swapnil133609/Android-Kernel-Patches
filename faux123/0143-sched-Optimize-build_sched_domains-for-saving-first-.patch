@@ -1,0 +1,36 @@
+From e794a3809323c4796ae9ccb568868b026a45f3b0 Mon Sep 17 00:00:00 2001
+From: Viresh Kumar <viresh.kumar@linaro.org>
+Date: Thu, 6 Jun 2013 18:29:01 -0500
+Subject: [PATCH 143/338] sched: Optimize build_sched_domains() for saving
+ first SD node for a cpu
+
+We are saving first scheduling domain for a cpu in build_sched_domains() by
+iterating over the nested sd->child list. We don't actually need to do it this
+way.
+
+tl will be equal to sched_domain_topology for the first iteration and so we can
+set *per_cpu_ptr(d.sd, i) based on that.  So, save pointer to first SD while
+running the iteration loop over tl's.
+
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ kernel/sched/core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 8dba090..5a973a5 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -6569,7 +6569,7 @@ static int build_sched_domains(const struct cpumask *cpu_map,
+ 		sd = NULL;
+ 		for (tl = sched_domain_topology; tl->init; tl++) {
+ 			sd = build_sched_domain(tl, &d, cpu_map, attr, sd, i);
+-			if (!*per_cpu_ptr(d.sd, i))
++			if (tl == sched_domain_topology)
+ 				*per_cpu_ptr(d.sd, i) = sd;
+ 			if (tl->flags & SDTL_OVERLAP || sched_feat(FORCE_SD_OVERLAP))
+ 				sd->flags |= SD_OVERLAP;
+-- 
+1.8.1.2
+

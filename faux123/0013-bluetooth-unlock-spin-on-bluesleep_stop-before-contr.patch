@@ -1,0 +1,49 @@
+From 8ac9192178de5edba0ec2b4413da0e1122eb567a Mon Sep 17 00:00:00 2001
+From: Devin Kim <dojip.kim@lge.com>
+Date: Fri, 25 Oct 2013 18:17:03 -0700
+Subject: [PATCH 013/507] bluetooth: unlock spin on bluesleep_stop before
+ controling the hsuart power
+
+Kernel migh be in sleep to wait for rpm communication when it controls the
+hsuart power. So should unlock the spin before controling the hsuart
+power.
+
+Change-Id: Ic051ee95df8be3e7dcea1bc71cba85bdbab34bef
+Signed-off-by: Devin Kim <dojip.kim@lge.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/bluetooth/bluesleep.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/bluetooth/bluesleep.c b/drivers/bluetooth/bluesleep.c
+index ea85546..fb3bf4f 100644
+--- a/drivers/bluetooth/bluesleep.c
++++ b/drivers/bluetooth/bluesleep.c
+@@ -187,7 +187,6 @@ static void hsuart_power(int on)
+ 	}
+ }
+ 
+-
+ /**
+  * @return 1 if the Host can go to sleep, 0 otherwise.
+  */
+@@ -531,13 +530,14 @@ static void bluesleep_stop(void)
+ 
+ 	if (test_bit(BT_ASLEEP, &flags)) {
+ 		clear_bit(BT_ASLEEP, &flags);
++		spin_unlock_irqrestore(&rw_lock, irq_flags);
+ 		hsuart_power(1);
++	} else {
++		spin_unlock_irqrestore(&rw_lock, irq_flags);
+ 	}
+ 
+ 	atomic_inc(&open_count);
+ 
+-	spin_unlock_irqrestore(&rw_lock, irq_flags);
+-
+ #if BT_ENABLE_IRQ_WAKE
+ 	if (disable_irq_wake(bsi->host_wake_irq))
+ 		BT_ERR("Couldn't disable hostwake IRQ wakeup mode");
+-- 
+1.7.9.5
+

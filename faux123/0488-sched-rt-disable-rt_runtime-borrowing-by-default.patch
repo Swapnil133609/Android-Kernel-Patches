@@ -1,0 +1,40 @@
+From dfd8640f59699fb726e17f7db412eb0580b42169 Mon Sep 17 00:00:00 2001
+From: Mike Galbraith <bitbucket@online.de>
+Date: Thu, 30 May 2013 14:01:25 -0700
+Subject: [PATCH 488/507] sched,rt: disable rt_runtime borrowing by default
+
+Make the default RT_RUNTIME_SHARE setting reflect the most common
+throttle role, that of safety mechanism to protect the box.
+
+Bug 1269903
+
+Change-Id: Id4ccf0095ea254f2e15fddc7ab02069f7f60a7c0
+Signed-off-by: Mike Galbraith <bitbucket@online.de>
+Reviewed-on: http://git-master/r/234274
+(cherry picked from commit be74a12c8d8b987f569cdd0eec2aead3dcbdfa31)
+Reviewed-on: http://git-master/r/237266
+Tested-by: Peter Boonstoppel <pboonstoppel@nvidia.com>
+Reviewed-by: Peter Boonstoppel <pboonstoppel@nvidia.com>
+Reviewed-by: Automatic_Commit_Validation_User
+Reviewed-by: Diwakar Tundlam <dtundlam@nvidia.com>
+Reviewed-by: Paul Walmsley <pwalmsley@nvidia.com>
+GVS: Gerrit_Virtual_Submit
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/sched/features.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/sched/features.h b/kernel/sched/features.h
+index de00a48..61a90dd 100644
+--- a/kernel/sched/features.h
++++ b/kernel/sched/features.h
+@@ -67,5 +67,5 @@ SCHED_FEAT(NONTASK_POWER, true)
+ SCHED_FEAT(TTWU_QUEUE, true)
+ 
+ SCHED_FEAT(FORCE_SD_OVERLAP, false)
+-SCHED_FEAT(RT_RUNTIME_SHARE, true)
++SCHED_FEAT(RT_RUNTIME_SHARE, false)
+ SCHED_FEAT(LB_MIN, false)
+-- 
+1.7.9.5
+

@@ -1,0 +1,49 @@
+From 62bf67f607cb288310b5ee7fdc9cc4b3cbe7403d Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Sun, 21 Apr 2013 23:42:47 -0700
+Subject: [PATCH 048/338] overall_stats: forward port to kernel 3.4+
+
+by replacing deprecated functions with native add/sub for 64bit data types
+
+Signed-off-by: faux123 <reioux@gmail.com>
+---
+ drivers/cpufreq/cpufreq_stats.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_stats.c b/drivers/cpufreq/cpufreq_stats.c
+index effaeae..c3110c3 100644
+--- a/drivers/cpufreq/cpufreq_stats.c
++++ b/drivers/cpufreq/cpufreq_stats.c
+@@ -83,21 +83,21 @@ static int cpufreq_stats_update(unsigned int cpu)
+ 
+ 	if (cpu == 0)
+ 		cpu0_time_in_state[stat->last_index] =
+-			cputime64_add(cpu0_time_in_state[stat->last_index],
+-			cputime_sub(cur_time, stat->last_time));
++			cpu0_time_in_state[stat->last_index] +
++			(cur_time - stat->last_time);
+ 	else if (cpu == 1)
+ 		cpu1_time_in_state[stat->last_index] =
+-			cputime64_add(cpu1_time_in_state[stat->last_index],
+-			cputime_sub(cur_time, stat->last_time));
++			cpu1_time_in_state[stat->last_index] +
++			(cur_time - stat->last_time);
+ #ifdef CONFIG_QUAD_CORES_SOC_STAT
+ 	else if (cpu == 2)
+ 		cpu2_time_in_state[stat->last_index] =
+-			cputime64_add(cpu2_time_in_state[stat->last_index],
+-			cputime_sub(cur_time, stat->last_time));
++			cpu2_time_in_state[stat->last_index] +
++			(cur_time - stat->last_time);
+ 	else if (cpu == 3)
+ 		cpu3_time_in_state[stat->last_index] =
+-			cputime64_add(cpu3_time_in_state[stat->last_index],
+-			cputime_sub(cur_time, stat->last_time));
++			cpu3_time_in_state[stat->last_index] +
++			(cur_time - stat->last_time);
+ #endif
+ 	stat->last_time = cur_time;
+ 	spin_unlock(&cpufreq_stats_lock);
+-- 
+1.8.1.2
+

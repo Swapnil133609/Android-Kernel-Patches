@@ -1,0 +1,69 @@
+From b887624e4cdae365a48b96e212470c6009243e64 Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Sun, 10 Nov 2013 00:14:37 +0100
+Subject: [PATCH 416/507] drivers/input/touchscreen/touch_synaptics_ds5: add
+ is_single_touch & s2w detection hook
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/touch_synaptics_ds5.c |   29 +++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+diff --git a/drivers/input/touchscreen/touch_synaptics_ds5.c b/drivers/input/touchscreen/touch_synaptics_ds5.c
+index 0d30850..8aea910 100644
+--- a/drivers/input/touchscreen/touch_synaptics_ds5.c
++++ b/drivers/input/touchscreen/touch_synaptics_ds5.c
+@@ -38,6 +38,10 @@
+ 
+ #include "SynaImage_ds5.h"
+ 
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_QPNP_PON
++#include <linux/input/sweep2wake.h>
++#endif
++
+ static struct workqueue_struct *synaptics_wq;
+ 
+ /* RMI4 spec from 511-000405-01 Rev.D
+@@ -239,6 +243,28 @@ static int synaptics_init_panel(struct i2c_client *client, struct synaptics_ts_f
+ static int get_ic_info(struct synaptics_ts_data *ts, struct synaptics_ts_fw_info *fw_info);
+ static void *get_touch_handle(struct i2c_client *client);
+ 
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++/* gives back true if only one touch is recognized */
++bool is_single_touch(struct synaptics_ts_data *ts)
++{
++        int i = 0, cnt = 0;
++
++        for (i = 0; i<ts->pdata->max_id; i++) {
++                if ((!ts->ts_data.curr_data[i].state) ||
++                    (ts->ts_data.curr_data[i].state == ABS_RELEASE))
++                        continue;
++                else cnt++;
++		//save some cycles if we are already >1
++		if (cnt>1)
++			break;
++        }
++        if (cnt == 1)
++                return true;
++        else
++                return false;
++}
++#endif
++
+ /* touch_asb_input_report
+  *
+  * finger status report
+@@ -261,6 +287,9 @@ static void touch_abs_input_report(struct synaptics_ts_data *ts, const ktime_t t
+ 				ts->ts_data.curr_data[id].state != ABS_RELEASE);
+ 
+ 		if (ts->ts_data.curr_data[id].state != ABS_RELEASE) {
++#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
++			detect_sweep2wake(ts->ts_data.curr_data[id].x_position, ts->ts_data.curr_data[id].y_position, is_single_touch(ts));
++#endif
+ 			input_report_abs(ts->input_dev, ABS_MT_POSITION_X,
+ 					ts->ts_data.curr_data[id].x_position);
+ 			input_report_abs(ts->input_dev, ABS_MT_POSITION_Y,
+-- 
+1.7.9.5
+

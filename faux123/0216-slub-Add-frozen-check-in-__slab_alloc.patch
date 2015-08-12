@@ -1,0 +1,35 @@
+From afaa5690425a84b9e1c384ebb1ad75b07febd201 Mon Sep 17 00:00:00 2001
+From: Christoph Lameter <cl@linux.com>
+Date: Wed, 9 May 2012 10:09:52 -0500
+Subject: [PATCH 216/507] slub: Add frozen check in __slab_alloc
+
+Verify that objects returned from __slab_alloc come from slab pages
+in the correct state.
+
+Signed-off-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slub.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/mm/slub.c b/mm/slub.c
+index 41ef138..b0f8285 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -2245,6 +2245,12 @@ redo:
+ 	stat(s, ALLOC_REFILL);
+ 
+ load_freelist:
++	/*
++	 * freelist is pointing to the list of objects to be used.
++	 * page is pointing to the page from which the objects are obtained.
++	 * That page must be frozen for per cpu allocations to work.
++	 */
++	VM_BUG_ON(!c->page->frozen);
+ 	c->freelist = get_freepointer(s, freelist);
+ 	c->tid = next_tid(c->tid);
+ 	local_irq_restore(flags);
+-- 
+1.7.9.5
+

@@ -1,0 +1,27 @@
+From 9242b0572383d68cd1df5c707b78f051a1a57ba0 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Mon, 4 Nov 2013 12:38:48 -0600
+Subject: [PATCH 365/507] intellidemand: enable touch boost for new touch
+ screen device
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_intellidemand.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/cpufreq/cpufreq_intellidemand.c b/drivers/cpufreq/cpufreq_intellidemand.c
+index c9d1c0b..f43c0fd 100644
+--- a/drivers/cpufreq/cpufreq_intellidemand.c
++++ b/drivers/cpufreq/cpufreq_intellidemand.c
+@@ -1289,6 +1289,7 @@ static int input_dev_filter(const char *input_dev_name)
+ {
+ 	if (strstr(input_dev_name, "touchscreen") ||
+ 		strstr(input_dev_name, "sec_touchscreen") ||
++		strstr(input_dev_name, "touch_dev") ||
+ 		strstr(input_dev_name, "-keypad") ||
+ 		strstr(input_dev_name, "-nav") ||
+ 		strstr(input_dev_name, "-oj")) {
+-- 
+1.7.9.5
+

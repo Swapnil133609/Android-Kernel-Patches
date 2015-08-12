@@ -1,0 +1,30 @@
+From da3176ffd49810c91a6ed77ed4098916feda123b Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Wed, 20 Feb 2013 20:08:16 -0600
+Subject: [PATCH 117/507] intelli_plug: bump threshold slightly for better
+ response
+
+Signed-off-by: faux123 <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/intelli_plug.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-msm/intelli_plug.c b/arch/arm/mach-msm/intelli_plug.c
+index cde6dbb..3c5b413 100644
+--- a/arch/arm/mach-msm/intelli_plug.c
++++ b/arch/arm/mach-msm/intelli_plug.c
+@@ -65,8 +65,8 @@ module_param(nr_run_hysteresis, uint, 0644);
+ 
+ static unsigned int nr_run_last;
+ 
+-static unsigned int NwNs_Threshold[] = { 19, 30,  27,  11,  19,  11, 0,  11};
+-static unsigned int TwTs_Threshold[] = {140,  0, 180, 190, 140, 190, 0, 190};
++static unsigned int NwNs_Threshold[] = { 19, 30,  19,  11,  19,  11, 0,  11};
++static unsigned int TwTs_Threshold[] = {140,  0, 140, 190, 140, 190, 0, 190};
+ 
+ static int mp_decision(void)
+ {
+-- 
+1.7.9.5
+

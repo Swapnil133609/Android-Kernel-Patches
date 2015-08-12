@@ -1,0 +1,36 @@
+From da76a447d02839d688457fcaf17cfb6b78337d59 Mon Sep 17 00:00:00 2001
+From: Julia Lawall <Julia.Lawall@lip6.fr>
+Date: Sun, 8 Jul 2012 13:37:40 +0200
+Subject: [PATCH 208/338] slub: remove invalid reference to list iterator
+ variable
+
+If list_for_each_entry, etc complete a traversal of the list, the iterator
+variable ends up pointing to an address at an offset from the list head,
+and not a meaningful structure.  Thus this value should not be used after
+the end of the iterator.  The patch replaces s->name by al->name, which is
+referenced nearby.
+
+This problem was found using Coccinelle (http://coccinelle.lip6.fr/).
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+---
+ mm/slub.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mm/slub.c b/mm/slub.c
+index 5195bcc..4e4de8d 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -5400,7 +5400,7 @@ static int __init slab_sysfs_init(void)
+ 		err = sysfs_slab_alias(al->s, al->name);
+ 		if (err)
+ 			printk(KERN_ERR "SLUB: Unable to add boot slab alias"
+-					" %s to sysfs\n", s->name);
++					" %s to sysfs\n", al->name);
+ 		kfree(al);
+ 	}
+ 
+-- 
+1.8.1.2
+

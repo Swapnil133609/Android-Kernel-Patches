@@ -1,0 +1,53 @@
+From 9d20b350323ae5980486b4671c54169bd2f814da Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 18 Nov 2013 08:44:37 +0100
+Subject: [PATCH 436/507] sweep2wake: cleanup header file
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/sweep2wake.c |    6 ++++++
+ include/linux/input/sweep2wake.h       |    9 ---------
+ 2 files changed, 6 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/input/touchscreen/sweep2wake.c b/drivers/input/touchscreen/sweep2wake.c
+index c67392e..fd50da5 100644
+--- a/drivers/input/touchscreen/sweep2wake.c
++++ b/drivers/input/touchscreen/sweep2wake.c
+@@ -28,7 +28,13 @@
+ #include <linux/input/sweep2wake.h>
+ #include <linux/slab.h>
+ #include <linux/workqueue.h>
++#include <linux/input.h>
++#ifndef CONFIG_HAS_EARLYSUSPEND
+ #include <linux/lcd_notify.h>
++#else
++#include <linux/earlysuspend.h>
++#endif
++#include <linux/hrtimer.h>
+ 
+ /* Version, author, desc, etc */
+ #define DRIVER_AUTHOR "Dennis Rassmann <showp1984@gmail.com>"
+diff --git a/include/linux/input/sweep2wake.h b/include/linux/input/sweep2wake.h
+index 25c9821..a98bcc0 100644
+--- a/include/linux/input/sweep2wake.h
++++ b/include/linux/input/sweep2wake.h
+@@ -21,15 +21,6 @@
+ #ifndef _LINUX_SWEEP2WAKE_H
+ #define _LINUX_SWEEP2WAKE_H
+ 
+-#include <linux/input.h>
+-#include <linux/earlysuspend.h>
+-#include <linux/hrtimer.h>
+-
+-#define SWEEP2WAKE_I2C_SLEEP 40
+-
+ extern int s2w_switch;
+ 
+-/* PowerKey setter */
+-extern void sweep2wake_setdev(struct input_dev *);
+-
+ #endif	/* _LINUX_SWEEP2WAKE_H */
+-- 
+1.7.9.5
+

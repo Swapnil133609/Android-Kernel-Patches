@@ -1,0 +1,107 @@
+From bad3c0a55ef60309f1bcf5c4aa2628b95df1afa6 Mon Sep 17 00:00:00 2001
+From: Ezequiel Garcia <elezegarcia@gmail.com>
+Date: Fri, 19 Oct 2012 09:33:12 -0300
+Subject: [PATCH 270/338] mm/sl[aou]b: Move common kmem_cache_size() to slab.h
+
+This function is identically defined in all three allocators
+and it's trivial to move it to slab.h
+
+Since now it's static, inline, header-defined function
+this patch also drops the EXPORT_SYMBOL tag.
+
+Cc: Pekka Enberg <penberg@kernel.org>
+Cc: Matt Mackall <mpm@selenic.com>
+Acked-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Ezequiel Garcia <elezegarcia@gmail.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+---
+ include/linux/slab.h | 9 ++++++++-
+ mm/slab.c            | 6 ------
+ mm/slob.c            | 6 ------
+ mm/slub.c            | 9 ---------
+ 4 files changed, 8 insertions(+), 22 deletions(-)
+
+diff --git a/include/linux/slab.h b/include/linux/slab.h
+index 98fab56..2085d04 100644
+--- a/include/linux/slab.h
++++ b/include/linux/slab.h
+@@ -128,7 +128,6 @@ struct kmem_cache *kmem_cache_create(const char *, size_t, size_t,
+ void kmem_cache_destroy(struct kmem_cache *);
+ int kmem_cache_shrink(struct kmem_cache *);
+ void kmem_cache_free(struct kmem_cache *, void *);
+-unsigned int kmem_cache_size(struct kmem_cache *);
+ 
+ /*
+  * Please use this macro to create slab caches. Simply specify the
+@@ -388,6 +387,14 @@ static inline void *kzalloc_node(size_t size, gfp_t flags, int node)
+ 	return kmalloc_node(size, flags | __GFP_ZERO, node);
+ }
+ 
++/*
++ * Determine the size of a slab object
++ */
++static inline unsigned int kmem_cache_size(struct kmem_cache *s)
++{
++	return s->object_size;
++}
++
+ void __init kmem_cache_init_late(void);
+ 
+ #endif	/* _LINUX_SLAB_H */
+diff --git a/mm/slab.c b/mm/slab.c
+index 03c6eed..e1a4b3c 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -3969,12 +3969,6 @@ void kfree(const void *objp)
+ }
+ EXPORT_SYMBOL(kfree);
+ 
+-unsigned int kmem_cache_size(struct kmem_cache *cachep)
+-{
+-	return cachep->object_size;
+-}
+-EXPORT_SYMBOL(kmem_cache_size);
+-
+ /*
+  * This initializes kmem_list3 or resizes various caches for all nodes.
+  */
+diff --git a/mm/slob.c b/mm/slob.c
+index 287a88a..fffbc82 100644
+--- a/mm/slob.c
++++ b/mm/slob.c
+@@ -604,12 +604,6 @@ void kmem_cache_free(struct kmem_cache *c, void *b)
+ }
+ EXPORT_SYMBOL(kmem_cache_free);
+ 
+-unsigned int kmem_cache_size(struct kmem_cache *c)
+-{
+-	return c->object_size;
+-}
+-EXPORT_SYMBOL(kmem_cache_size);
+-
+ int __kmem_cache_shutdown(struct kmem_cache *c)
+ {
+ 	/* No way to check for remaining objects */
+diff --git a/mm/slub.c b/mm/slub.c
+index 0697885..22a7bc9 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -3125,15 +3125,6 @@ error:
+ 	return -EINVAL;
+ }
+ 
+-/*
+- * Determine the size of a slab object
+- */
+-unsigned int kmem_cache_size(struct kmem_cache *s)
+-{
+-	return s->object_size;
+-}
+-EXPORT_SYMBOL(kmem_cache_size);
+-
+ static void list_slab_objects(struct kmem_cache *s, struct page *page,
+ 							const char *text)
+ {
+-- 
+1.8.1.2
+

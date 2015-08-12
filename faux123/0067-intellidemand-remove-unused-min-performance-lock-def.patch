@@ -1,0 +1,30 @@
+From c0631e730a6b05d69291c4f8ee8d0ace56a27a5d Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Fri, 28 Dec 2012 20:35:46 -0800
+Subject: [PATCH 067/507] intellidemand: remove unused min performance lock
+ defines
+
+Signed-off-by: faux123 <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_intellidemand.c |    4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_intellidemand.c b/drivers/cpufreq/cpufreq_intellidemand.c
+index 2074e28..476e3d4 100644
+--- a/drivers/cpufreq/cpufreq_intellidemand.c
++++ b/drivers/cpufreq/cpufreq_intellidemand.c
+@@ -56,10 +56,6 @@
+ #define DBS_SYNC_FREQ				(702000)
+ #define DBS_OPTIMAL_FREQ			(1296000)
+ 
+-#ifdef CONFIG_CPUFREQ_ID_PERFLOCK
+-#define DBS_PERFLOCK_MIN_FREQ			(702000)
+-#endif
+-
+ u64 freq_boosted_time;
+ /*
+  * The polling frequency of this governor depends on the capability of
+-- 
+1.7.9.5
+

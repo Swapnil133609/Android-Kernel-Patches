@@ -1,0 +1,27 @@
+From 4cddfc39ca5eb23ca5d35edcc79d8c0f33b20474 Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Sat, 2 Feb 2013 07:20:16 -0800
+Subject: [PATCH 097/507] arch/arm/Kconfig: enable unaligned capability for
+ ARM
+
+Signed-off-by: faux123 <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1c82d9f..8de740c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -20,6 +20,7 @@ config ARM
+ 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
+ 	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
+ 	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
++	select HAVE_EFFICIENT_UNALIGNED_ACCESS
+ 	select HAVE_GENERIC_DMA_COHERENT
+ 	select HAVE_KERNEL_GZIP
+ 	select HAVE_KERNEL_LZO
+-- 
+1.7.9.5
+

@@ -1,0 +1,38 @@
+From a216554828d75cb101e93c35f2816fb812f2633b Mon Sep 17 00:00:00 2001
+From: Christoph Lameter <cl@linux.com>
+Date: Tue, 10 Jul 2012 18:31:05 -0500
+Subject: [PATCH 199/338] slob: Fix early boot kernel crash
+
+Commit fd3142a59af2012a7c5dc72ec97a4935ff1c5fc6 broke
+slob since a piece of a change for a later patch slipped into
+it.
+
+Fengguang Wu writes:
+
+  The commit crashes the kernel w/o any dmesg output (the attached one is
+  created by the script as a summary for that run). This is very
+  reproducible in kvm for the attached config.
+
+Reported-by: Fengguang Wu <fengguang.wu@intel.com>
+Signed-off-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+---
+ mm/slob.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mm/slob.c b/mm/slob.c
+index d63923d..71bd93d 100644
+--- a/mm/slob.c
++++ b/mm/slob.c
+@@ -516,7 +516,7 @@ struct kmem_cache *__kmem_cache_create(const char *name, size_t size,
+ 
+ 	if (c) {
+ 		c->name = name;
+-		c->size = c->object_size;
++		c->size = size;
+ 		if (flags & SLAB_DESTROY_BY_RCU) {
+ 			/* leave room for rcu footer at the end of object */
+ 			c->size += sizeof(struct slob_rcu);
+-- 
+1.8.1.2
+

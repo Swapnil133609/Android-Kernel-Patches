@@ -1,0 +1,29 @@
+From 9c41465cabdb0e389b4f36a5e049a7c6075217c9 Mon Sep 17 00:00:00 2001
+From: Christoph Lameter <cl@linux.com>
+Date: Wed, 13 Jun 2012 10:24:53 -0500
+Subject: [PATCH 195/338] slob: No need to zero mapping since it is no longer
+ in use
+
+Reviewed-by: Joonsoo Kim <js1304@gmail.com>
+Acked-by: David Rientjes <rientjes@google.com>
+Signed-off-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+---
+ mm/slob.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/mm/slob.c b/mm/slob.c
+index 30862a2..74c3bb2 100644
+--- a/mm/slob.c
++++ b/mm/slob.c
+@@ -97,7 +97,6 @@ typedef struct slob_block slob_t;
+ static inline void free_slob_page(struct page *sp)
+ {
+ 	reset_page_mapcount(sp);
+-	sp->mapping = NULL;
+ }
+ 
+ /*
+-- 
+1.8.1.2
+

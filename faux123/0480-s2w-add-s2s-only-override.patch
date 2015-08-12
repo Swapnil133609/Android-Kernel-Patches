@@ -1,0 +1,158 @@
+From f7a38b5140d6e836daa5ae87146a8d3d5bc4970d Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 25 Nov 2013 04:59:44 +0100
+Subject: [PATCH 480/507] s2w: add s2s only override
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/sweep2wake.c          |   32 +++++++++++++++++++++--
+ drivers/input/touchscreen/touch_synaptics.c     |    4 +--
+ drivers/input/touchscreen/touch_synaptics_ds5.c |    2 +-
+ drivers/video/msm/mdss/mdss_dsi_panel.c         |    4 +--
+ include/linux/input/sweep2wake.h                |    2 +-
+ 5 files changed, 36 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/input/touchscreen/sweep2wake.c b/drivers/input/touchscreen/sweep2wake.c
+index 1447ce6..0de336d 100644
+--- a/drivers/input/touchscreen/sweep2wake.c
++++ b/drivers/input/touchscreen/sweep2wake.c
+@@ -56,6 +56,7 @@ MODULE_LICENSE("GPLv2");
+ /* Tuneables */
+ #define S2W_DEBUG		0
+ #define S2W_DEFAULT		0
++#define S2W_S2SONLY_DEFAULT	0
+ #define S2W_PWRKEY_DUR          60
+ 
+ #ifdef CONFIG_MACH_MSM8974_HAMMERHEAD
+@@ -77,7 +78,7 @@ MODULE_LICENSE("GPLv2");
+ 
+ 
+ /* Resources */
+-int s2w_switch = S2W_DEFAULT;
++int s2w_switch = S2W_DEFAULT, s2w_s2sonly = S2W_S2SONLY_DEFAULT;
+ static int touch_x = 0, touch_y = 0;
+ static bool touch_x_called = false, touch_y_called = false;
+ static bool scr_suspended = false, exec_count = true;
+@@ -514,7 +515,7 @@ static ssize_t s2w_sweep2wake_show(struct device *dev,
+ static ssize_t s2w_sweep2wake_dump(struct device *dev,
+ 		struct device_attribute *attr, const char *buf, size_t count)
+ {
+-	if (buf[0] >= '0' && buf[0] <= '2' && buf[1] == '\n')
++	if (buf[0] >= '0' && buf[0] <= '1' && buf[1] == '\n')
+                 if (s2w_switch != buf[0] - '0')
+ 		        s2w_switch = buf[0] - '0';
+ 
+@@ -524,6 +525,29 @@ static ssize_t s2w_sweep2wake_dump(struct device *dev,
+ static DEVICE_ATTR(sweep2wake, (S_IWUSR|S_IRUGO),
+ 	s2w_sweep2wake_show, s2w_sweep2wake_dump);
+ 
++static ssize_t s2w_s2w_s2sonly_show(struct device *dev,
++		struct device_attribute *attr, char *buf)
++{
++	size_t count = 0;
++
++	count += sprintf(buf, "%d\n", s2w_s2sonly);
++
++	return count;
++}
++
++static ssize_t s2w_s2w_s2sonly_dump(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t count)
++{
++	if (buf[0] >= '0' && buf[0] <= '1' && buf[1] == '\n')
++                if (s2w_s2sonly != buf[0] - '0')
++		        s2w_s2sonly = buf[0] - '0';
++
++	return count;
++}
++
++static DEVICE_ATTR(s2w_s2sonly, (S_IWUSR|S_IRUGO),
++	s2w_s2w_s2sonly_show, s2w_s2w_s2sonly_dump);
++
+ static ssize_t s2w_version_show(struct device *dev,
+ 		struct device_attribute *attr, char *buf)
+ {
+@@ -616,6 +640,10 @@ static int __init sweep2wake_init(void)
+ 	if (rc) {
+ 		pr_warn("%s: sysfs_create_file failed for sweep2wake\n", __func__);
+ 	}
++	rc = sysfs_create_file(android_touch_kobj, &dev_attr_s2w_s2sonly.attr);
++	if (rc) {
++		pr_warn("%s: sysfs_create_file failed for s2w_s2sonly\n", __func__);
++	}
+ 	rc = sysfs_create_file(android_touch_kobj, &dev_attr_sweep2wake_version.attr);
+ 	if (rc) {
+ 		pr_warn("%s: sysfs_create_file failed for sweep2wake_version\n", __func__);
+diff --git a/drivers/input/touchscreen/touch_synaptics.c b/drivers/input/touchscreen/touch_synaptics.c
+index 8590569..53a476a 100644
+--- a/drivers/input/touchscreen/touch_synaptics.c
++++ b/drivers/input/touchscreen/touch_synaptics.c
+@@ -1608,7 +1608,7 @@ static int synaptics_ts_start(struct synaptics_ts_data *ts)
+ 	bool prevent_sleep = false;
+ #endif
+ #if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE)
+-	prevent_sleep = (s2w_switch > 0);
++	prevent_sleep = (s2w_switch > 0) && (s2w_s2sonly == 0);
+ #endif
+ #if defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
+ 	prevent_sleep = prevent_sleep || (dt2w_switch > 0);
+@@ -1646,7 +1646,7 @@ static int synaptics_ts_stop(struct synaptics_ts_data *ts)
+ 	bool prevent_sleep = false;
+ #endif
+ #if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE)
+-	prevent_sleep = (s2w_switch > 0);
++	prevent_sleep = (s2w_switch > 0) && (s2w_s2sonly == 0);
+ #endif
+ #if defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
+ 	prevent_sleep = prevent_sleep || (dt2w_switch > 0);
+diff --git a/drivers/input/touchscreen/touch_synaptics_ds5.c b/drivers/input/touchscreen/touch_synaptics_ds5.c
+index 4a2044b..a72d5cf 100644
+--- a/drivers/input/touchscreen/touch_synaptics_ds5.c
++++ b/drivers/input/touchscreen/touch_synaptics_ds5.c
+@@ -1677,7 +1677,7 @@ static int lcd_notifier_callback(struct notifier_block *this,
+ 	bool prevent_sleep = false;
+ #endif
+ #if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE)
+-	prevent_sleep = (s2w_switch > 0);
++	prevent_sleep = (s2w_switch > 0) && (s2w_s2sonly == 0);
+ #endif
+ #if defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
+ 	prevent_sleep = prevent_sleep || (dt2w_switch > 0);
+diff --git a/drivers/video/msm/mdss/mdss_dsi_panel.c b/drivers/video/msm/mdss/mdss_dsi_panel.c
+index d341148..5b17953 100644
+--- a/drivers/video/msm/mdss/mdss_dsi_panel.c
++++ b/drivers/video/msm/mdss/mdss_dsi_panel.c
+@@ -184,7 +184,7 @@ void mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
+ 	bool prevent_sleep = false;
+ #endif
+ #if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE)
+-	prevent_sleep = (s2w_switch > 0);
++	prevent_sleep = (s2w_switch > 0) && (s2w_s2sonly == 0);
+ #endif
+ #if defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
+ 	prevent_sleep = prevent_sleep || (dt2w_switch > 0);
+@@ -334,7 +334,7 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
+ 	bool prevent_sleep = false;
+ #endif
+ #if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE)
+-	prevent_sleep = (s2w_switch > 0);
++	prevent_sleep = (s2w_switch > 0) && (s2w_s2sonly == 0);
+ #endif
+ #if defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
+ 	prevent_sleep = prevent_sleep || (dt2w_switch > 0);
+diff --git a/include/linux/input/sweep2wake.h b/include/linux/input/sweep2wake.h
+index 7c3947c..656c40d 100644
+--- a/include/linux/input/sweep2wake.h
++++ b/include/linux/input/sweep2wake.h
+@@ -21,6 +21,6 @@
+ #ifndef _LINUX_SWEEP2WAKE_H
+ #define _LINUX_SWEEP2WAKE_H
+ 
+-extern int s2w_switch;
++extern int s2w_switch, s2w_s2sonly;
+ 
+ #endif	/* _LINUX_SWEEP2WAKE_H */
+-- 
+1.7.9.5
+

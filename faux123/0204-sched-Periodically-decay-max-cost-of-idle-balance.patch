@@ -1,0 +1,176 @@
+From ab1ff9c1223d3f78b4b4f3ab85febbe6216fadc9 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sun, 8 Sep 2013 17:10:10 -0500
+Subject: [PATCH 204/507] sched: Periodically decay max cost of idle balance
+
+This RFC patch builds on patch 2 and periodically decays that max value to
+do idle balancing per sched domain.
+
+Though we want to decay it fairly consistently, we may not want to lower it by
+too much each time, especially since avg_idle is capped based on that value.
+So I thought that decaying the value every second and lowering it by half a
+percent each time appeared to be fairly reasonable.
+
+This change would allow us to remove the limit we set on each domain's max cost
+to idle balance. Also, since the max can be reduced now, we now have to
+update rq->max_idle balance_cost more frequently. So after every idle balance,
+we loop through the sched domain to find the max sd's newidle load balance cost
+for any one domain. Then we will set rq->max_idle_balance_cost to that value.
+
+Since we are now decaying the max cost to do idle balancing, that max cost can
+also become not high enough. One possible explanation for why is that
+besides the time spent on each newidle load balance, there are other costs
+associated with attempting idle balancing. Idle balance also releases and
+reacquires a spin lock. That cost is not counted when we keep track of each
+domain's cost to do newidle load balance. Also, acquiring the rq locks can
+potentially prevent other CPUs from running something useful. And after
+migrating tasks, it might potentially have to pay the costs of cache misses and
+refreshing tasks' cache.
+
+Because of that, this patch also compares avg_idle with max cost to do idle
+balancing + sched_migration_cost. While using the max cost helps reduce
+overestimating the average idle, the sched_migration_cost can help account
+for those additional costs of idle balancing.
+
+Signed-off-by: Jason Low <jason.low2@hp.com>
+[peterz: rewrote the logic, but kept the spirit]
+Signed-off-by: Peter Zijlstra <peterz@infradead.org>
+backported to Linux 3.4
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ include/linux/sched.h    |    3 +++
+ include/linux/topology.h |    3 +++
+ kernel/sched/fair.c      |   42 ++++++++++++++++++++++++++++++++----------
+ 3 files changed, 38 insertions(+), 10 deletions(-)
+
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index cb4cbbc..40f77d5 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -996,7 +996,10 @@ struct sched_domain {
+ 	unsigned int nr_balance_failed; /* initialise to 0 */
+ 
+ 	u64 last_update;
++
++	/* idle_balance() stats */
+ 	u64 max_newidle_lb_cost;
++	unsigned long next_decay_max_lb_cost;
+ 
+ #ifdef CONFIG_SCHEDSTATS
+ 	/* load_balance() stats */
+diff --git a/include/linux/topology.h b/include/linux/topology.h
+index 73de7f1..7e0d8b2 100644
+--- a/include/linux/topology.h
++++ b/include/linux/topology.h
+@@ -109,6 +109,7 @@ int arch_update_cpu_topology(void);
+ 	.balance_interval	= 1,					\
+ 	.smt_gain		= 1178,	/* 15% */			\
+ 	.max_newidle_lb_cost	= 0,					\
++	.next_decay_max_lb_cost	= jiffies,				\
+ }
+ #endif
+ #endif /* CONFIG_SCHED_SMT */
+@@ -142,6 +143,7 @@ int arch_update_cpu_topology(void);
+ 	.last_balance		= jiffies,				\
+ 	.balance_interval	= 1,					\
+ 	.max_newidle_lb_cost	= 0,					\
++	.next_decay_max_lb_cost	= jiffies,				\
+ }
+ #endif
+ #endif /* CONFIG_SCHED_MC */
+@@ -176,6 +178,7 @@ int arch_update_cpu_topology(void);
+ 	.last_balance		= jiffies,				\
+ 	.balance_interval	= 1,					\
+ 	.max_newidle_lb_cost	= 0,					\
++	.next_decay_max_lb_cost	= jiffies,				\
+ }
+ #endif
+ 
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 2cb30d1..b71f8e0 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -4632,7 +4632,7 @@ void idle_balance(int this_cpu, struct rq *this_rq)
+ 	for_each_domain(this_cpu, sd) {
+ 		unsigned long interval;
+ 		int balance = 1;
+-		u64 t0, domain_cost, max = 5*sysctl_sched_migration_cost;
++		u64 t0, domain_cost;
+ 
+ 		if (!(sd->flags & SD_LOAD_BALANCE))
+ 			continue;
+@@ -4648,8 +4648,6 @@ void idle_balance(int this_cpu, struct rq *this_rq)
+ 						   sd, CPU_NEWLY_IDLE, &balance);
+ 
+ 			domain_cost = sched_clock_cpu(smp_processor_id()) - t0;
+-			if (domain_cost > max)
+-				domain_cost = max;
+ 
+ 			if (domain_cost > sd->max_newidle_lb_cost)
+ 				sd->max_newidle_lb_cost = domain_cost;
+@@ -4998,15 +4996,39 @@ static void rebalance_domains(int cpu, enum cpu_idle_type idle)
+ 	/* Earliest time when we have to do rebalance again */
+ 	unsigned long next_balance = jiffies + 60*HZ;
+ 	int update_next_balance = 0;
+-	int need_serialize;
++	int need_serialize, need_decay = 0;
++	u64 max_cost = 0;
+ 
+ 	update_shares(cpu);
+ 
+ 	rcu_read_lock();
+ 	for_each_domain(cpu, sd) {
++		/*
++		 * Decay the newidle max times here because this is a regular
++		 * visit to all the domains. Decay ~0.5% per second.
++		 */
++		if (time_after(jiffies, sd->next_decay_max_lb_cost)) {
++			sd->max_newidle_lb_cost =
++			(sd->max_newidle_lb_cost * 254) / 256;
++			sd->next_decay_max_lb_cost = jiffies + HZ;
++			need_decay = 1;
++		}
++		max_cost += sd->max_newidle_lb_cost;
++
+ 		if (!(sd->flags & SD_LOAD_BALANCE))
+ 			continue;
+ 
++		/*
++		 * Stop the load balance at this level. There is another
++		 * * CPU in our sched group which is doing load balancing more
++		 * actively.
++		 */
++		if (!balance) {
++			if (need_decay)
++				continue;
++			break;
++		}
++
+ 		interval = sd->balance_interval;
+ 		if (idle != CPU_IDLE)
+ 			interval *= sd->busy_factor;
+@@ -5039,14 +5061,14 @@ out:
+ 			next_balance = sd->last_balance + interval;
+ 			update_next_balance = 1;
+ 		}
+-
++	}
++	if (need_decay) {
+ 		/*
+-		 * Stop the load balance at this level. There is another
+-		 * CPU in our sched group which is doing load balancing more
+-		 * actively.
++		 * Ensure the rq-wide value also decays but keep it at a
++		 * reasonable floor to avoid funnies with rq->avg_idle.
+ 		 */
+-		if (!balance)
+-			break;
++		rq->max_idle_balance_cost =
++			max((u64)sysctl_sched_migration_cost, max_cost);
+ 	}
+ 	rcu_read_unlock();
+ 
+-- 
+1.7.9.5
+

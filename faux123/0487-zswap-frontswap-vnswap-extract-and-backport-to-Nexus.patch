@@ -1,0 +1,5704 @@
+From 33bfdf6296dfc8129fcaeed584da5b8653067abf Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sun, 29 Dec 2013 19:22:53 -0800
+Subject: [PATCH 487/507] zswap, frontswap, vnswap: extract and backport to
+ Nexus series
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/staging/Kconfig               |    2 +
+ drivers/staging/Makefile              |    1 +
+ drivers/staging/vnswap/Kconfig        |    4 +
+ drivers/staging/vnswap/Makefile       |    1 +
+ drivers/staging/vnswap/vnswap.c       | 1145 ++++++++++++++++++++++++++++++++
+ drivers/staging/vnswap/vnswap.h       |  119 ++++
+ drivers/staging/vnswap/vnswap_sysfs.c |  144 ++++
+ fs/debugfs/file.c                     |   46 ++
+ include/linux/atomic.h                |   27 +
+ include/linux/debugfs.h               |    4 +
+ include/linux/frontswap.h             |  127 ++++
+ include/linux/mm.h                    |    3 +
+ include/linux/rmap.h                  |    3 +
+ include/linux/swap.h                  |   12 +
+ include/linux/swapfile.h              |   13 +
+ include/linux/zsmalloc.h              |   56 ++
+ include/trace/events/vmscan.h         |   28 +
+ kernel/sysctl.c                       |    7 +
+ mm/Kconfig                            |   75 +++
+ mm/Makefile                           |    3 +
+ mm/filemap.c                          |    8 +
+ mm/frontswap.c                        |  349 ++++++++++
+ mm/internal.h                         |   50 ++
+ mm/memory.c                           |    4 +
+ mm/page_alloc.c                       |    6 +
+ mm/page_io.c                          |   78 ++-
+ mm/rmap.c                             |    3 +
+ mm/shmem.c                            |    3 +
+ mm/swap_state.c                       |   16 +
+ mm/swapfile.c                         |  101 ++-
+ mm/vmscan.c                           |   86 ++-
+ mm/zsmalloc.c                         | 1117 +++++++++++++++++++++++++++++++
+ mm/zswap.c                            | 1167 +++++++++++++++++++++++++++++++++
+ 33 files changed, 4792 insertions(+), 16 deletions(-)
+ create mode 100644 drivers/staging/vnswap/Kconfig
+ create mode 100644 drivers/staging/vnswap/Makefile
+ create mode 100644 drivers/staging/vnswap/vnswap.c
+ create mode 100644 drivers/staging/vnswap/vnswap.h
+ create mode 100644 drivers/staging/vnswap/vnswap_sysfs.c
+ create mode 100644 include/linux/frontswap.h
+ create mode 100644 include/linux/swapfile.h
+ create mode 100644 include/linux/zsmalloc.h
+ create mode 100644 mm/frontswap.c
+ create mode 100644 mm/zsmalloc.c
+ create mode 100644 mm/zswap.c
+
+diff --git a/drivers/staging/Kconfig b/drivers/staging/Kconfig
+index 97d412d..d2262a2 100644
+--- a/drivers/staging/Kconfig
++++ b/drivers/staging/Kconfig
+@@ -132,4 +132,6 @@ source "drivers/staging/ramster/Kconfig"
+ 
+ source "drivers/staging/ozwpan/Kconfig"
+ 
++source "drivers/staging/vnswap/Kconfig"
++
+ endif # STAGING
+diff --git a/drivers/staging/Makefile b/drivers/staging/Makefile
+index ffe7d44..f2593fc 100644
+--- a/drivers/staging/Makefile
++++ b/drivers/staging/Makefile
+@@ -57,3 +57,4 @@ obj-$(CONFIG_ANDROID)		+= android/
+ obj-$(CONFIG_PHONE)		+= telephony/
+ obj-$(CONFIG_RAMSTER)		+= ramster/
+ obj-$(CONFIG_USB_WPAN_HCD)	+= ozwpan/
++obj-$(CONFIG_VNSWAP)		+= vnswap/
+diff --git a/drivers/staging/vnswap/Kconfig b/drivers/staging/vnswap/Kconfig
+new file mode 100644
+index 0000000..c236f62
+--- /dev/null
++++ b/drivers/staging/vnswap/Kconfig
+@@ -0,0 +1,4 @@
++config VNSWAP
++	tristate "Fake device for swap"
++	depends on BLOCK && SYSFS && ZSWAP
++	default n
+diff --git a/drivers/staging/vnswap/Makefile b/drivers/staging/vnswap/Makefile
+new file mode 100644
+index 0000000..16fd89c
+--- /dev/null
++++ b/drivers/staging/vnswap/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_VNSWAP)	+= vnswap.o vnswap_sysfs.o
+diff --git a/drivers/staging/vnswap/vnswap.c b/drivers/staging/vnswap/vnswap.c
+new file mode 100644
+index 0000000..42aae6e
+--- /dev/null
++++ b/drivers/staging/vnswap/vnswap.c
+@@ -0,0 +1,1145 @@
++/*
++ * Virtual Nand Swap Device which simulates Swap Area
++ *
++ * Copyright (C) 2013 SungHwan Yun
++ *
++ * This code is released using a dual license strategy: BSD/GPL
++ * You can choose the licence that better fits your requirements.
++ *
++ * Released under the terms of 3-clause BSD License
++ * Released under the terms of GNU General Public License Version 2.0
++ */
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/bitops.h>
++#include <linux/blkdev.h>
++#include <linux/device.h>
++#include <linux/genhd.h>
++#include <linux/string.h>
++#include <linux/delay.h>
++#include <linux/fs.h>
++#include <linux/mempool.h>
++#include <linux/pagemap.h>
++#include <linux/time.h>
++#include <linux/atomic.h>
++#include <linux/types.h>
++#include <linux/vmalloc.h>
++
++#include "vnswap.h"
++
++/* Globals */
++static int vnswap_major;
++struct vnswap *vnswap_device;
++struct page *swap_header_page;
++
++/*
++ * Description : virtual swp_offset -> backing storage block Mapping table
++ * Value : 1 ~ Max swp_entry (used) , 0 (free)
++ * For example,
++ * vnswap_table [1] = 0, vnswap_table [3] = 1, vnswap_table [6] = 2,
++ * vnswap_table [7] = 3,
++ * vnswap_table [10] = 4, vnswap_table [Others] = -1
++ */
++static DEFINE_SPINLOCK(vnswap_table_lock);
++int *vnswap_table;
++
++/* Backing Storage bitmap information */
++unsigned long *backing_storage_bitmap;
++unsigned int backing_storage_bitmap_last_allocated_index = -1;
++
++/* Backing Storage bmap and bdev information */
++sector_t *backing_storage_bmap;
++struct block_device *backing_storage_bdev;
++struct file *backing_storage_file;
++
++static DEFINE_SPINLOCK(vnswap_original_bio_lock);
++
++void vnswap_init_disksize(u64 disksize)
++{
++	int i;
++	vnswap_device->disksize = PAGE_ALIGN(disksize);
++	if ((vnswap_device->disksize/PAGE_SIZE > MAX_SWAP_AREA_SIZE_PAGES) ||
++		!vnswap_device->disksize) {
++		pr_err("%s %d: disksize is invalid (disksize = %llu)\n",
++				__func__, __LINE__, vnswap_device->disksize);
++		vnswap_device->disksize = 0;
++		vnswap_device->init_success = VNSWAP_INIT_DISKSIZE_FAIL;
++		return;
++	}
++	set_capacity(vnswap_device->disk,
++		vnswap_device->disksize >> SECTOR_SHIFT);
++
++	vnswap_table = vmalloc((vnswap_device->disksize/PAGE_SIZE) *
++					sizeof(int));
++	if (vnswap_table == NULL) {
++		pr_err("%s %d: alloc vnswap_table is failed.\n",
++				__func__, __LINE__);
++		vnswap_device->init_success = VNSWAP_INIT_DISKSIZE_FAIL;
++		return;
++	}
++	for (i = 0; i < vnswap_device->disksize/PAGE_SIZE; i++)
++		vnswap_table[i] = -1;
++	vnswap_device->init_success = VNSWAP_INIT_DISKSIZE_SUCCESS;
++}
++
++int vnswap_init_backing_storage(void)
++{
++	struct address_space *mapping;
++	struct inode *inode = NULL;
++	unsigned blkbits, blocks_per_page;
++	sector_t probe_block, last_block, first_block;
++	sector_t discard_start_block = 0, discard_last_block = 0;
++	int ret = 0, i;
++	mm_segment_t oldfs;
++	struct timeval discard_start, discard_end;
++	int discard_time;
++
++	if (!vnswap_device ||
++		vnswap_device->init_success != VNSWAP_INIT_DISKSIZE_SUCCESS) {
++		ret = -EINVAL;
++		pr_err("%s %d: init disksize is failed." \
++				"So we can not go ahead anymore.(init_success = %d)\n",
++				__func__, __LINE__,
++				!vnswap_device ? -1 :
++				vnswap_device->init_success);
++		goto error;
++	}
++
++	oldfs = get_fs();
++	set_fs(get_ds());
++
++	backing_storage_file =
++		filp_open(vnswap_device->backing_storage_filename,
++					O_RDWR | O_LARGEFILE, 0);
++
++	if (IS_ERR(backing_storage_file)) {
++		ret = PTR_ERR(backing_storage_file);
++		vnswap_device->stats.vnswap_backing_storage_open_fail =
++			PTR_ERR(backing_storage_file);
++		backing_storage_file = NULL;
++		set_fs(oldfs);
++		pr_err("%s %d: filp_open failed" \
++				"(backing_storage_file, error, " \
++				"backing_storage_filename)" \
++				" = (0x%08x, 0x%08x, %s)\n",
++				__func__, __LINE__,
++				(unsigned int) backing_storage_file,
++				ret, vnswap_device->backing_storage_filename);
++		goto error;
++	} else {
++		set_fs(oldfs);
++		vnswap_device->stats.vnswap_backing_storage_open_fail = 0;
++		dprintk("%s %d: filp_open success" \
++				"(backing_storage_file, error, backing_storage_filename)"
++				"= (0x%08x, 0x%08x, %s)\n",
++				__func__, __LINE__,
++				(unsigned int) backing_storage_file,
++				ret, vnswap_device->backing_storage_filename);
++	}
++
++	mapping = backing_storage_file->f_mapping;
++	inode = mapping->host;
++	backing_storage_bdev = inode->i_sb->s_bdev;
++
++	if (!S_ISREG(inode->i_mode)) {
++		ret = -EINVAL;
++		pr_err("%s %d: backing storage file is not regular file" \
++				"(inode->i_mode = %d)\n",
++				__func__, __LINE__, inode->i_mode);
++		goto close_file;
++	}
++
++	inode->i_flags |= S_IMMUTABLE;
++
++	blkbits = inode->i_blkbits;
++	blocks_per_page = PAGE_SIZE >> blkbits;
++
++	if (blocks_per_page != 1) {
++		ret = -EINVAL;
++		pr_err("%s %d: blocks_per_page is not 1. " \
++				"(blocks_per_page, inode->i_blkbits) = (%d, %d)\n",
++				__func__, __LINE__,
++				blocks_per_page, inode->i_blkbits);
++		goto close_file;
++	}
++
++	last_block = i_size_read(inode) >> blkbits;
++	vnswap_device->bs_size = last_block;
++	vnswap_device->stats.vnswap_total_slot_num = last_block;
++
++	if ((vnswap_device->bs_size > MAX_BACKING_STORAGE_SIZE_PAGES) ||
++		!vnswap_device->bs_size) {
++		ret = -EINVAL;
++		pr_err("%s %d: backing storage size is invalid." \
++				"(backing storage size = %llu)\n",
++				__func__, __LINE__,
++				vnswap_device->bs_size);
++		goto close_file;
++	}
++
++	/*
++	* Align sizeof(unsigned long) * 8 page
++	*  - This alignment is for Integer (sizeof(unsigned long) Bytes ->
++	*    sizeof(unsigned long) * 8 Bit -> sizeof(unsigned long) * 8 page)
++	*    bitmap operation
++	*/
++	if (vnswap_device->bs_size % (sizeof(unsigned long)*8) != 0) {
++		dprintk("%s %d: backing storage size is misaligned " \
++				"(32 page align)." \
++				"So, it is truncated from %llu pages to %llu pages\n",
++				__func__, __LINE__, vnswap_device->bs_size,
++				vnswap_device->bs_size /
++				(sizeof(unsigned long)*8)*
++				(sizeof(unsigned long)*8));
++		vnswap_device->bs_size = (vnswap_device->bs_size /
++			(sizeof(unsigned long)*8) * (sizeof(unsigned long)*8));
++	}
++
++	backing_storage_bitmap = vmalloc(vnswap_device->bs_size / 8);
++	if (backing_storage_bitmap == NULL) {
++		ret = -ENOMEM;
++		goto close_file;
++	}
++
++	for (i = 0; i < vnswap_device->bs_size / 32; i++)
++		backing_storage_bitmap[i] = 0;
++	backing_storage_bitmap_last_allocated_index = -1;
++
++	backing_storage_bmap = vmalloc(vnswap_device->bs_size *
++							sizeof(sector_t));
++	if (backing_storage_bmap == NULL) {
++		ret = -ENOMEM;
++		goto free_bitmap;
++	}
++
++	for (probe_block = 0; probe_block < last_block; probe_block++) {
++		first_block = bmap(inode, probe_block);
++		if (first_block == 0) {
++			pr_err("%s %d: backing_storage file has holes." \
++					"(probe_block, first_block) = (%llu,%llu)\n",
++					__func__, __LINE__,
++					probe_block, first_block);
++			ret = -EINVAL;
++			goto free_bmap;
++		}
++		backing_storage_bmap[probe_block] = first_block;
++
++		/* new extent */
++		if (discard_start_block == 0) {
++			discard_start_block = discard_last_block = first_block;
++			continue;
++		}
++
++		/* first block is a member of extent */
++		if (discard_last_block+1 == first_block) {
++			discard_last_block++;
++			continue;
++		}
++
++		/*
++		* first block is not a member of extent
++		* discard current extent.
++		*/
++		do_gettimeofday(&discard_start);
++		ret = blkdev_issue_discard(backing_storage_bdev,
++				discard_start_block << (PAGE_SHIFT - 9),
++				(discard_last_block - discard_start_block + 1)
++				<< (PAGE_SHIFT - 9), GFP_KERNEL, 0);
++		do_gettimeofday(&discard_end);
++
++		discard_time = (discard_end.tv_sec - discard_start.tv_sec) *
++			USEC_PER_SEC +
++			(discard_end.tv_usec - discard_start.tv_usec);
++
++		if (ret) {
++			pr_err("%s %d: blkdev_issue_discard failed. (ret) = (%d)\n",
++					__func__, __LINE__, ret);
++			goto free_bmap;
++		}
++		dprintk("%s %d: blkdev_issue_discard success" \
++				"(start, size, discard_time) = (%llu, %llu, %d)\n",
++				__func__, __LINE__, discard_start_block,
++				discard_last_block - discard_start_block + 1,
++				discard_time);
++		discard_start_block = discard_last_block = first_block;
++	}
++
++	/* last extent */
++	if (discard_start_block) {
++		do_gettimeofday(&discard_start);
++		ret = blkdev_issue_discard(backing_storage_bdev,
++				discard_start_block << (PAGE_SHIFT - 9),
++				(discard_last_block - discard_start_block + 1)
++				<< (PAGE_SHIFT - 9), GFP_KERNEL, 0);
++		do_gettimeofday(&discard_end);
++		discard_time = (discard_end.tv_sec - discard_start.tv_sec) *
++			USEC_PER_SEC +
++			(discard_end.tv_usec - discard_start.tv_usec);
++		if (ret) {
++			pr_err("%s %d: blkdev_issue_discard failed. (ret) = (%d)\n",
++					__func__, __LINE__, ret);
++			goto free_bmap;
++		}
++		dprintk("%s %d: blkdev_issue_discard success" \
++				"(start, size, discard_time) = (%llu, %llu, %d)\n",
++				__func__, __LINE__, discard_start_block,
++				discard_last_block - discard_start_block + 1,
++				discard_time);
++		discard_start_block = discard_last_block = 0;
++	}
++
++	vnswap_device->init_success |= VNSWAP_INIT_BACKING_STORAGE_SUCCESS;
++	return ret;
++
++free_bmap:
++	vfree(backing_storage_bmap);
++
++free_bitmap:
++	vfree(backing_storage_bitmap);
++
++close_file:
++	filp_close(backing_storage_file, NULL);
++
++error:
++	vnswap_device->init_success |= VNSWAP_INIT_BACKING_STORAGE_FAIL;
++	return ret;
++}
++
++/* find free area (nand_offset, page_offset) in backing storage */
++int vnswap_find_free_area_in_backing_storage(int *nand_offset)
++{
++	int i, found = 0;
++
++	/* Backing Storage is full */
++	if (backing_storage_bitmap_last_allocated_index ==
++		vnswap_device->bs_size) {
++		atomic_inc(&vnswap_device->stats.
++			vnswap_backing_storage_full_num);
++		return -ENOSPC;
++	}
++
++	for (i = backing_storage_bitmap_last_allocated_index + 1;
++		i < vnswap_device->bs_size; i++)
++		if (!test_bit(i, backing_storage_bitmap)) {
++			found = 1;
++			break;
++		}
++
++	if (!found) {
++		for (i = 0;
++			i < backing_storage_bitmap_last_allocated_index;
++			i++)
++			if (!test_bit(i, backing_storage_bitmap)) {
++				found = 1;
++				break;
++			}
++	}
++
++	/* Backing Storage is full */
++	if (!found) {
++		backing_storage_bitmap_last_allocated_index =
++			vnswap_device->bs_size;
++		atomic_inc(&vnswap_device->stats.
++			vnswap_backing_storage_full_num);
++		return -ENOSPC;
++	}
++	*nand_offset =
++		backing_storage_bitmap_last_allocated_index = i;
++	return i;
++}
++
++/* refer req_bio_endio() */
++void vnswap_bio_end_read(struct bio *bio, int err)
++{
++	const int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
++	struct bio *original_bio = (struct bio *) bio->bi_private;
++	unsigned long flags;
++
++	dprintk("%s %d: (uptodate,error,bi_size) = (%d, %d, %d)\n",
++			__func__, __LINE__, uptodate, err, bio->bi_size);
++
++	if (!uptodate || err) {
++		atomic_inc(&vnswap_device->stats.vnswap_bio_end_fail_r1_num);
++		pr_err("%s %d: (error, bio->bi_size, original_bio->bi_size," \
++				"bio->bi_vcnt, original_bio->bi_vcnt, " \
++				"bio->bi_idx," \
++				"original_bio->bi_idx, " \
++				"vnswap_bio_end_fail_r1_num ~" \
++				"vnswap_bio_end_fail_r3_num) =" \
++				"(%d, %d, %d, %d, %d, %d, %d, %d, %d, %d)\n",
++				__func__, __LINE__, err, bio->bi_size,
++				original_bio->bi_size,
++				bio->bi_vcnt, original_bio->bi_vcnt,
++				bio->bi_idx,
++				original_bio->bi_idx,
++				vnswap_device->stats.
++					vnswap_bio_end_fail_r1_num.counter,
++				vnswap_device->stats.
++					vnswap_bio_end_fail_r2_num.counter,
++				vnswap_device->stats.
++					vnswap_bio_end_fail_r3_num.counter);
++		bio_io_error(original_bio);
++		goto out_bio_put;
++	} else {
++		/*
++		* There are bytes yet to be transferred.
++		* blk_end_request() -> blk_end_bidi_request() ->
++		* blk_update_bidi_request() ->
++		* blk_update_request() -> req_bio_endio() ->
++		* bio->bi_size -= nbytes;
++		*/
++		spin_lock_irqsave(&vnswap_original_bio_lock, flags);
++		original_bio->bi_size -= (PAGE_SIZE-bio->bi_size);
++
++		if (bio->bi_size == PAGE_SIZE) {
++			atomic_inc(&vnswap_device->stats.
++				vnswap_bio_end_fail_r2_num);
++			pr_err("%s %d: (error, bio->bi_size, " \
++					"original_bio->bi_size," \
++					"bio->bi_vcnt," \
++					"original_bio->bi_vcnt, bio->bi_idx, " \
++					"original_bio->bi_idx," \
++					"vnswap_bio_end_fail_r1_num ~ " \
++					"vnswap_bio_end_fail_r3_num) = " \
++					"(%d, %d, %d, %d, %d, %d, %d, %d, %d, %d)\n",
++					__func__, __LINE__, err, bio->bi_size,
++					original_bio->bi_size,
++					bio->bi_vcnt, original_bio->bi_vcnt,
++					bio->bi_idx,
++					original_bio->bi_idx,
++					vnswap_device->stats.
++						vnswap_bio_end_fail_r1_num.
++						counter,
++					vnswap_device->stats.
++						vnswap_bio_end_fail_r2_num.
++						counter,
++					vnswap_device->stats.
++						vnswap_bio_end_fail_r3_num.
++						counter);
++			spin_unlock_irqrestore(&vnswap_original_bio_lock,
++				flags);
++			goto out_bio_put;
++		}
++
++		if (bio->bi_size || original_bio->bi_size) {
++			atomic_inc(&vnswap_device->stats.
++				vnswap_bio_end_fail_r3_num);
++			pr_err("%s %d: (error, bio->bi_size, " \
++					"original_bio->bi_size," \
++					"bio->bi_vcnt," \
++					"original_bio->bi_vcnt, bio->bi_idx, " \
++					"original_bio->bi_idx," \
++					"vnswap_bio_end_fail_r1_num ~ " \
++					"vnswap_bio_end_fail_r3_num) = " \
++					"(%d, %d, %d, %d, %d, %d, %d, %d, %d, %d)\n",
++					__func__, __LINE__, err, bio->bi_size,
++					original_bio->bi_size,
++					bio->bi_vcnt, original_bio->bi_vcnt,
++					bio->bi_idx, original_bio->bi_idx,
++					vnswap_device->stats.
++						vnswap_bio_end_fail_r1_num.
++						counter,
++					vnswap_device->stats.
++						vnswap_bio_end_fail_r2_num.
++						counter,
++					vnswap_device->stats.
++						vnswap_bio_end_fail_r3_num.
++						counter);
++			spin_unlock_irqrestore(&vnswap_original_bio_lock,
++				flags);
++			goto out_bio_put;
++		}
++
++		set_bit(BIO_UPTODATE, &original_bio->bi_flags);
++		spin_unlock_irqrestore(&vnswap_original_bio_lock, flags);
++		bio_endio(original_bio, 0);
++	}
++
++out_bio_put:
++	bio_put(bio);
++}
++
++/* refer req_bio_endio() */
++void vnswap_bio_end_write(struct bio *bio, int err)
++{
++	struct bio *original_bio = (struct bio *) bio->bi_private;
++	unsigned long flags;
++
++	dprintk("%s %d: (error, bi_size) = (%d, %d)\n",
++			__func__, __LINE__, err, bio->bi_size);
++
++	if (err) {
++		atomic_inc(&vnswap_device->stats.vnswap_bio_end_fail_w1_num);
++		pr_err("%s %d: (error, bio->bi_size, original_bio->bi_size, " \
++				"bio->bi_vcnt," \
++				"original_bio->bi_vcnt, bio->bi_idx, " \
++				"original_bio->bi_idx," \
++				"vnswap_bio_end_fail_w1_num ~ " \
++				"vnswap_bio_end_fail_w3_num) = " \
++				"(%d, %d, %d, %d, %d, %d, %d, %d, %d, %d)\n",
++				__func__, __LINE__, err, bio->bi_size,
++				original_bio->bi_size,
++				bio->bi_vcnt, original_bio->bi_vcnt,
++				bio->bi_idx,
++				original_bio->bi_idx,
++				vnswap_device->stats.
++					vnswap_bio_end_fail_w1_num.counter,
++				vnswap_device->stats.
++					vnswap_bio_end_fail_w2_num.counter,
++				vnswap_device->stats.
++					vnswap_bio_end_fail_w3_num.counter);
++		bio_io_error(original_bio);
++		goto out_bio_put;
++	} else {
++		/*
++		* There are bytes yet to be transferred.
++		* blk_end_request() -> blk_end_bidi_request() ->
++		* blk_update_bidi_request() ->
++		* blk_update_request() -> req_bio_endio() ->
++		* bio->bi_size -= nbytes;
++		*/
++		spin_lock_irqsave(&vnswap_original_bio_lock, flags);
++		original_bio->bi_size -= (PAGE_SIZE-bio->bi_size);
++
++		if (bio->bi_size == PAGE_SIZE) {
++			atomic_inc(&vnswap_device->stats.
++				vnswap_bio_end_fail_w2_num);
++			pr_err("%s %d: (error, bio->bi_size, " \
++					"original_bio->bi_size, " \
++					"bio->bi_vcnt," \
++					"original_bio->bi_vcnt, bio->bi_idx, " \
++					"original_bio->bi_idx," \
++					"vnswap_bio_end_fail_w1_num ~ " \
++					"vnswap_bio_end_fail_w3_num) = " \
++					"(%d, %d, %d, %d, %d, %d, %d, %d, %d, %d)\n",
++					__func__, __LINE__, err, bio->bi_size,
++					original_bio->bi_size,
++					bio->bi_vcnt, original_bio->bi_vcnt,
++					bio->bi_idx,
++					original_bio->bi_idx,
++					vnswap_device->stats.
++						vnswap_bio_end_fail_w1_num.
++						counter,
++					vnswap_device->stats.
++						vnswap_bio_end_fail_w2_num.
++						counter,
++					vnswap_device->stats.
++						vnswap_bio_end_fail_w3_num.
++						counter);
++			spin_unlock_irqrestore(&vnswap_original_bio_lock,
++				flags);
++			goto out_bio_put;
++		}
++
++		if (bio->bi_size || original_bio->bi_size) {
++			atomic_inc(&vnswap_device->stats.
++				vnswap_bio_end_fail_w3_num);
++			pr_err("%s %d: (error, bio->bi_size, " \
++					"original_bio->bi_size, " \
++					"bio->bi_vcnt," \
++					"original_bio->bi_vcnt, bio->bi_idx, " \
++					"original_bio->bi_idx," \
++					"vnswap_bio_end_fail_w1_num ~ " \
++					"vnswap_bio_end_fail_w3_num) = " \
++					"(%d, %d, %d, %d, %d, %d, %d, %d, %d, %d)\n",
++					__func__, __LINE__, err, bio->bi_size,
++					original_bio->bi_size,
++					bio->bi_vcnt, original_bio->bi_vcnt,
++					bio->bi_idx,
++					original_bio->bi_idx,
++					vnswap_device->stats.
++						vnswap_bio_end_fail_w1_num.
++						counter,
++					vnswap_device->stats.
++						vnswap_bio_end_fail_w2_num.
++						counter,
++					vnswap_device->stats.
++						vnswap_bio_end_fail_w3_num.
++						counter);
++			spin_unlock_irqrestore(&vnswap_original_bio_lock,
++				flags);
++			goto out_bio_put;
++		}
++
++		set_bit(BIO_UPTODATE, &original_bio->bi_flags);
++		spin_unlock_irqrestore(&vnswap_original_bio_lock,
++			flags);
++		bio_endio(original_bio, 0);
++	}
++
++out_bio_put:
++	bio_put(bio);
++}
++
++/* Insert entry into VNSWAP_IO sub system */
++int vnswap_submit_bio(int rw, int nand_offset,
++	struct page *page, struct bio *original_bio)
++{
++	struct bio *bio;
++	int ret = 0;
++
++	if (!rw) {
++		VM_BUG_ON(!PageLocked(page));
++		VM_BUG_ON(PageUptodate(page));
++	}
++
++	bio = bio_alloc(GFP_NOIO, 1);
++
++	if (!bio) {
++		atomic_inc(&vnswap_device->stats.vnswap_bio_no_mem_num);
++		ret = -ENOMEM;
++		goto out;
++	}
++
++	bio->bi_sector = (backing_storage_bmap[nand_offset] <<
++					(PAGE_SHIFT - 9));
++	bio->bi_bdev = backing_storage_bdev;
++	bio->bi_io_vec[0].bv_page = page;
++	bio->bi_io_vec[0].bv_len = PAGE_SIZE;
++	bio->bi_io_vec[0].bv_offset = 0;
++	bio->bi_vcnt = 1;
++	bio->bi_idx = 0;
++	bio->bi_size = PAGE_SIZE;
++	bio->bi_private = (void *) original_bio;
++	if (rw)
++		bio->bi_end_io = vnswap_bio_end_write;
++	else
++		bio->bi_end_io = vnswap_bio_end_read;
++
++	dprintk("%s %d: (rw, nand_offset) = (%d,%d)\n",
++			__func__, __LINE__, rw, nand_offset);
++
++	submit_bio(rw, bio);
++
++	if (rw) {
++		atomic_inc(&vnswap_device->stats.
++			vnswap_stored_pages);
++		atomic_inc(&vnswap_device->stats.
++			vnswap_write_pages);
++	} else {
++		atomic_inc(&vnswap_device->stats.
++			vnswap_read_pages);
++	}
++	/* TODO: check bio->bi_flags */
++
++out:
++	return ret;
++}
++
++int vnswap_bvec_read(struct vnswap *vnswap, struct bio_vec *bvec,
++	u32 index, struct bio *bio)
++{
++	struct page *page;
++	unsigned char *user_mem, *swap_header_page_mem;
++	int nand_offset = 0, ret = 0;
++
++	page = bvec->bv_page;
++
++	/* swap header */
++	if (index == 0) {
++		user_mem = kmap_atomic(page);
++		swap_header_page_mem = kmap_atomic(swap_header_page);
++		memcpy(user_mem, swap_header_page_mem, bvec->bv_len);
++		kunmap_atomic(swap_header_page_mem);
++		kunmap_atomic(user_mem);
++		flush_dcache_page(page);
++		return 0;
++	}
++
++	spin_lock(&vnswap_table_lock);
++	nand_offset = vnswap_table[index];
++	if (nand_offset == -1) {
++		pr_err("%s %d: vnswap_table is not mapped. " \
++				"(index, nand_offset)" \
++				"= (%d, %d)\n", __func__, __LINE__,
++				index, nand_offset);
++		ret = -EIO;
++		atomic_inc(&vnswap_device->stats.
++			vnswap_not_mapped_read_pages);
++		spin_unlock(&vnswap_table_lock);
++		goto out;
++	}
++	spin_unlock(&vnswap_table_lock);
++
++	dprintk("%s %d: (index, nand_offset) = (%d, %d)\n",
++			__func__, __LINE__, index, nand_offset);
++
++	/* Read nand_offset position backing storage into page */
++	ret = vnswap_submit_bio(0, nand_offset, page, bio);
++
++out:
++	return ret;
++}
++
++int vnswap_bvec_write(struct vnswap *vnswap, struct bio_vec *bvec,
++	u32 index, struct bio *bio)
++{
++	struct page *page;
++	unsigned char *user_mem, *swap_header_page_mem;
++	int nand_offset = 0, ret;
++
++	page = bvec->bv_page;
++
++	/* swap header */
++	if (index == 0) {
++		user_mem = kmap_atomic(page);
++		swap_header_page_mem = kmap_atomic(swap_header_page);
++		memcpy(swap_header_page_mem, user_mem, PAGE_SIZE);
++		kunmap_atomic(swap_header_page_mem);
++		kunmap_atomic(user_mem);
++		return 0;
++	}
++
++	spin_lock(&vnswap_table_lock);
++	nand_offset = vnswap_table[index];
++
++	/* duplicate write - remove existing mapping */
++	if (nand_offset != -1) {
++		atomic_inc(&vnswap_device->stats.
++			vnswap_double_mapped_slot_num);
++		clear_bit(nand_offset, backing_storage_bitmap);
++		vnswap_table[index] = -1;
++		atomic_dec(&vnswap_device->stats.
++			vnswap_used_slot_num);
++		atomic_dec(&vnswap_device->stats.
++			vnswap_stored_pages);
++	}
++
++	ret = vnswap_find_free_area_in_backing_storage(&nand_offset);
++	if (ret < 0) {
++		spin_unlock(&vnswap_table_lock);
++		return ret;
++	}
++	set_bit(nand_offset, backing_storage_bitmap);
++	vnswap_table[index] = nand_offset;
++	atomic_inc(&vnswap_device->stats.
++		vnswap_used_slot_num);
++	spin_unlock(&vnswap_table_lock);
++
++	dprintk("%s %d: (index, nand_offset) = (%d, %d)\n",
++			__func__, __LINE__, index, nand_offset);
++	ret = vnswap_submit_bio(1, nand_offset, page, bio);
++
++	if (ret) {
++		spin_lock(&vnswap_table_lock);
++		clear_bit(nand_offset, backing_storage_bitmap);
++		vnswap_table[index] = -1;
++		spin_unlock(&vnswap_table_lock);
++	}
++
++	return ret;
++}
++
++int vnswap_bvec_rw(struct vnswap *vnswap, struct bio_vec *bvec,
++	u32 index, struct bio *bio, int rw)
++{
++	int ret;
++
++	if (rw == READ) {
++		down_read(&vnswap->lock);
++		dprintk("%s %d: (rw,index) = (%d, %d)\n",
++			__func__, __LINE__, rw, index);
++		ret = vnswap_bvec_read(vnswap, bvec, index, bio);
++		up_read(&vnswap->lock);
++	} else {
++		down_write(&vnswap->lock);
++		dprintk("%s %d: (rw,index) = (%d, %d)\n",
++			__func__, __LINE__, rw, index);
++		ret = vnswap_bvec_write(vnswap, bvec, index, bio);
++		up_write(&vnswap->lock);
++	}
++
++	return ret;
++}
++
++void __vnswap_make_request(struct vnswap *vnswap,
++	struct bio *bio, int rw)
++{
++	int i, offset, ret;
++	u32 index, is_swap_header_page;
++	struct bio_vec *bvec;
++
++	index = bio->bi_sector >> SECTORS_PER_PAGE_SHIFT;
++	offset = (bio->bi_sector & (SECTORS_PER_PAGE - 1)) <<
++				SECTOR_SHIFT;
++
++	if (index == 0)
++		is_swap_header_page = 1;
++	else
++		is_swap_header_page = 0;
++
++	dprintk("%s %d: (rw, index, offset, bi_size) = " \
++			"(%d, %d, %d, %d)\n",
++			__func__, __LINE__,
++			rw, index, offset, bio->bi_size);
++
++	if (offset) {
++		atomic_inc(&vnswap_device->stats.
++			vnswap_bio_invalid_num);
++		pr_err("%s %d: invalid offset. " \
++				"(bio->bi_sector, index, offset," \
++				"vnswap_bio_invalid_num) = (%llu, %d, %d, %d)\n",
++				__func__, __LINE__, bio->bi_sector,
++				index, offset,
++				vnswap_device->stats.
++					vnswap_bio_invalid_num.counter);
++		goto out_error;
++	}
++
++	if (bio->bi_size > PAGE_SIZE) {
++		atomic_inc(&vnswap_device->stats.
++			vnswap_bio_large_bi_size_num);
++		goto out_error;
++	}
++
++	if (bio->bi_vcnt > 1) {
++		atomic_inc(&vnswap_device->stats.
++			vnswap_bio_large_bi_vcnt_num);
++		goto out_error;
++	}
++
++	bio_for_each_segment(bvec, bio, i) {
++		if (bvec->bv_len != PAGE_SIZE || bvec->bv_offset != 0) {
++			atomic_inc(&vnswap_device->stats.
++				vnswap_bio_invalid_num);
++			pr_err("%s %d: bvec is misaligned. " \
++					"(bv_len, bv_offset," \
++					"vnswap_bio_invalid_num) = (%d, %d, %d)\n",
++					__func__, __LINE__,
++					bvec->bv_len, bvec->bv_offset,
++					vnswap_device->stats.
++						vnswap_bio_invalid_num.counter);
++			goto out_error;
++		}
++
++		dprintk("%s %d: (rw, index, bvec->bv_len) = " \
++				"(%d, %d, %d)\n",
++				__func__, __LINE__, rw, index, bvec->bv_len);
++
++		ret = vnswap_bvec_rw(vnswap, bvec, index, bio, rw);
++		if (ret < 0) {
++			if (ret != -ENOSPC)
++				pr_err("%s %d: vnswap_bvec_rw failed." \
++						"(ret) = (%d)\n",
++						__func__, __LINE__, ret);
++			else
++				dprintk("%s %d: vnswap_bvec_rw failed. " \
++				"(ret) = (%d)\n",
++						__func__, __LINE__, ret);
++			goto out_error;
++		}
++
++		index++;
++	}
++
++	if (is_swap_header_page) {
++		set_bit(BIO_UPTODATE, &bio->bi_flags);
++		bio_endio(bio, 0);
++	}
++
++	return;
++
++out_error:
++	bio_io_error(bio);
++}
++
++/*
++ * Check if request is within bounds and aligned on vnswap logical blocks.
++ */
++static inline int vnswap_valid_io_request(struct vnswap *vnswap,
++	struct bio *bio)
++{
++	if (unlikely(
++		(bio->bi_sector >= (vnswap->disksize >> SECTOR_SHIFT)) ||
++		(bio->bi_sector & (VNSWAP_SECTOR_PER_LOGICAL_BLOCK - 1)) ||
++		(bio->bi_size & (VNSWAP_LOGICAL_BLOCK_SIZE - 1)))) {
++
++		return 0;
++	}
++
++	/* I/O request is valid */
++	return 1;
++}
++
++/*
++ * Handler function for all vnswap I/O requests.
++ */
++void vnswap_make_request(struct request_queue *queue, struct bio *bio)
++{
++	struct vnswap *vnswap = queue->queuedata;
++
++	/* disable NAND I/O when DiskSize is not initialized */
++	if (!(vnswap_device->init_success & VNSWAP_INIT_DISKSIZE_SUCCESS))
++		goto error;
++
++	/*
++	 * disable NAND I/O when Backing Storage is not initialized and
++	 * is not swap_header_page
++	 */
++	if (!(vnswap_device->init_success &
++		VNSWAP_INIT_BACKING_STORAGE_SUCCESS)
++		&& (bio->bi_sector >> SECTORS_PER_PAGE_SHIFT))
++		goto error;
++
++	if (!vnswap_valid_io_request(vnswap, bio)) {
++		atomic_inc(&vnswap_device->stats.
++			vnswap_bio_invalid_num);
++		pr_err("%s %d: invalid io request. " \
++				"(bio->bi_sector, bio->bi_size," \
++				"vnswap->disksize, vnswap_bio_invalid_num) = " \
++				"(%llu, %d, %llu, %d)\n",
++				__func__, __LINE__,
++				bio->bi_sector, bio->bi_size,
++				vnswap->disksize,
++				vnswap_device->stats.
++					vnswap_bio_invalid_num.counter);
++		goto error;
++	}
++
++	__vnswap_make_request(vnswap, bio, bio_data_dir(bio));
++	return;
++
++error:
++	bio_io_error(bio);
++}
++
++void vnswap_slot_free_notify(struct block_device *bdev, unsigned long index)
++{
++	struct vnswap *vnswap;
++	int nand_offset = 0;
++
++	vnswap = bdev->bd_disk->private_data;
++
++	spin_lock(&vnswap_table_lock);
++	nand_offset = vnswap_table[index];
++
++	/* This index is not mapped to vnswap and is mapped to zswap */
++	if (nand_offset == -1) {
++		atomic_inc(&vnswap_device->stats.
++			vnswap_not_mapped_slot_free_num);
++		spin_unlock(&vnswap_table_lock);
++		return;
++	}
++
++	atomic_inc(&vnswap_device->stats.
++		vnswap_mapped_slot_free_num);
++	atomic_dec(&vnswap_device->stats.
++		vnswap_stored_pages);
++	atomic_dec(&vnswap_device->stats.
++		vnswap_used_slot_num);
++	clear_bit(nand_offset, backing_storage_bitmap);
++	vnswap_table[index] = -1;
++
++	/* When Backing Storage is full, set Backing Storage is not full */
++	if (backing_storage_bitmap_last_allocated_index ==
++		vnswap_device->bs_size) {
++		backing_storage_bitmap_last_allocated_index = nand_offset;
++	}
++	spin_unlock(&vnswap_table_lock);
++
++	/*
++	 * disable blkdev_issue_discard
++	 * - BUG: scheduling while atomic: rild/4248/0x00000003
++	*   blkdev_issue_discard() -> wait_for_completion() ->
++	 *	wait_for_common() -> schedule_timeout() -> schedule()
++	 */
++#if 0
++	/* discard nand_offset position Backing Storage for security */
++	ret = blkdev_issue_discard(backing_storage_bdev,
++			(backing_storage_bmap[nand_offset] << (PAGE_SHIFT - 9)),
++			1 << (PAGE_SHIFT - 9), GFP_KERNEL, 0);
++	if (ret)
++		dprintk("vnswap_slot_free_notify: " \
++		"blkdev_issue_discard is failed\n");
++#endif
++}
++
++const struct block_device_operations vnswap_devops = {
++	.swap_slot_free_notify = vnswap_slot_free_notify,
++	.owner = THIS_MODULE
++};
++
++static int create_device(struct vnswap *vnswap)
++{
++	int ret = 0;
++
++	init_rwsem(&vnswap->lock);
++
++	vnswap->queue = blk_alloc_queue(GFP_KERNEL);
++	if (!vnswap->queue) {
++		pr_err("%s %d: Error allocating disk queue for device\n",
++				__func__, __LINE__);
++		ret = -ENOMEM;
++		goto out;
++	}
++
++	blk_queue_make_request(vnswap->queue, vnswap_make_request);
++	vnswap->queue->queuedata = vnswap;
++
++	 /* gendisk structure */
++	vnswap->disk = alloc_disk(1);
++	if (!vnswap->disk) {
++		blk_cleanup_queue(vnswap->queue);
++		pr_err("%s %d: Error allocating disk structure for device\n",
++				__func__, __LINE__);
++		ret = -ENOMEM;
++		goto out_free_queue;
++	}
++
++	vnswap->disk->major = vnswap_major;
++	vnswap->disk->first_minor = 0;
++	vnswap->disk->fops = &vnswap_devops;
++	vnswap->disk->queue = vnswap->queue;
++	vnswap->disk->private_data = vnswap;
++	snprintf(vnswap->disk->disk_name, 16, "vnswap%d", 0);
++
++	/* Actual capacity set using sysfs (/sys/block/vnswap<id>/disksize) */
++	set_capacity(vnswap->disk, 0);
++
++	/*
++	 * To ensure that we always get PAGE_SIZE aligned
++	 * and n*PAGE_SIZED sized I/O requests.
++	 */
++	blk_queue_physical_block_size(vnswap->disk->queue,
++		PAGE_SIZE);
++	blk_queue_logical_block_size(vnswap->disk->queue,
++		VNSWAP_LOGICAL_BLOCK_SIZE);
++	blk_queue_io_min(vnswap->disk->queue, PAGE_SIZE);
++	blk_queue_io_opt(vnswap->disk->queue, PAGE_SIZE);
++	blk_queue_max_hw_sectors(vnswap->disk->queue,
++		PAGE_SIZE / SECTOR_SIZE);
++
++	add_disk(vnswap->disk);
++
++	vnswap->disksize = 0;
++	vnswap->bs_size = 0;
++	vnswap->init_success = 0;
++
++	ret = sysfs_create_group(&disk_to_dev(vnswap->disk)->kobj,
++			&vnswap_disk_attr_group);
++	if (ret < 0) {
++		pr_err("%s %d: Error creating sysfs group\n",
++			__func__, __LINE__);
++		goto out_put_disk;
++	}
++
++	/* vnswap devices sort of resembles non-rotational disks */
++	queue_flag_set_unlocked(QUEUE_FLAG_NONROT,
++		vnswap->disk->queue);
++
++	swap_header_page =  alloc_page(__GFP_HIGHMEM);
++
++	if (!swap_header_page) {
++		pr_err("%s %d: Error creating swap_header_page\n",
++			__func__, __LINE__);
++		ret = -ENOMEM;
++		goto remove_vnswap_group;
++	}
++
++out:
++	return ret;
++
++remove_vnswap_group:
++	sysfs_remove_group(&disk_to_dev(vnswap->disk)->kobj,
++		&vnswap_disk_attr_group);
++
++out_put_disk:
++	put_disk(vnswap->disk);
++
++out_free_queue:
++	blk_cleanup_queue(vnswap->queue);
++
++	return ret;
++}
++
++void destroy_device(struct vnswap *vnswap)
++{
++	sysfs_remove_group(&disk_to_dev(vnswap->disk)->kobj,
++		&vnswap_disk_attr_group);
++
++	if (vnswap->disk) {
++		del_gendisk(vnswap->disk);
++		put_disk(vnswap->disk);
++	}
++
++	if (vnswap->queue)
++		blk_cleanup_queue(vnswap->queue);
++}
++
++int __init vnswap_init(void)
++{
++	int ret = 0;
++
++	vnswap_major = register_blkdev(0, "vnswap");
++	if (vnswap_major <= 0) {
++		pr_err("%s %d: Unable to get major number\n",
++			__func__, __LINE__);
++		ret = -EBUSY;
++		goto out;
++	}
++
++	/* Initialize global variables */
++	vnswap_table = NULL;
++	backing_storage_bitmap = NULL;
++	backing_storage_bmap = NULL;
++	backing_storage_bdev = NULL;
++	backing_storage_file = NULL;
++
++	/* Allocate and initialize the device */
++	vnswap_device = kzalloc(sizeof(struct vnswap), GFP_KERNEL);
++	if (!vnswap_device) {
++		ret = -ENOMEM;
++		pr_err("%s %d: Unable to allocate vnswap_device\n",
++			__func__, __LINE__);
++		goto unregister;
++	}
++
++	ret = create_device(vnswap_device);
++	if (ret) {
++		pr_err("%s %d: Unable to create vnswap_device\n",
++			__func__, __LINE__);
++		goto free_devices;
++	}
++
++	vnswap_device->stats.vnswap_is_init = 1;
++
++	return 0;
++
++free_devices:
++	kfree(vnswap_device);
++
++unregister:
++	unregister_blkdev(vnswap_major, "vnswap");
++
++out:
++	return ret;
++}
++
++void __exit vnswap_exit(void)
++{
++	destroy_device(vnswap_device);
++
++	unregister_blkdev(vnswap_major, "vnswap");
++
++	if (backing_storage_file)
++		filp_close(backing_storage_file, NULL);
++	if (swap_header_page)
++		__free_page(swap_header_page);
++	kfree(vnswap_device);
++	if (backing_storage_bmap)
++		vfree(backing_storage_bmap);
++	if (backing_storage_bitmap)
++		vfree(backing_storage_bitmap);
++	if (vnswap_table)
++		vfree(vnswap_table);
++
++	dprintk("%s %d: Cleanup done!\n", __func__, __LINE__);
++}
++
++module_init(vnswap_init);
++module_exit(vnswap_exit);
++
++MODULE_LICENSE("Dual BSD/GPL");
++MODULE_AUTHOR("SungHwan Yun <sunghwan.yun@samsung.com>");
++MODULE_DESCRIPTION("Virtual Nand Swap Device which simulates Swap Area");
+diff --git a/drivers/staging/vnswap/vnswap.h b/drivers/staging/vnswap/vnswap.h
+new file mode 100644
+index 0000000..f36cb08
+--- /dev/null
++++ b/drivers/staging/vnswap/vnswap.h
+@@ -0,0 +1,119 @@
++/*
++ * Virtual Nand Swap Device which simulates Swap Area
++ *
++ * Copyright (C) 2013 SungHwan Yun
++ *
++ * This code is released using a dual license strategy: BSD/GPL
++ * You can choose the licence that better fits your requirements.
++ *
++ * Released under the terms of 3-clause BSD License
++ * Released under the terms of GNU General Public License Version 2.0
++ */
++
++#ifndef _VNSWAP_DRV_H_
++#define _VNSWAP_DRV_H_
++
++#include <linux/spinlock.h>
++#include <linux/mutex.h>
++#include <linux/blkdev.h>
++
++#define VNSWAP_DEBUG    0
++
++#if VNSWAP_DEBUG > 0
++#define dprintk        printk
++#else
++#define dprintk(x...)  do { ; } while (0)
++#endif
++
++/*
++ * Max Swap Area Size (4GB)
++ *  - 1024*1024 page = 4KB*1024*1024 = 4GB
++ */
++#define MAX_SWAP_AREA_SIZE_PAGES	(_AC(1 , UL) << 20)
++
++/*
++ * Max Backing Storage Size (1GB)
++ *  - 256*1024 page = 4KB*256*1024 = 1GB
++ */
++#define MAX_BACKING_STORAGE_SIZE_PAGES	(_AC(1 , UL) << 18)
++
++#define VNSWAP_INIT_DISKSIZE_SUCCESS 0x1
++#define VNSWAP_INIT_DISKSIZE_FAIL 0x2
++#define VNSWAP_INIT_BACKING_STORAGE_SUCCESS 0x10
++#define VNSWAP_INIT_BACKING_STORAGE_FAIL 0x20
++
++#define SECTOR_SHIFT		9
++#define SECTOR_SIZE		(1 << SECTOR_SHIFT)
++#define SECTORS_PER_PAGE_SHIFT	(PAGE_SHIFT - SECTOR_SHIFT)
++#define SECTORS_PER_PAGE	(1 << SECTORS_PER_PAGE_SHIFT)
++#define VNSWAP_LOGICAL_BLOCK_SHIFT 12
++#define VNSWAP_LOGICAL_BLOCK_SIZE	(1 << VNSWAP_LOGICAL_BLOCK_SHIFT)
++#define VNSWAP_SECTOR_PER_LOGICAL_BLOCK	(1 << \
++	(VNSWAP_LOGICAL_BLOCK_SHIFT - SECTOR_SHIFT))
++
++#define MAX_BACKING_STORAGE_FILENAME_LEN	127
++
++struct vnswap_stats {
++	u64 vnswap_is_init;	/* vnswap_init success or fail */
++	u64 vnswap_total_slot_num;	/* total  slot number */
++	atomic_t vnswap_stored_pages;
++		/* The number of pages currently stored in backing storagel */
++	atomic_t vnswap_used_slot_num;
++		/* currently used slot number */
++	atomic_t vnswap_mapped_slot_free_num;
++		/* total mapped slot free number */
++	atomic_t vnswap_double_mapped_slot_num;
++		/* total double mapped slot number */
++	atomic_t vnswap_read_pages;	/* total read pages */
++	atomic_t vnswap_write_pages;	/* total write pages */
++	atomic_t vnswap_bio_end_fail_r1_num;
++		/* total bio_end fail pages */
++	atomic_t vnswap_bio_end_fail_r2_num;
++	atomic_t vnswap_bio_end_fail_r3_num;
++	atomic_t vnswap_bio_end_fail_w1_num;
++	atomic_t vnswap_bio_end_fail_w2_num;
++	atomic_t vnswap_bio_end_fail_w3_num;
++	atomic_t vnswap_bio_large_bi_size_num;
++		/* total large bio bi_size (>4kb) number */
++	atomic_t vnswap_bio_large_bi_vcnt_num;
++		/* total large bio bi_vcnt (>1) number */
++	atomic_t vnswap_bio_invalid_num;
++		/* total invalid (not aligned 4kb) bio number */
++	atomic_t vnswap_bio_no_mem_num;
++		/* total bio alloc fail number */
++	atomic_t vnswap_not_mapped_read_pages;
++		/* total not-mapped read pages */
++	atomic_t vnswap_not_mapped_slot_free_num;
++		/* total not-mapped-slot free number */
++	atomic_t vnswap_backing_storage_full_num;
++		/* total write_fail_because_of_backing_storage_full number */
++	int vnswap_backing_storage_open_fail;
++		/* backing storage file open fail */
++};
++
++struct vnswap {
++	struct rw_semaphore lock;
++		/* protect buffers against concurrent read and writes */
++	struct request_queue *queue;
++	struct gendisk *disk;
++	u64 disksize;	/* bytes */
++	char backing_storage_filename[MAX_BACKING_STORAGE_FILENAME_LEN+1];
++	u64 bs_size;	/* backing storage size (pages) */
++	int init_success;
++		/* vnswap init success: VNSWAP_INIT_DISKSIZE_SUCCESS |
++		* VNSWAP_INIT_BACKING_STORAGE_SUCCESS ,
++		* others: vnswap init fail*/
++	struct vnswap_stats stats;
++};
++
++extern void vnswap_init_disksize(u64 disksize);
++extern int vnswap_init_backing_storage(void);
++
++extern struct vnswap *vnswap_device;
++extern struct block_device *backing_storage_bdev;
++
++#ifdef CONFIG_SYSFS
++extern struct attribute_group vnswap_disk_attr_group;
++#endif
++
++#endif
+diff --git a/drivers/staging/vnswap/vnswap_sysfs.c b/drivers/staging/vnswap/vnswap_sysfs.c
+new file mode 100644
+index 0000000..fc5c1a0
+--- /dev/null
++++ b/drivers/staging/vnswap/vnswap_sysfs.c
+@@ -0,0 +1,144 @@
++/*
++ * Virtual Nand Swap Device which simulates Swap Area
++ *
++ * Copyright (C) 2013 SungHwan Yun
++ *
++ * This code is released using a dual license strategy: BSD/GPL
++ * You can choose the licence that better fits your requirements.
++ *
++ * Released under the terms of 3-clause BSD License
++ * Released under the terms of GNU General Public License Version 2.0
++ */
++
++#include <linux/device.h>
++#include <linux/genhd.h>
++#include <linux/mm.h>
++#include <linux/fs.h>
++#include <linux/atomic.h>
++#include <linux/types.h>
++
++#include "vnswap.h"
++
++static ssize_t disksize_show(struct device *dev,
++	struct device_attribute *attr, char *buf)
++{
++	return sprintf(buf, "%llu\n", vnswap_device->disksize);
++}
++
++static ssize_t disksize_store(struct device *dev,
++	struct device_attribute *attr, const char *buf, size_t len)
++{
++	int ret;
++	u64 disksize;
++
++	ret = kstrtoull(buf, 10, &disksize);
++	if (ret)
++		return ret;
++
++	vnswap_init_disksize(disksize);
++	return len;
++}
++
++static ssize_t swap_filename_show(struct device *dev,
++	struct device_attribute *attr, char *buf)
++{
++	if (!vnswap_device)
++		return 0;
++	dprintk("%s %d: backing_storage_filename = %s\n",
++			__func__, __LINE__,
++			vnswap_device->backing_storage_filename);
++	return sprintf(buf, "%s\n", vnswap_device->backing_storage_filename);
++}
++
++static ssize_t swap_filename_store(struct device *dev,
++	struct device_attribute *attr, const char *buf, size_t len)
++{
++	if (!vnswap_device) {
++		pr_err("%s %d: vnswap_device is null\n", __func__, __LINE__);
++		return len;
++	}
++	memcpy((void *)vnswap_device->backing_storage_filename,
++			(void *)buf, len);
++	dprintk("%s %d: (buf, len, backing_storage_filename) = " \
++			"(%s, %d, %s)\n",
++			__func__, __LINE__,
++			buf, len, vnswap_device->backing_storage_filename);
++	return len;
++}
++
++static ssize_t init_backing_storage_show(struct device *dev,
++	struct device_attribute *attr, char *buf)
++{
++	return sprintf(buf, "(disksize, bs_size) = (%llu, %llu)\n",
++		vnswap_device ? vnswap_device->disksize : 0,
++		vnswap_device ? vnswap_device->bs_size : 0);
++}
++
++static ssize_t init_backing_storage_store(struct device *dev,
++	struct device_attribute *attr, const char *buf, size_t len)
++{
++	vnswap_init_backing_storage();
++	return len;
++}
++
++static ssize_t vnswap_init_show(struct device *dev,
++	struct device_attribute *attr, char *buf)
++{
++	return sprintf(buf, "(vnswap_is_init, init_success) = (%llu, %d)\n",
++			vnswap_device->stats.vnswap_is_init,
++			(vnswap_device) ? vnswap_device->init_success : 0);
++}
++
++static ssize_t vnswap_swap_info_show(struct device *dev,
++	struct device_attribute *attr, char *buf)
++{
++	return sprintf(buf, "(%d, %d, %d) (%llu, %d, %d, %d, %d, %d) " \
++						"(%d, %d, %d, %d, %d, %d, " \
++						"%d, %d, %d, %d, %d, %d)\n",
++		vnswap_device->stats.vnswap_stored_pages.counter,
++		vnswap_device->stats.vnswap_write_pages.counter,
++		vnswap_device->stats.vnswap_read_pages.counter,
++		vnswap_device->stats.vnswap_total_slot_num,
++		vnswap_device->stats.vnswap_used_slot_num.counter,
++		vnswap_device->stats.vnswap_backing_storage_full_num.counter,
++		vnswap_device->stats.vnswap_mapped_slot_free_num.counter,
++		vnswap_device->stats.vnswap_not_mapped_slot_free_num.counter,
++		vnswap_device->stats.vnswap_double_mapped_slot_num.counter,
++		vnswap_device->stats.vnswap_bio_end_fail_r1_num.counter,
++		vnswap_device->stats.vnswap_bio_end_fail_r2_num.counter,
++		vnswap_device->stats.vnswap_bio_end_fail_r3_num.counter,
++		vnswap_device->stats.vnswap_bio_end_fail_w1_num.counter,
++		vnswap_device->stats.vnswap_bio_end_fail_w2_num.counter,
++		vnswap_device->stats.vnswap_bio_end_fail_w3_num.counter,
++		vnswap_device->stats.vnswap_bio_large_bi_size_num.counter,
++		vnswap_device->stats.vnswap_bio_large_bi_vcnt_num.counter,
++		vnswap_device->stats.vnswap_bio_invalid_num.counter,
++		vnswap_device->stats.vnswap_bio_no_mem_num.counter,
++		vnswap_device->stats.vnswap_not_mapped_read_pages.counter,
++		vnswap_device->stats.vnswap_backing_storage_open_fail
++	);
++}
++
++static DEVICE_ATTR(disksize, S_IRUGO | S_IWUSR, disksize_show,
++	disksize_store);
++static DEVICE_ATTR(swap_filename, S_IRUGO | S_IWUSR, swap_filename_show,
++	swap_filename_store);
++static DEVICE_ATTR(init_backing_storage, S_IRUGO | S_IWUSR,
++	init_backing_storage_show, init_backing_storage_store);
++static DEVICE_ATTR(vnswap_init, S_IRUGO | S_IWUSR,
++	vnswap_init_show, NULL);
++static DEVICE_ATTR(vnswap_swap_info, S_IRUGO | S_IWUSR,
++	vnswap_swap_info_show, NULL);
++
++static struct attribute *vnswap_disk_attrs[] = {
++	&dev_attr_disksize.attr,
++	&dev_attr_swap_filename.attr,
++	&dev_attr_init_backing_storage.attr,
++	&dev_attr_vnswap_init.attr,
++	&dev_attr_vnswap_swap_info.attr,
++	NULL,
++};
++
++struct attribute_group vnswap_disk_attr_group = {
++	.attrs = vnswap_disk_attrs,
++};
+diff --git a/fs/debugfs/file.c b/fs/debugfs/file.c
+index 5dfafdd..2780149 100644
+--- a/fs/debugfs/file.c
++++ b/fs/debugfs/file.c
+@@ -20,6 +20,9 @@
+ #include <linux/namei.h>
+ #include <linux/debugfs.h>
+ #include <linux/io.h>
++#ifdef CONFIG_ZSWAP
++#include <linux/atomic.h>
++#endif
+ 
+ static ssize_t default_read_file(struct file *file, char __user *buf,
+ 				 size_t count, loff_t *ppos)
+@@ -402,6 +405,49 @@ struct dentry *debugfs_create_size_t(const char *name, umode_t mode,
+ }
+ EXPORT_SYMBOL_GPL(debugfs_create_size_t);
+ 
++#ifdef CONFIG_ZSWAP
++static int debugfs_atomic_t_set(void *data, u64 val)
++{
++	atomic_set((atomic_t *)data, val);
++	return 0;
++}
++static int debugfs_atomic_t_get(void *data, u64 *val)
++{
++	*val = atomic_read((atomic_t *)data);
++	return 0;
++}
++DEFINE_SIMPLE_ATTRIBUTE(fops_atomic_t, debugfs_atomic_t_get,
++			debugfs_atomic_t_set, "%llu\n");
++DEFINE_SIMPLE_ATTRIBUTE(fops_atomic_t_ro, debugfs_atomic_t_get, NULL, "%llu\n");
++DEFINE_SIMPLE_ATTRIBUTE(fops_atomic_t_wo, NULL, debugfs_atomic_t_set, "%llu\n");
++
++/**
++ * debugfs_create_atomic_t - create a debugfs file that is used to read and
++ * write an atomic_t value
++ * @name: a pointer to a string containing the name of the file to create.
++ * @mode: the permission that the file should have
++ * @parent: a pointer to the parent dentry for this file.  This should be a
++ *          directory dentry if set.  If this parameter is %NULL, then the
++ *          file will be created in the root of the debugfs filesystem.
++ * @value: a pointer to the variable that the file should read to and write
++ *         from.
++ */
++struct dentry *debugfs_create_atomic_t(const char *name, umode_t mode,
++				 struct dentry *parent, atomic_t *value)
++{
++	/* if there are no write bits set, make read only */
++	if (!(mode & S_IWUGO))
++		return debugfs_create_file(name, mode, parent, value,
++					&fops_atomic_t_ro);
++	/* if there are no read bits set, make write only */
++	if (!(mode & S_IRUGO))
++		return debugfs_create_file(name, mode, parent, value,
++					&fops_atomic_t_wo);
++
++	return debugfs_create_file(name, mode, parent, value, &fops_atomic_t);
++}
++EXPORT_SYMBOL_GPL(debugfs_create_atomic_t);
++#endif /* CONFIG_ZSWAP */
+ 
+ static ssize_t read_file_bool(struct file *file, char __user *user_buf,
+ 			      size_t count, loff_t *ppos)
+diff --git a/include/linux/atomic.h b/include/linux/atomic.h
+index 70cfcb2..00c5e55 100644
+--- a/include/linux/atomic.h
++++ b/include/linux/atomic.h
+@@ -86,6 +86,33 @@ static inline int atomic_dec_unless_positive(atomic_t *p)
+ }
+ #endif
+ 
++#ifdef CONFIG_ZSWAP
++/*
++ * atomic_dec_if_positive - decrement by 1 if old value positive
++ * @v: pointer of type atomic_t
++ *
++ * The function returns the old value of *v minus 1, even if
++ * the atomic variable, v, was not decremented.
++ */
++#ifndef atomic_dec_if_positive
++static inline int atomic_dec_if_positive(atomic_t *v)
++{
++	int c, old, dec;
++	c = atomic_read(v);
++	for (;;) {
++		dec = c - 1;
++		if (unlikely(dec < 0))
++			break;
++		old = atomic_cmpxchg((v), c, dec);
++		if (likely(old == c))
++			break;
++		c = old;
++	}
++	return dec;
++}
++#endif
++#endif /* CONFIG_ZSWAP */
++
+ #ifndef CONFIG_ARCH_HAS_ATOMIC_OR
+ static inline void atomic_or(int i, atomic_t *v)
+ {
+diff --git a/include/linux/debugfs.h b/include/linux/debugfs.h
+index ae36b72..b76588e 100644
+--- a/include/linux/debugfs.h
++++ b/include/linux/debugfs.h
+@@ -79,6 +79,10 @@ struct dentry *debugfs_create_x64(const char *name, umode_t mode,
+ 				  struct dentry *parent, u64 *value);
+ struct dentry *debugfs_create_size_t(const char *name, umode_t mode,
+ 				     struct dentry *parent, size_t *value);
++#ifdef CONFIG_ZSWAP
++struct dentry *debugfs_create_atomic_t(const char *name, umode_t mode,
++				     struct dentry *parent, atomic_t *value);
++#endif
+ struct dentry *debugfs_create_bool(const char *name, umode_t mode,
+ 				  struct dentry *parent, u32 *value);
+ 
+diff --git a/include/linux/frontswap.h b/include/linux/frontswap.h
+new file mode 100644
+index 0000000..0e4e2ee
+--- /dev/null
++++ b/include/linux/frontswap.h
+@@ -0,0 +1,127 @@
++#ifndef _LINUX_FRONTSWAP_H
++#define _LINUX_FRONTSWAP_H
++
++#include <linux/swap.h>
++#include <linux/mm.h>
++#include <linux/bitops.h>
++
++struct frontswap_ops {
++	void (*init)(unsigned);
++	int (*store)(unsigned, pgoff_t, struct page *);
++	int (*load)(unsigned, pgoff_t, struct page *);
++	void (*invalidate_page)(unsigned, pgoff_t);
++	void (*invalidate_area)(unsigned);
++};
++
++extern bool frontswap_enabled;
++extern struct frontswap_ops
++	frontswap_register_ops(struct frontswap_ops *ops);
++extern void frontswap_shrink(unsigned long);
++extern unsigned long frontswap_curr_pages(void);
++extern void frontswap_writethrough(bool);
++
++extern void __frontswap_init(unsigned type);
++extern int __frontswap_store(struct page *page);
++extern int __frontswap_load(struct page *page);
++extern void __frontswap_invalidate_page(unsigned, pgoff_t);
++extern void __frontswap_invalidate_area(unsigned);
++
++#ifdef CONFIG_FRONTSWAP
++
++static inline bool frontswap_test(struct swap_info_struct *sis, pgoff_t offset)
++{
++	bool ret = false;
++
++	if (frontswap_enabled && sis->frontswap_map)
++		ret = test_bit(offset, sis->frontswap_map);
++	return ret;
++}
++
++static inline void frontswap_set(struct swap_info_struct *sis, pgoff_t offset)
++{
++	if (frontswap_enabled && sis->frontswap_map)
++		set_bit(offset, sis->frontswap_map);
++}
++
++static inline void frontswap_clear(struct swap_info_struct *sis, pgoff_t offset)
++{
++	if (frontswap_enabled && sis->frontswap_map)
++		clear_bit(offset, sis->frontswap_map);
++}
++
++static inline void frontswap_map_set(struct swap_info_struct *p,
++				     unsigned long *map)
++{
++	p->frontswap_map = map;
++}
++
++static inline unsigned long *frontswap_map_get(struct swap_info_struct *p)
++{
++	return p->frontswap_map;
++}
++#else
++/* all inline routines become no-ops and all externs are ignored */
++
++#define frontswap_enabled (0)
++
++static inline bool frontswap_test(struct swap_info_struct *sis, pgoff_t offset)
++{
++	return false;
++}
++
++static inline void frontswap_set(struct swap_info_struct *sis, pgoff_t offset)
++{
++}
++
++static inline void frontswap_clear(struct swap_info_struct *sis, pgoff_t offset)
++{
++}
++
++static inline void frontswap_map_set(struct swap_info_struct *p,
++				     unsigned long *map)
++{
++}
++
++static inline unsigned long *frontswap_map_get(struct swap_info_struct *p)
++{
++	return NULL;
++}
++#endif
++
++static inline int frontswap_store(struct page *page)
++{
++	int ret = -1;
++
++	if (frontswap_enabled)
++		ret = __frontswap_store(page);
++	return ret;
++}
++
++static inline int frontswap_load(struct page *page)
++{
++	int ret = -1;
++
++	if (frontswap_enabled)
++		ret = __frontswap_load(page);
++	return ret;
++}
++
++static inline void frontswap_invalidate_page(unsigned type, pgoff_t offset)
++{
++	if (frontswap_enabled)
++		__frontswap_invalidate_page(type, offset);
++}
++
++static inline void frontswap_invalidate_area(unsigned type)
++{
++	if (frontswap_enabled)
++		__frontswap_invalidate_area(type);
++}
++
++static inline void frontswap_init(unsigned type)
++{
++	if (frontswap_enabled)
++		__frontswap_init(type);
++}
++
++#endif /* _LINUX_FRONTSWAP_H */
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index 6eba591..a845490 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -160,6 +160,9 @@ extern pgprot_t protection_map[16];
+ #define FAULT_FLAG_ALLOW_RETRY	0x08	/* Retry fault if blocking */
+ #define FAULT_FLAG_RETRY_NOWAIT	0x10	/* Don't drop mmap_sem and wait when retrying */
+ #define FAULT_FLAG_KILLABLE	0x20	/* The fault task is in SIGKILL killable region */
++#ifdef CONFIG_ZSWAP
++#define FAULT_FLAG_TRIED	0x40	/* second try */
++#endif
+ 
+ /*
+  * This interface is used by x86 PAT code to identify a pfn mapping that is
+diff --git a/include/linux/rmap.h b/include/linux/rmap.h
+index fd07c45..90c4a82 100644
+--- a/include/linux/rmap.h
++++ b/include/linux/rmap.h
+@@ -35,6 +35,9 @@ struct anon_vma {
+ 	 * anon_vma if they are the last user on release
+ 	 */
+ 	atomic_t refcount;
++#ifdef CONFIG_ZSWAP
++	atomic_t swapra_miss;
++#endif
+ 
+ 	/*
+ 	 * NOTE: the LSB of the head.next is set by
+diff --git a/include/linux/swap.h b/include/linux/swap.h
+index b1fd5c7..df24b8a 100644
+--- a/include/linux/swap.h
++++ b/include/linux/swap.h
+@@ -197,6 +197,10 @@ struct swap_info_struct {
+ 	struct block_device *bdev;	/* swap device or bdev of swap file */
+ 	struct file *swap_file;		/* seldom referenced */
+ 	unsigned int old_block_size;	/* seldom referenced */
++#ifdef CONFIG_FRONTSWAP
++	unsigned long *frontswap_map;	/* frontswap in-use, one bit per page */
++	atomic_t frontswap_pages;	/* frontswap pages in-use counter */
++#endif
+ };
+ 
+ struct swap_list_t {
+@@ -316,6 +320,11 @@ static inline void mem_cgroup_uncharge_swap(swp_entry_t ent)
+ /* linux/mm/page_io.c */
+ extern int swap_readpage(struct page *);
+ extern int swap_writepage(struct page *page, struct writeback_control *wbc);
++#ifdef CONFIG_ZSWAP
++extern void end_swap_bio_write(struct bio *bio, int err);
++extern int __swap_writepage(struct page *page, struct writeback_control *wbc,
++	void (*end_write_func)(struct bio *, int));
++#endif
+ extern void end_swap_bio_read(struct bio *bio, int err);
+ 
+ /* linux/mm/swap_state.c */
+@@ -324,6 +333,9 @@ extern struct address_space swapper_space;
+ extern void show_swap_cache_info(void);
+ extern int add_to_swap(struct page *);
+ extern int add_to_swap_cache(struct page *, swp_entry_t, gfp_t);
++#ifdef CONFIG_ZSWAP
++extern int __add_to_swap_cache(struct page *page, swp_entry_t entry);
++#endif
+ extern void __delete_from_swap_cache(struct page *);
+ extern void delete_from_swap_cache(struct page *);
+ extern void free_page_and_swap_cache(struct page *);
+diff --git a/include/linux/swapfile.h b/include/linux/swapfile.h
+new file mode 100644
+index 0000000..e282624
+--- /dev/null
++++ b/include/linux/swapfile.h
+@@ -0,0 +1,13 @@
++#ifndef _LINUX_SWAPFILE_H
++#define _LINUX_SWAPFILE_H
++
++/*
++ * these were static in swapfile.c but frontswap.c needs them and we don't
++ * want to expose them to the dozens of source files that include swap.h
++ */
++extern spinlock_t swap_lock;
++extern struct swap_list_t swap_list;
++extern struct swap_info_struct *swap_info[];
++extern int try_to_unuse(unsigned int, bool, unsigned long);
++
++#endif /* _LINUX_SWAPFILE_H */
+diff --git a/include/linux/zsmalloc.h b/include/linux/zsmalloc.h
+new file mode 100644
+index 0000000..398dae3
+--- /dev/null
++++ b/include/linux/zsmalloc.h
+@@ -0,0 +1,56 @@
++/*
++ * zsmalloc memory allocator
++ *
++ * Copyright (C) 2011  Nitin Gupta
++ *
++ * This code is released using a dual license strategy: BSD/GPL
++ * You can choose the license that better fits your requirements.
++ *
++ * Released under the terms of 3-clause BSD License
++ * Released under the terms of GNU General Public License Version 2.0
++ */
++
++#ifndef _ZS_MALLOC_H_
++#define _ZS_MALLOC_H_
++
++#include <linux/types.h>
++#include <linux/mm_types.h>
++
++/*
++ * zsmalloc mapping modes
++ *
++ * NOTE: These only make a difference when a mapped object spans pages.
++ *       They also have no effect when PGTABLE_MAPPING is selected.
++*/
++enum zs_mapmode {
++	ZS_MM_RW, /* normal read-write mapping */
++	ZS_MM_RO, /* read-only (no copy-out at unmap time) */
++	ZS_MM_WO /* write-only (no copy-in at map time) */
++	/*
++	 * NOTE: ZS_MM_WO should only be used for initializing new
++	 * (uninitialized) allocations.  Partial writes to already
++	 * initialized allocations should use ZS_MM_RW to preserve the
++	 * existing data.
++	 */
++};
++
++struct zs_ops {
++	struct page * (*alloc)(gfp_t);
++	void (*free)(struct page *);
++};
++
++struct zs_pool;
++
++struct zs_pool *zs_create_pool(gfp_t flags, struct zs_ops *ops);
++void zs_destroy_pool(struct zs_pool *pool);
++
++unsigned long zs_malloc(struct zs_pool *pool, size_t size, gfp_t flags);
++void zs_free(struct zs_pool *pool, unsigned long obj);
++
++void *zs_map_object(struct zs_pool *pool, unsigned long handle,
++			enum zs_mapmode mm);
++void zs_unmap_object(struct zs_pool *pool, unsigned long handle);
++
++u64 zs_get_total_size_bytes(struct zs_pool *pool);
++
++#endif
+diff --git a/include/trace/events/vmscan.h b/include/trace/events/vmscan.h
+index f64560e..0840af3 100644
+--- a/include/trace/events/vmscan.h
++++ b/include/trace/events/vmscan.h
+@@ -263,22 +263,30 @@ DECLARE_EVENT_CLASS(mm_vmscan_lru_isolate_template,
+ 		unsigned long nr_requested,
+ 		unsigned long nr_scanned,
+ 		unsigned long nr_taken,
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 		unsigned long nr_lumpy_taken,
+ 		unsigned long nr_lumpy_dirty,
+ 		unsigned long nr_lumpy_failed,
++#endif
+ 		isolate_mode_t isolate_mode,
+ 		int file),
+ 
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 	TP_ARGS(order, nr_requested, nr_scanned, nr_taken, nr_lumpy_taken, nr_lumpy_dirty, nr_lumpy_failed, isolate_mode, file),
++#else
++	TP_ARGS(order, nr_requested, nr_scanned, nr_taken, isolate_mode, file),
++#endif
+ 
+ 	TP_STRUCT__entry(
+ 		__field(int, order)
+ 		__field(unsigned long, nr_requested)
+ 		__field(unsigned long, nr_scanned)
+ 		__field(unsigned long, nr_taken)
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 		__field(unsigned long, nr_lumpy_taken)
+ 		__field(unsigned long, nr_lumpy_dirty)
+ 		__field(unsigned long, nr_lumpy_failed)
++#endif
+ 		__field(isolate_mode_t, isolate_mode)
+ 		__field(int, file)
+ 	),
+@@ -288,22 +296,30 @@ DECLARE_EVENT_CLASS(mm_vmscan_lru_isolate_template,
+ 		__entry->nr_requested = nr_requested;
+ 		__entry->nr_scanned = nr_scanned;
+ 		__entry->nr_taken = nr_taken;
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 		__entry->nr_lumpy_taken = nr_lumpy_taken;
+ 		__entry->nr_lumpy_dirty = nr_lumpy_dirty;
+ 		__entry->nr_lumpy_failed = nr_lumpy_failed;
++#endif
+ 		__entry->isolate_mode = isolate_mode;
+ 		__entry->file = file;
+ 	),
+ 
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 	TP_printk("isolate_mode=%d order=%d nr_requested=%lu nr_scanned=%lu nr_taken=%lu contig_taken=%lu contig_dirty=%lu contig_failed=%lu file=%d",
++#else
++	TP_printk("isolate_mode=%d order=%d nr_requested=%lu nr_scanned=%lu nr_taken=%lu file=%d",
++#endif
+ 		__entry->isolate_mode,
+ 		__entry->order,
+ 		__entry->nr_requested,
+ 		__entry->nr_scanned,
+ 		__entry->nr_taken,
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 		__entry->nr_lumpy_taken,
+ 		__entry->nr_lumpy_dirty,
+ 		__entry->nr_lumpy_failed,
++#endif
+ 		__entry->file)
+ );
+ 
+@@ -313,13 +329,19 @@ DEFINE_EVENT(mm_vmscan_lru_isolate_template, mm_vmscan_lru_isolate,
+ 		unsigned long nr_requested,
+ 		unsigned long nr_scanned,
+ 		unsigned long nr_taken,
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 		unsigned long nr_lumpy_taken,
+ 		unsigned long nr_lumpy_dirty,
+ 		unsigned long nr_lumpy_failed,
++#endif
+ 		isolate_mode_t isolate_mode,
+ 		int file),
+ 
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 	TP_ARGS(order, nr_requested, nr_scanned, nr_taken, nr_lumpy_taken, nr_lumpy_dirty, nr_lumpy_failed, isolate_mode, file)
++#else
++	TP_ARGS(order, nr_requested, nr_scanned, nr_taken, isolate_mode, file)
++#endif
+ 
+ );
+ 
+@@ -329,13 +351,19 @@ DEFINE_EVENT(mm_vmscan_lru_isolate_template, mm_vmscan_memcg_isolate,
+ 		unsigned long nr_requested,
+ 		unsigned long nr_scanned,
+ 		unsigned long nr_taken,
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 		unsigned long nr_lumpy_taken,
+ 		unsigned long nr_lumpy_dirty,
+ 		unsigned long nr_lumpy_failed,
++#endif
+ 		isolate_mode_t isolate_mode,
+ 		int file),
+ 
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 	TP_ARGS(order, nr_requested, nr_scanned, nr_taken, nr_lumpy_taken, nr_lumpy_dirty, nr_lumpy_failed, isolate_mode, file)
++#else
++	TP_ARGS(order, nr_requested, nr_scanned, nr_taken, isolate_mode, file)
++#endif
+ 
+ );
+ 
+diff --git a/kernel/sysctl.c b/kernel/sysctl.c
+index 9ebfee0..53cdf21 100644
+--- a/kernel/sysctl.c
++++ b/kernel/sysctl.c
+@@ -128,6 +128,9 @@ static int __maybe_unused two = 2;
+ static int __maybe_unused three = 3;
+ static unsigned long one_ul = 1;
+ static int one_hundred = 100;
++#ifdef CONFIG_ZSWAP
++extern int max_swappiness;
++#endif
+ #ifdef CONFIG_PRINTK
+ static int ten_thousand = 10000;
+ #endif
+@@ -1129,7 +1132,11 @@ static struct ctl_table vm_table[] = {
+ 		.mode		= 0644,
+ 		.proc_handler	= proc_dointvec_minmax,
+ 		.extra1		= &zero,
++#ifdef CONFIG_ZSWAP
++		.extra2		= &max_swappiness,
++#else
+ 		.extra2		= &one_hundred,
++#endif
+ 	},
+ #ifdef CONFIG_HUGETLB_PAGE
+ 	{
+diff --git a/mm/Kconfig b/mm/Kconfig
+index bbab5a6..19f65c2 100644
+--- a/mm/Kconfig
++++ b/mm/Kconfig
+@@ -401,3 +401,78 @@ config USE_USER_ACCESSIBLE_TIMERS
+ 	  architecture-specific code that will need to be enabled
+ 	  separately.
+ 
++config FRONTSWAP
++	bool "Enable frontswap to cache swap pages if tmem is present"
++	depends on SWAP
++	default n
++	help
++	  Frontswap is so named because it can be thought of as the opposite
++	  of a "backing" store for a swap device.  The data is stored into
++	  "transcendent memory", memory that is not directly accessible or
++	  addressable by the kernel and is of unknown and possibly
++	  time-varying size.  When space in transcendent memory is available,
++	  a significant swap I/O reduction may be achieved.  When none is
++	  available, all frontswap calls are reduced to a single pointer-
++	  compare-against-NULL resulting in a negligible performance hit
++	  and swap data is stored as normal on the matching swap device.
++
++	  If unsure, say Y to enable frontswap.
++
++config ZSMALLOC_NEW
++	tristate "Memory allocator for compressed pages"
++	default n
++	help
++	  zsmalloc is a slab-based memory allocator designed to store
++	  compressed RAM pages.  zsmalloc uses virtual memory mapping
++	  in order to reduce fragmentation.  However, this results in a
++	  non-standard allocator interface where a handle, not a pointer, is
++	  returned by an alloc().  This handle must be mapped in order to
++	  access the allocated space.
++
++config PGTABLE_MAPPING
++	bool "Use page table mapping to access object in zsmalloc"
++	depends on ZSMALLOC_NEW
++	help
++	  By default, zsmalloc uses a copy-based object mapping method to
++	  access allocations that span two pages. However, if a particular
++	  architecture (ex, ARM) performs VM mapping faster than copying,
++	  then you should select this. This causes zsmalloc to use page table
++	  mapping rather than copying for object mapping.
++
++	  You can check speed with zsmalloc benchmark[1].
++	  [1] https://github.com/spartacus06/zsmalloc
++
++config ZSWAP
++	bool "In-kernel swap page compression"
++	depends on FRONTSWAP && CRYPTO
++	select CRYPTO_LZO
++	select ZSMALLOC_NEW
++	select ANDROID_LOW_MEMORY_KILLER_ADJUST_TASKSIZE if ANDROID_LOW_MEMORY_KILLER
++	default n
++	help
++	  Zswap is a backend for the frontswap mechanism in the VMM.
++	  It receives pages from frontswap and attempts to store them
++	  in a compressed memory pool, resulting in an effective
++	  partial memory reclaim.  In addition, pages and be retrieved
++	  from this compressed store much faster than most tradition
++	  swap devices resulting in reduced I/O and faster performance
++	  for many workloads.
++
++config DISABLE_LUMPY_RECLAIM
++	bool "Disable lumpy reclaim"
++	default y
++	depends on ZSWAP
++
++config DIRECT_RECLAIM_FILE_PAGES_ONLY
++	bool "Reclaim file pages only"
++	default n
++	depends on ZSWAP
++
++config DIRECT_RECLAIM_ALLOW_COMPACTION
++	bool "Allow compaction on direct reclaim path"
++	default y
++
++config TIGHT_PGDAT_BALANCE
++	bool "Increase balance condition"
++	default n
++	depends on ZSWAP
+\ No newline at end of file
+diff --git a/mm/Makefile b/mm/Makefile
+index 90be6c3..f4639db 100644
+--- a/mm/Makefile
++++ b/mm/Makefile
+@@ -27,6 +27,8 @@ obj-$(CONFIG_HAVE_MEMBLOCK) += memblock.o
+ 
+ obj-$(CONFIG_BOUNCE)	+= bounce.o
+ obj-$(CONFIG_SWAP)	+= page_io.o swap_state.o swapfile.o thrash.o
++obj-$(CONFIG_FRONTSWAP)	+= frontswap.o
++obj-$(CONFIG_ZSWAP)	+= zswap.o
+ obj-$(CONFIG_HAS_DMA)	+= dmapool.o
+ obj-$(CONFIG_HUGETLBFS)	+= hugetlb.o
+ obj-$(CONFIG_NUMA) 	+= mempolicy.o
+@@ -51,3 +53,4 @@ obj-$(CONFIG_HWPOISON_INJECT) += hwpoison-inject.o
+ obj-$(CONFIG_DEBUG_KMEMLEAK) += kmemleak.o
+ obj-$(CONFIG_DEBUG_KMEMLEAK_TEST) += kmemleak-test.o
+ obj-$(CONFIG_CLEANCACHE) += cleancache.o
++obj-$(CONFIG_ZSMALLOC_NEW) += zsmalloc.o
+diff --git a/mm/filemap.c b/mm/filemap.c
+index 1a4791e..dd0a8a6 100644
+--- a/mm/filemap.c
++++ b/mm/filemap.c
+@@ -1627,13 +1627,21 @@ int filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+ 	 * Do we have something in the page cache already?
+ 	 */
+ 	page = find_get_page(mapping, offset);
++#ifdef CONFIG_ZSWAP
++	if (likely(page) && !(vmf->flags & FAULT_FLAG_TRIED)) {
++#else
+ 	if (likely(page)) {
++#endif
+ 		/*
+ 		 * We found the page, so try async readahead before
+ 		 * waiting for the lock.
+ 		 */
+ 		do_async_mmap_readahead(vma, ra, file, page, offset);
++#ifdef CONFIG_ZSWAP
++	} else if (!page) {
++#else
+ 	} else {
++#endif
+ 		/* No page in the page cache at all */
+ 		do_sync_mmap_readahead(vma, ra, file, offset);
+ 		count_vm_event(PGMAJFAULT);
+diff --git a/mm/frontswap.c b/mm/frontswap.c
+new file mode 100644
+index 0000000..0547a35
+--- /dev/null
++++ b/mm/frontswap.c
+@@ -0,0 +1,349 @@
++/*
++ * Frontswap frontend
++ *
++ * This code provides the generic "frontend" layer to call a matching
++ * "backend" driver implementation of frontswap.  See
++ * Documentation/vm/frontswap.txt for more information.
++ *
++ * Copyright (C) 2009-2012 Oracle Corp.  All rights reserved.
++ * Author: Dan Magenheimer
++ *
++ * This work is licensed under the terms of the GNU GPL, version 2.
++ */
++
++#include <linux/mman.h>
++#include <linux/swap.h>
++#include <linux/swapops.h>
++#include <linux/security.h>
++#include <linux/module.h>
++#include <linux/debugfs.h>
++#include <linux/frontswap.h>
++#include <linux/swapfile.h>
++
++/*
++ * frontswap_ops is set by frontswap_register_ops to contain the pointers
++ * to the frontswap "backend" implementation functions.
++ */
++static struct frontswap_ops frontswap_ops __read_mostly;
++
++/*
++ * This global enablement flag reduces overhead on systems where frontswap_ops
++ * has not been registered, so is preferred to the slower alternative: a
++ * function call that checks a non-global.
++ */
++bool frontswap_enabled __read_mostly;
++EXPORT_SYMBOL(frontswap_enabled);
++
++/*
++ * If enabled, frontswap_store will return failure even on success.  As
++ * a result, the swap subsystem will always write the page to swap, in
++ * effect converting frontswap into a writethrough cache.  In this mode,
++ * there is no direct reduction in swap writes, but a frontswap backend
++ * can unilaterally "reclaim" any pages in use with no data loss, thus
++ * providing increases control over maximum memory usage due to frontswap.
++ */
++static bool frontswap_writethrough_enabled __read_mostly;
++
++#ifdef CONFIG_DEBUG_FS
++/*
++ * Counters available via /sys/kernel/debug/frontswap (if debugfs is
++ * properly configured).  These are for information only so are not protected
++ * against increment races.
++ */
++static u64 frontswap_loads;
++static u64 frontswap_succ_stores;
++static u64 frontswap_failed_stores;
++static u64 frontswap_invalidates;
++
++static inline void inc_frontswap_loads(void) {
++	frontswap_loads++;
++}
++static inline void inc_frontswap_succ_stores(void) {
++	frontswap_succ_stores++;
++}
++static inline void inc_frontswap_failed_stores(void) {
++	frontswap_failed_stores++;
++}
++static inline void inc_frontswap_invalidates(void) {
++	frontswap_invalidates++;
++}
++#else
++static inline void inc_frontswap_loads(void) { }
++static inline void inc_frontswap_succ_stores(void) { }
++static inline void inc_frontswap_failed_stores(void) { }
++static inline void inc_frontswap_invalidates(void) { }
++#endif
++/*
++ * Register operations for frontswap, returning previous thus allowing
++ * detection of multiple backends and possible nesting.
++ */
++struct frontswap_ops frontswap_register_ops(struct frontswap_ops *ops)
++{
++	struct frontswap_ops old = frontswap_ops;
++
++	frontswap_ops = *ops;
++	frontswap_enabled = true;
++	return old;
++}
++EXPORT_SYMBOL(frontswap_register_ops);
++
++/*
++ * Enable/disable frontswap writethrough (see above).
++ */
++void frontswap_writethrough(bool enable)
++{
++	frontswap_writethrough_enabled = enable;
++}
++EXPORT_SYMBOL(frontswap_writethrough);
++
++/*
++ * Called when a swap device is swapon'd.
++ */
++void __frontswap_init(unsigned type)
++{
++	struct swap_info_struct *sis = swap_info[type];
++
++	BUG_ON(sis == NULL);
++	if (sis->frontswap_map == NULL)
++		return;
++	frontswap_ops.init(type);
++}
++EXPORT_SYMBOL(__frontswap_init);
++
++static inline void __frontswap_clear(struct swap_info_struct *sis, pgoff_t offset)
++{
++	frontswap_clear(sis, offset);
++	atomic_dec(&sis->frontswap_pages);
++}
++
++/*
++ * "Store" data from a page to frontswap and associate it with the page's
++ * swaptype and offset.  Page must be locked and in the swap cache.
++ * If frontswap already contains a page with matching swaptype and
++ * offset, the frontswap implementation may either overwrite the data and
++ * return success or invalidate the page from frontswap and return failure.
++ */
++int __frontswap_store(struct page *page)
++{
++	int ret = -1, dup = 0;
++	swp_entry_t entry = { .val = page_private(page), };
++	int type = swp_type(entry);
++	struct swap_info_struct *sis = swap_info[type];
++	pgoff_t offset = swp_offset(entry);
++
++	BUG_ON(!PageLocked(page));
++	BUG_ON(sis == NULL);
++	if (frontswap_test(sis, offset))
++		dup = 1;
++	ret = frontswap_ops.store(type, offset, page);
++	if (ret == 0) {
++		frontswap_set(sis, offset);
++		inc_frontswap_succ_stores();
++		if (!dup)
++			atomic_inc(&sis->frontswap_pages);
++	} else {
++		/*
++		  failed dup always results in automatic invalidate of
++		  the (older) page from frontswap
++		 */
++		inc_frontswap_failed_stores();
++		if (dup)
++			__frontswap_clear(sis, offset);
++	}
++	if (frontswap_writethrough_enabled)
++		/* report failure so swap also writes to swap device */
++		ret = -1;
++	return ret;
++}
++EXPORT_SYMBOL(__frontswap_store);
++
++/*
++ * "Get" data from frontswap associated with swaptype and offset that were
++ * specified when the data was put to frontswap and use it to fill the
++ * specified page with data. Page must be locked and in the swap cache.
++ */
++int __frontswap_load(struct page *page)
++{
++	int ret = -1;
++	swp_entry_t entry = { .val = page_private(page), };
++	int type = swp_type(entry);
++	struct swap_info_struct *sis = swap_info[type];
++	pgoff_t offset = swp_offset(entry);
++
++	BUG_ON(!PageLocked(page));
++	BUG_ON(sis == NULL);
++	if (frontswap_test(sis, offset))
++		ret = frontswap_ops.load(type, offset, page);
++	if (ret == 0)
++		inc_frontswap_loads();
++	return ret;
++}
++EXPORT_SYMBOL(__frontswap_load);
++
++/*
++ * Invalidate any data from frontswap associated with the specified swaptype
++ * and offset so that a subsequent "get" will fail.
++ */
++void __frontswap_invalidate_page(unsigned type, pgoff_t offset)
++{
++	struct swap_info_struct *sis = swap_info[type];
++
++	BUG_ON(sis == NULL);
++	if (frontswap_test(sis, offset)) {
++		frontswap_ops.invalidate_page(type, offset);
++		__frontswap_clear(sis, offset);
++		inc_frontswap_invalidates();
++	}
++}
++EXPORT_SYMBOL(__frontswap_invalidate_page);
++
++/*
++ * Invalidate all data from frontswap associated with all offsets for the
++ * specified swaptype.
++ */
++void __frontswap_invalidate_area(unsigned type)
++{
++	struct swap_info_struct *sis = swap_info[type];
++
++	BUG_ON(sis == NULL);
++	if (sis->frontswap_map == NULL)
++		return;
++	frontswap_ops.invalidate_area(type);
++	atomic_set(&sis->frontswap_pages, 0);
++	memset(sis->frontswap_map, 0, sis->max / sizeof(long));
++}
++EXPORT_SYMBOL(__frontswap_invalidate_area);
++
++static unsigned long __frontswap_curr_pages(void)
++{
++	int type;
++	unsigned long totalpages = 0;
++	struct swap_info_struct *si = NULL;
++
++	assert_spin_locked(&swap_lock);
++	for (type = swap_list.head; type >= 0; type = si->next) {
++		si = swap_info[type];
++		totalpages += atomic_read(&si->frontswap_pages);
++	}
++	return totalpages;
++}
++
++static int __frontswap_unuse_pages(unsigned long total, unsigned long *unused,
++					int *swapid)
++{
++	int ret = -EINVAL;
++	struct swap_info_struct *si = NULL;
++	int si_frontswap_pages;
++	unsigned long total_pages_to_unuse = total;
++	unsigned long pages = 0, pages_to_unuse = 0;
++	int type;
++
++	assert_spin_locked(&swap_lock);
++	for (type = swap_list.head; type >= 0; type = si->next) {
++		si = swap_info[type];
++		si_frontswap_pages = atomic_read(&si->frontswap_pages);
++		if (total_pages_to_unuse < si_frontswap_pages) {
++			pages = pages_to_unuse = total_pages_to_unuse;
++		} else {
++			pages = si_frontswap_pages;
++			pages_to_unuse = 0; /* unuse all */
++		}
++		/* ensure there is enough RAM to fetch pages from frontswap */
++		if (security_vm_enough_memory_mm(current->mm, pages)) {
++			ret = -ENOMEM;
++			continue;
++		}
++		vm_unacct_memory(pages);
++		*unused = pages_to_unuse;
++		*swapid = type;
++		ret = 0;
++		break;
++	}
++
++	return ret;
++}
++
++/*
++ * Used to check if it's necessory and feasible to unuse pages.
++ * Return 1 when nothing to do, 0 when need to shink pages,
++ * error code when there is an error.
++ */
++static int __frontswap_shrink(unsigned long target_pages,
++				unsigned long *pages_to_unuse,
++				int *type)
++{
++	unsigned long total_pages = 0, total_pages_to_unuse;
++
++	assert_spin_locked(&swap_lock);
++
++	total_pages = __frontswap_curr_pages();
++	if (total_pages <= target_pages) {
++		/* Nothing to do */
++		*pages_to_unuse = 0;
++		return 1;
++	}
++	total_pages_to_unuse = total_pages - target_pages;
++	return __frontswap_unuse_pages(total_pages_to_unuse, pages_to_unuse, type);
++}
++
++/*
++ * Frontswap, like a true swap device, may unnecessarily retain pages
++ * under certain circumstances; "shrink" frontswap is essentially a
++ * "partial swapoff" and works by calling try_to_unuse to attempt to
++ * unuse enough frontswap pages to attempt to -- subject to memory
++ * constraints -- reduce the number of pages in frontswap to the
++ * number given in the parameter target_pages.
++ */
++void frontswap_shrink(unsigned long target_pages)
++{
++	unsigned long pages_to_unuse = 0;
++	int uninitialized_var(type), ret;
++
++	/*
++	 * we don't want to hold swap_lock while doing a very
++	 * lengthy try_to_unuse, but swap_list may change
++	 * so restart scan from swap_list.head each time
++	 */
++	spin_lock(&swap_lock);
++	ret = __frontswap_shrink(target_pages, &pages_to_unuse, &type);
++	spin_unlock(&swap_lock);
++	if (ret == 0)
++		try_to_unuse(type, true, pages_to_unuse);
++	return;
++}
++EXPORT_SYMBOL(frontswap_shrink);
++
++/*
++ * Count and return the number of frontswap pages across all
++ * swap devices.  This is exported so that backend drivers can
++ * determine current usage without reading debugfs.
++ */
++unsigned long frontswap_curr_pages(void)
++{
++	unsigned long totalpages = 0;
++
++	spin_lock(&swap_lock);
++	totalpages = __frontswap_curr_pages();
++	spin_unlock(&swap_lock);
++
++	return totalpages;
++}
++EXPORT_SYMBOL(frontswap_curr_pages);
++
++static int __init init_frontswap(void)
++{
++#ifdef CONFIG_DEBUG_FS
++	struct dentry *root = debugfs_create_dir("frontswap", NULL);
++	if (root == NULL)
++		return -ENXIO;
++	debugfs_create_u64("loads", S_IRUGO, root, &frontswap_loads);
++	debugfs_create_u64("succ_stores", S_IRUGO, root, &frontswap_succ_stores);
++	debugfs_create_u64("failed_stores", S_IRUGO, root,
++				&frontswap_failed_stores);
++	debugfs_create_u64("invalidates", S_IRUGO,
++				root, &frontswap_invalidates);
++#endif
++	return 0;
++}
++
++module_init(init_frontswap);
+diff --git a/mm/internal.h b/mm/internal.h
+index 7ee736d..caf6b39 100644
+--- a/mm/internal.h
++++ b/mm/internal.h
+@@ -12,6 +12,9 @@
+ #define __MM_INTERNAL_H
+ 
+ #include <linux/mm.h>
++#ifdef CONFIG_ZSWAP
++#include <linux/rmap.h>
++#endif
+ 
+ void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *start_vma,
+ 		unsigned long floor, unsigned long ceiling);
+@@ -359,3 +362,50 @@ extern u32 hwpoison_filter_enable;
+ #define ALLOC_HIGH		0x20 /* __GFP_HIGH set */
+ #define ALLOC_CPUSET		0x40 /* check for correct cpuset */
+ #define ALLOC_CMA		0x80 /* allow allocations from CMA areas */
++
++/*
++ * Unnecessary readahead harms performance, especially for SSD devices, where
++ * large reads are significantly more expensive than small ones.
++ * These implements simple swap random access detection. In swap page fault: if
++ * the page is found in swapcache, decrease a counter in the vma, otherwise we
++ * need to perform sync swapin and the counter is increased.  Optionally swapin
++ * will perform readahead if the counter is below a threshold.
++ */
++#ifdef CONFIG_ZSWAP
++#define SWAPRA_MISS_THRESHOLD  (100)
++#define SWAPRA_MAX_MISS ((SWAPRA_MISS_THRESHOLD) * 10)
++static inline void swap_cache_hit(struct vm_area_struct *vma)
++{
++	if (vma && vma->anon_vma)
++		atomic_dec_if_positive(&vma->anon_vma->swapra_miss);
++}
++
++static inline void swap_cache_miss(struct vm_area_struct *vma)
++{
++	if (!vma || !vma->anon_vma)
++		return;
++	if (atomic_read(&vma->anon_vma->swapra_miss) < SWAPRA_MAX_MISS)
++		atomic_inc(&vma->anon_vma->swapra_miss);
++}
++
++static inline int swap_cache_skip_readahead(struct vm_area_struct *vma)
++{
++	if (!vma || !vma->anon_vma)
++		return 0;
++	return atomic_read(&vma->anon_vma->swapra_miss) >
++		SWAPRA_MISS_THRESHOLD;
++}
++#else
++static inline void swap_cache_hit(struct vm_area_struct *vma)
++{
++}
++
++static inline void swap_cache_miss(struct vm_area_struct *vma)
++{
++}
++
++static inline int swap_cache_skip_readahead(struct vm_area_struct *vma)
++{
++	return 0;
++}
++#endif	/* CONFIG_ZSWAP */
+diff --git a/mm/memory.c b/mm/memory.c
+index 2111354..be02f84 100644
+--- a/mm/memory.c
++++ b/mm/memory.c
+@@ -2963,6 +2963,10 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
+ 		delayacct_clear_flag(DELAYACCT_PF_SWAPIN);
+ 		goto out_release;
+ 	}
++#ifdef CONFIG_ZSWAP
++	else if (!(flags & FAULT_FLAG_TRIED))
++		swap_cache_hit(vma);
++#endif
+ 
+ 	locked = lock_page_or_retry(page, mm, flags);
+ 	delayacct_clear_flag(DELAYACCT_PF_SWAPIN);
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 9ea0f09..6518d25 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -2439,6 +2439,7 @@ rebalance:
+ 	if (test_thread_flag(TIF_MEMDIE) && !(gfp_mask & __GFP_NOFAIL))
+ 		goto nopage;
+ 
++#ifdef CONFIG_DIRECT_RECLAIM_ALLOW_COMPACTION
+ 	/*
+ 	 * Try direct compaction. The first pass is asynchronous. Subsequent
+ 	 * attempts after direct reclaim are synchronous
+@@ -2452,6 +2453,7 @@ rebalance:
+ 					&did_some_progress);
+ 	if (page)
+ 		goto got_pg;
++#endif /* CONFIG_DIRECT_RECLAIM_ALLOW_COMPACTION */
+ 	sync_migration = true;
+ 
+ 	/*
+@@ -5265,6 +5267,7 @@ void setup_per_zone_wmarks(void)
+  */
+ static void __meminit calculate_zone_inactive_ratio(struct zone *zone)
+ {
++#ifndef CONFIG_ZSWAP
+ 	unsigned int gb, ratio;
+ 
+ 	/* Zone size in gigabytes */
+@@ -5275,6 +5278,9 @@ static void __meminit calculate_zone_inactive_ratio(struct zone *zone)
+ 		ratio = 1;
+ 
+ 	zone->inactive_ratio = ratio;
++#else
++	zone->inactive_ratio = 1;
++#endif
+ }
+ 
+ static void __meminit setup_per_zone_inactive_ratio(void)
+diff --git a/mm/page_io.c b/mm/page_io.c
+index dc76b4d..8a96ba7 100644
+--- a/mm/page_io.c
++++ b/mm/page_io.c
+@@ -18,6 +18,9 @@
+ #include <linux/bio.h>
+ #include <linux/swapops.h>
+ #include <linux/writeback.h>
++#ifdef CONFIG_FRONTSWAP
++#include <linux/frontswap.h>
++#endif
+ #include <asm/pgtable.h>
+ 
+ static struct bio *get_swap_bio(gfp_t gfp_flags,
+@@ -40,7 +43,7 @@ static struct bio *get_swap_bio(gfp_t gfp_flags,
+ 	return bio;
+ }
+ 
+-static void end_swap_bio_write(struct bio *bio, int err)
++void end_swap_bio_write(struct bio *bio, int err)
+ {
+ 	const int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
+ 	struct page *page = bio->bi_io_vec[0].bv_page;
+@@ -85,6 +88,59 @@ void end_swap_bio_read(struct bio *bio, int err)
+ 	bio_put(bio);
+ }
+ 
++#ifdef CONFIG_ZSWAP
++int __swap_writepage(struct page *page, struct writeback_control *wbc,
++	void (*end_write_func)(struct bio *, int));
++
++/*
++ * We may have stale swap cache pages in memory: notice
++ * them here and get rid of the unnecessary final write.
++ */
++int swap_writepage(struct page *page, struct writeback_control *wbc)
++{
++	int ret = 0;
++
++	if (try_to_free_swap(page)) {
++		unlock_page(page);
++		goto out;
++	}
++
++#ifdef CONFIG_FRONTSWAP
++	if (frontswap_store(page) == 0) {
++		set_page_writeback(page);
++		unlock_page(page);
++		end_page_writeback(page);
++		goto out;
++	}
++#endif
++	ret = __swap_writepage(page, wbc, end_swap_bio_write);
++out:
++	return ret;
++}
++
++int __swap_writepage(struct page *page, struct writeback_control *wbc,
++	void (*end_write_func)(struct bio *, int))
++{
++	struct bio *bio;
++	int ret = 0, rw = WRITE;
++
++	bio = get_swap_bio(GFP_NOIO, page, end_write_func);
++	if (bio == NULL) {
++		set_page_dirty(page);
++		unlock_page(page);
++		ret = -ENOMEM;
++		goto out;
++	}
++	if (wbc->sync_mode == WB_SYNC_ALL)
++		rw |= REQ_SYNC;
++	count_vm_event(PSWPOUT);
++	set_page_writeback(page);
++	unlock_page(page);
++	submit_bio(rw, bio);
++out:
++	return ret;
++}
++#else
+ /*
+  * We may have stale swap cache pages in memory: notice
+  * them here and get rid of the unnecessary final write.
+@@ -98,6 +154,16 @@ int swap_writepage(struct page *page, struct writeback_control *wbc)
+ 		unlock_page(page);
+ 		goto out;
+ 	}
++
++#ifdef CONFIG_FRONTSWAP
++	if (frontswap_store(page) == 0) {
++		set_page_writeback(page);
++		unlock_page(page);
++		end_page_writeback(page);
++		goto out;
++	}
++#endif
++
+ 	bio = get_swap_bio(GFP_NOIO, page, end_swap_bio_write);
+ 	if (bio == NULL) {
+ 		set_page_dirty(page);
+@@ -114,6 +180,7 @@ int swap_writepage(struct page *page, struct writeback_control *wbc)
+ out:
+ 	return ret;
+ }
++#endif /* !CONFIG_ZSWAP */
+ 
+ int swap_readpage(struct page *page)
+ {
+@@ -122,6 +189,15 @@ int swap_readpage(struct page *page)
+ 
+ 	VM_BUG_ON(!PageLocked(page));
+ 	VM_BUG_ON(PageUptodate(page));
++
++#ifdef CONFIG_FRONTSWAP
++	if (frontswap_load(page) == 0) {
++		SetPageUptodate(page);
++		unlock_page(page);
++		goto out;
++	}
++#endif
++
+ 	bio = get_swap_bio(GFP_KERNEL, page, end_swap_bio_read);
+ 	if (bio == NULL) {
+ 		unlock_page(page);
+diff --git a/mm/rmap.c b/mm/rmap.c
+index 5b5ad58..5a1c74e 100644
+--- a/mm/rmap.c
++++ b/mm/rmap.c
+@@ -416,6 +416,9 @@ static void anon_vma_ctor(void *data)
+ 
+ 	mutex_init(&anon_vma->mutex);
+ 	atomic_set(&anon_vma->refcount, 0);
++#ifdef CONFIG_ZSWAP
++	atomic_set(&anon_vma->swapra_miss, 0);
++#endif
+ 	INIT_LIST_HEAD(&anon_vma->head);
+ }
+ 
+diff --git a/mm/shmem.c b/mm/shmem.c
+index 10fb7b4..3b8b601 100644
+--- a/mm/shmem.c
++++ b/mm/shmem.c
+@@ -809,6 +809,9 @@ static struct page *shmem_swapin(swp_entry_t swap, gfp_t gfp,
+ 	pvma.vm_pgoff = index;
+ 	pvma.vm_ops = NULL;
+ 	pvma.vm_policy = spol;
++#ifdef CONFIG_ZSWAP
++	pvma.anon_vma = NULL;
++#endif
+ 	return swapin_readahead(swap, gfp, &pvma, 0);
+ }
+ 
+diff --git a/mm/swap_state.c b/mm/swap_state.c
+index 4c5ff7f..18fcb65 100644
+--- a/mm/swap_state.c
++++ b/mm/swap_state.c
+@@ -19,6 +19,9 @@
+ #include <linux/page_cgroup.h>
+ 
+ #include <asm/pgtable.h>
++#ifdef CONFIG_ZSWAP
++#include "internal.h"
++#endif
+ 
+ /*
+  * swapper_space is a fiction, retained to simplify the path through
+@@ -66,7 +69,11 @@ void show_swap_cache_info(void)
+  * __add_to_swap_cache resembles add_to_page_cache_locked on swapper_space,
+  * but sets SwapCache flag and private instead of mapping and index.
+  */
++#ifdef CONFIG_ZSWAP
++int __add_to_swap_cache(struct page *page, swp_entry_t entry)
++#else
+ static int __add_to_swap_cache(struct page *page, swp_entry_t entry)
++#endif
+ {
+ 	int error;
+ 
+@@ -377,6 +384,12 @@ struct page *swapin_readahead(swp_entry_t entry, gfp_t gfp_mask,
+ 	unsigned long start_offset, end_offset;
+ 	unsigned long mask = (1UL << page_cluster) - 1;
+ 
++#ifdef CONFIG_ZSWAP
++	swap_cache_miss(vma);
++	if (swap_cache_skip_readahead(vma))
++		goto skip;
++#endif
++
+ 	/* Read a page_cluster sized and aligned cluster around offset. */
+ 	start_offset = offset & ~mask;
+ 	end_offset = offset | mask;
+@@ -392,5 +405,8 @@ struct page *swapin_readahead(swp_entry_t entry, gfp_t gfp_mask,
+ 		page_cache_release(page);
+ 	}
+ 	lru_add_drain();	/* Push any new pages onto the LRU now */
++#ifdef CONFIG_ZSWAP
++skip:
++#endif
+ 	return read_swap_cache_async(entry, gfp_mask, vma, addr);
+ }
+diff --git a/mm/swapfile.c b/mm/swapfile.c
+index fafc26d..12a78dd 100644
+--- a/mm/swapfile.c
++++ b/mm/swapfile.c
+@@ -31,6 +31,10 @@
+ #include <linux/memcontrol.h>
+ #include <linux/poll.h>
+ #include <linux/oom.h>
++#ifdef CONFIG_FRONTSWAP
++#include <linux/frontswap.h>
++#include <linux/swapfile.h>
++#endif
+ 
+ #include <asm/pgtable.h>
+ #include <asm/tlbflush.h>
+@@ -42,7 +46,12 @@ static bool swap_count_continued(struct swap_info_struct *, pgoff_t,
+ static void free_swap_count_continuations(struct swap_info_struct *);
+ static sector_t map_swap_entry(swp_entry_t, struct block_device**);
+ 
++#ifdef CONFIG_FRONTSWAP
++DEFINE_SPINLOCK(swap_lock);
++#else
+ static DEFINE_SPINLOCK(swap_lock);
++#endif
++
+ static unsigned int nr_swapfiles;
+ long nr_swap_pages;
+ long total_swap_pages;
+@@ -53,9 +62,15 @@ static const char Unused_file[] = "Unused swap file entry ";
+ static const char Bad_offset[] = "Bad swap offset entry ";
+ static const char Unused_offset[] = "Unused swap offset entry ";
+ 
++#ifdef CONFIG_FRONTSWAP
++struct swap_list_t swap_list = {-1, -1};
++
++struct swap_info_struct *swap_info[MAX_SWAPFILES];
++#else
+ static struct swap_list_t swap_list = {-1, -1};
+ 
+ static struct swap_info_struct *swap_info[MAX_SWAPFILES];
++#endif
+ 
+ static DEFINE_MUTEX(swapon_mutex);
+ 
+@@ -556,6 +571,9 @@ static unsigned char swap_entry_free(struct swap_info_struct *p,
+ 			swap_list.next = p->type;
+ 		nr_swap_pages++;
+ 		p->inuse_pages--;
++#ifdef CONFIG_FRONTSWAP
++		frontswap_invalidate_page(p->type, offset);
++#endif
+ 		if ((p->flags & SWP_BLKDEV) &&
+ 				disk->fops->swap_slot_free_notify)
+ 			disk->fops->swap_slot_free_notify(p->bdev, offset);
+@@ -1016,11 +1034,17 @@ static int unuse_mm(struct mm_struct *mm,
+ }
+ 
+ /*
+- * Scan swap_map from current position to next entry still in use.
++ * Scan swap_map (or frontswap_map if frontswap parameter is true)
++ * from current position to next entry still in use.
+  * Recycle to start on reaching the end, returning 0 when empty.
+  */
++#ifdef CONFIG_FRONTSWAP
++static unsigned int find_next_to_unuse(struct swap_info_struct *si,
++					unsigned int prev, bool frontswap)
++#else
+ static unsigned int find_next_to_unuse(struct swap_info_struct *si,
+ 					unsigned int prev)
++#endif
+ {
+ 	unsigned int max = si->max;
+ 	unsigned int i = prev;
+@@ -1046,6 +1070,14 @@ static unsigned int find_next_to_unuse(struct swap_info_struct *si,
+ 			prev = 0;
+ 			i = 1;
+ 		}
++#ifdef CONFIG_FRONTSWAP
++		if (frontswap) {
++			if (frontswap_test(si, i))
++				break;
++			else
++				continue;
++		}
++#endif
+ 		count = si->swap_map[i];
+ 		if (count && swap_count(count) != SWAP_MAP_BAD)
+ 			break;
+@@ -1057,8 +1089,16 @@ static unsigned int find_next_to_unuse(struct swap_info_struct *si,
+  * We completely avoid races by reading each swap page in advance,
+  * and then search for the process using it.  All the necessary
+  * page table adjustments can then be made atomically.
++ *
++ * if the boolean frontswap is true, only unuse pages_to_unuse pages;
++ * pages_to_unuse==0 means all pages; ignored if frontswap is false
+  */
++#ifdef CONFIG_FRONTSWAP
++int try_to_unuse(unsigned int type, bool frontswap,
++		 unsigned long pages_to_unuse)
++#else
+ static int try_to_unuse(unsigned int type)
++#endif
+ {
+ 	struct swap_info_struct *si = swap_info[type];
+ 	struct mm_struct *start_mm;
+@@ -1091,7 +1131,11 @@ static int try_to_unuse(unsigned int type)
+ 	 * one pass through swap_map is enough, but not necessarily:
+ 	 * there are races when an instance of an entry might be missed.
+ 	 */
++#ifdef CONFIG_FRONTSWAP
++	while ((i = find_next_to_unuse(si, i, frontswap)) != 0) {
++#else
+ 	while ((i = find_next_to_unuse(si, i)) != 0) {
++#endif
+ 		if (signal_pending(current)) {
+ 			retval = -EINTR;
+ 			break;
+@@ -1258,6 +1302,12 @@ static int try_to_unuse(unsigned int type)
+ 		 * interactive performance.
+ 		 */
+ 		cond_resched();
++#ifdef CONFIG_FRONTSWAP
++		if (frontswap && pages_to_unuse > 0) {
++			if (!--pages_to_unuse)
++				break;
++		}
++#endif
+ 	}
+ 
+ 	mmput(start_mm);
+@@ -1516,8 +1566,14 @@ bad_bmap:
+ 	goto out;
+ }
+ 
++#ifdef CONFIG_FRONTSWAP
++static void enable_swap_info(struct swap_info_struct *p, int prio,
++				unsigned char *swap_map,
++				unsigned long *frontswap_map)
++#else
+ static void enable_swap_info(struct swap_info_struct *p, int prio,
+ 				unsigned char *swap_map)
++#endif
+ {
+ 	int i, prev;
+ 
+@@ -1527,6 +1583,9 @@ static void enable_swap_info(struct swap_info_struct *p, int prio,
+ 	else
+ 		p->prio = --least_priority;
+ 	p->swap_map = swap_map;
++#ifdef CONFIG_FRONTSWAP
++	frontswap_map_set(p, frontswap_map);
++#endif
+ 	p->flags |= SWP_WRITEOK;
+ 	nr_swap_pages += p->pages;
+ 	total_swap_pages += p->pages;
+@@ -1543,6 +1602,9 @@ static void enable_swap_info(struct swap_info_struct *p, int prio,
+ 		swap_list.head = swap_list.next = p->type;
+ 	else
+ 		swap_info[prev]->next = p->type;
++#ifdef CONFIG_FRONTSWAP
++	frontswap_init(p->type);
++#endif
+ 	spin_unlock(&swap_lock);
+ }
+ 
+@@ -1616,7 +1678,11 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
+ 	spin_unlock(&swap_lock);
+ 
+ 	oom_score_adj = test_set_oom_score_adj(OOM_SCORE_ADJ_MAX);
++#ifdef CONFIG_FRONTSWAP
++	err = try_to_unuse(type, false, 0); /* force all pages to be unused */
++#else
+ 	err = try_to_unuse(type);
++#endif
+ 	compare_swap_oom_score_adj(OOM_SCORE_ADJ_MAX, oom_score_adj);
+ 
+ 	if (err) {
+@@ -1627,7 +1693,11 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
+ 		 * sys_swapoff for this swap_info_struct at this point.
+ 		 */
+ 		/* re-insert swap space back into swap_list */
++#ifdef CONFIG_FRONTSWAP
++		enable_swap_info(p, p->prio, p->swap_map, frontswap_map_get(p));
++#else
+ 		enable_swap_info(p, p->prio, p->swap_map);
++#endif
+ 		goto out_dput;
+ 	}
+ 
+@@ -1653,9 +1723,15 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
+ 	swap_map = p->swap_map;
+ 	p->swap_map = NULL;
+ 	p->flags = 0;
++#ifdef CONFIG_FRONTSWAP
++	frontswap_invalidate_area(type);
++#endif
+ 	spin_unlock(&swap_lock);
+ 	mutex_unlock(&swapon_mutex);
+ 	vfree(swap_map);
++#ifdef CONFIG_FRONTSWAP
++	vfree(frontswap_map_get(p));
++#endif
+ 	/* Destroy swap account informatin */
+ 	swap_cgroup_swapoff(type);
+ 
+@@ -2019,6 +2095,9 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
+ 	sector_t span;
+ 	unsigned long maxpages;
+ 	unsigned char *swap_map = NULL;
++#ifdef CONFIG_FRONTSWAP
++	unsigned long *frontswap_map = NULL;
++#endif
+ 	struct page *page = NULL;
+ 	struct inode *inode = NULL;
+ 
+@@ -2103,6 +2182,12 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
+ 		goto bad_swap;
+ 	}
+ 
++#ifdef CONFIG_FRONTSWAP
++	/* frontswap enabled? set up bit-per-page map for frontswap */
++	if (frontswap_enabled)
++		frontswap_map = vzalloc(maxpages / sizeof(long));
++#endif
++
+ 	if (p->bdev) {
+ 		if (blk_queue_nonrot(bdev_get_queue(p->bdev))) {
+ 			p->flags |= SWP_SOLIDSTATE;
+@@ -2117,6 +2202,19 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
+ 	if (swap_flags & SWAP_FLAG_PREFER)
+ 		prio =
+ 		  (swap_flags & SWAP_FLAG_PRIO_MASK) >> SWAP_FLAG_PRIO_SHIFT;
++
++#ifdef CONFIG_FRONTSWAP
++	enable_swap_info(p, prio, swap_map, frontswap_map);
++
++	printk(KERN_INFO "Adding %uk swap on %s.  "
++			"Priority:%d extents:%d across:%lluk %s%s%s\n",
++		p->pages<<(PAGE_SHIFT-10), name, p->prio,
++		nr_extents, (unsigned long long)span<<(PAGE_SHIFT-10),
++		(p->flags & SWP_SOLIDSTATE) ? "SS" : "",
++		(p->flags & SWP_DISCARDABLE) ? "D" : "",
++		(frontswap_map) ? "FS" : "");
++
++#else
+ 	enable_swap_info(p, prio, swap_map);
+ 
+ 	printk(KERN_INFO "Adding %uk swap on %s.  "
+@@ -2125,6 +2223,7 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
+ 		nr_extents, (unsigned long long)span<<(PAGE_SHIFT-10),
+ 		(p->flags & SWP_SOLIDSTATE) ? "SS" : "",
+ 		(p->flags & SWP_DISCARDABLE) ? "D" : "");
++#endif
+ 
+ 	mutex_unlock(&swapon_mutex);
+ 	atomic_inc(&proc_poll_event);
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 33dc256..8082be4 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -71,6 +71,10 @@ typedef unsigned __bitwise__ reclaim_mode_t;
+ #define RECLAIM_MODE_LUMPYRECLAIM	((__force reclaim_mode_t)0x08u)
+ #define RECLAIM_MODE_COMPACTION		((__force reclaim_mode_t)0x10u)
+ 
++#ifdef CONFIG_ZSWAP
++int max_swappiness = 200;
++#endif
++
+ struct scan_control {
+ 	/* Incremented by the number of inactive pages that were scanned */
+ 	unsigned long nr_scanned;
+@@ -364,6 +368,7 @@ out:
+ 	return ret;
+ }
+ 
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ static void set_reclaim_mode(int priority, struct scan_control *sc,
+ 				   bool sync)
+ {
+@@ -391,6 +396,25 @@ static void set_reclaim_mode(int priority, struct scan_control *sc,
+ 	else
+ 		sc->reclaim_mode = RECLAIM_MODE_SINGLE | RECLAIM_MODE_ASYNC;
+ }
++#else
++static void set_reclaim_mode(int priority, struct scan_control *sc,
++				   bool sync)
++{
++	/* Sync reclaim used only for compaction */
++	reclaim_mode_t syncmode = sync ? RECLAIM_MODE_SYNC : RECLAIM_MODE_ASYNC;
++
++	/*
++	 * Restrict reclaim/compaction to costly allocations or when
++	 * under memory pressure
++	 */
++	if (COMPACTION_BUILD && sc->order &&
++			(sc->order > PAGE_ALLOC_COSTLY_ORDER ||
++			 priority < DEF_PRIORITY - 2))
++		sc->reclaim_mode = RECLAIM_MODE_COMPACTION | syncmode;
++	else
++		sc->reclaim_mode = RECLAIM_MODE_SINGLE | RECLAIM_MODE_ASYNC;
++}
++#endif
+ 
+ static void reset_reclaim_mode(struct scan_control *sc)
+ {
+@@ -417,9 +441,11 @@ static int may_write_to_queue(struct backing_dev_info *bdi,
+ 	if (bdi == current->backing_dev_info)
+ 		return 1;
+ 
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 	/* lumpy reclaim for hugepage often need a lot of write */
+ 	if (sc->order > PAGE_ALLOC_COSTLY_ORDER)
+ 		return 1;
++#endif
+ 	return 0;
+ }
+ 
+@@ -710,9 +736,11 @@ static enum page_references page_check_references(struct page *page,
+ 	referenced_ptes = page_referenced(page, 1, mz->mem_cgroup, &vm_flags);
+ 	referenced_page = TestClearPageReferenced(page);
+ 
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 	/* Lumpy reclaim - ignore references */
+ 	if (sc->reclaim_mode & RECLAIM_MODE_LUMPYRECLAIM)
+ 		return PAGEREF_RECLAIM;
++#endif
+ 
+ 	/*
+ 	 * Mlock lost the isolation race with us.  Let try_to_unmap()
+@@ -824,7 +852,11 @@ static unsigned long shrink_page_list(struct list_head *page_list,
+ 				wait_on_page_writeback(page);
+ 			else {
+ 				unlock_page(page);
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 				goto keep_lumpy;
++#else
++				goto keep_reclaim_mode;
++#endif
+ 			}
+ 		}
+ 
+@@ -908,7 +940,11 @@ static unsigned long shrink_page_list(struct list_head *page_list,
+ 				goto activate_locked;
+ 			case PAGE_SUCCESS:
+ 				if (PageWriteback(page))
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 					goto keep_lumpy;
++#else
++					goto keep_reclaim_mode;
++#endif
+ 				if (PageDirty(page))
+ 					goto keep;
+ 
+@@ -1008,7 +1044,11 @@ keep_locked:
+ 		unlock_page(page);
+ keep:
+ 		reset_reclaim_mode(sc);
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ keep_lumpy:
++#else
++keep_reclaim_mode:
++#endif
+ 		list_add(&page->lru, &ret_pages);
+ 		VM_BUG_ON(PageLRU(page) || PageUnevictable(page));
+ 	}
+@@ -1064,11 +1104,7 @@ int __isolate_lru_page(struct page *page, isolate_mode_t mode, int file)
+ 	if (!all_lru_mode && !!page_is_file_cache(page) != file)
+ 		return ret;
+ 
+-	/*
+-	 * When this function is being called for lumpy reclaim, we
+-	 * initially look into all LRU pages, active, inactive and
+-	 * unevictable; only give shrink_page_list evictable pages.
+-	 */
++	/* Do not give back unevictable pages for compaction */
+ 	if (PageUnevictable(page))
+ 		return ret;
+ 
+@@ -1153,9 +1189,11 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
+ 	struct lruvec *lruvec;
+ 	struct list_head *src;
+ 	unsigned long nr_taken = 0;
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 	unsigned long nr_lumpy_taken = 0;
+ 	unsigned long nr_lumpy_dirty = 0;
+ 	unsigned long nr_lumpy_failed = 0;
++#endif
+ 	unsigned long scan;
+ 	int lru = LRU_BASE;
+ 
+@@ -1168,10 +1206,12 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
+ 
+ 	for (scan = 0; scan < nr_to_scan && !list_empty(src); scan++) {
+ 		struct page *page;
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 		unsigned long pfn;
+ 		unsigned long end_pfn;
+ 		unsigned long page_pfn;
+ 		int zone_id;
++#endif
+ 
+ 		page = lru_to_page(src);
+ 		prefetchw_prev_lru_page(page, src, flags);
+@@ -1194,6 +1234,7 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
+ 			BUG();
+ 		}
+ 
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 		if (!sc->order || !(sc->reclaim_mode & RECLAIM_MODE_LUMPYRECLAIM))
+ 			continue;
+ 
+@@ -1271,6 +1312,7 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
+ 		/* If we break out of the loop above, lumpy reclaim failed */
+ 		if (pfn < end_pfn)
+ 			nr_lumpy_failed++;
++#endif
+ 	}
+ 
+ 	*nr_scanned = scan;
+@@ -1278,7 +1320,9 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
+ 	trace_mm_vmscan_lru_isolate(sc->order,
+ 			nr_to_scan, scan,
+ 			nr_taken,
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 			nr_lumpy_taken, nr_lumpy_dirty, nr_lumpy_failed,
++#endif
+ 			mode, file);
+ 	return nr_taken;
+ }
+@@ -1472,7 +1516,7 @@ static inline bool should_reclaim_stall(unsigned long nr_taken,
+ 	if (current_is_kswapd())
+ 		return false;
+ 
+-	/* Only stall on lumpy reclaim */
++	/* Only stall for memory compaction */
+ 	if (sc->reclaim_mode & RECLAIM_MODE_SINGLE)
+ 		return false;
+ 
+@@ -1523,8 +1567,10 @@ shrink_inactive_list(unsigned long nr_to_scan, struct mem_cgroup_zone *mz,
+ 	}
+ 
+ 	set_reclaim_mode(priority, sc, false);
++#ifndef CONFIG_DISABLE_LUMPY_RECLAIM
+ 	if (sc->reclaim_mode & RECLAIM_MODE_LUMPYRECLAIM)
+ 		isolate_mode |= ISOLATE_ACTIVE;
++#endif
+ 
+ 	lru_add_drain();
+ 
+@@ -1950,11 +1996,14 @@ static void get_scan_count(struct mem_cgroup_zone *mz, struct scan_control *sc,
+ 	}
+ 
+ 	/*
+-	 * With swappiness at 100, anonymous and file have the same priority.
+ 	 * This scanning priority is essentially the inverse of IO cost.
+ 	 */
+ 	anon_prio = vmscan_swappiness(mz, sc);
++#ifdef CONFIG_ZSWAP
++	file_prio = max_swappiness - vmscan_swappiness(mz, sc);
++#else
+ 	file_prio = 200 - vmscan_swappiness(mz, sc);
++#endif
+ 
+ 	/*
+ 	 * OK, so we have swap space and a fair amount of page cache
+@@ -2440,7 +2489,11 @@ unsigned long try_to_free_pages(struct zonelist *zonelist, int order,
+ 		.may_writepage = !laptop_mode,
+ 		.nr_to_reclaim = SWAP_CLUSTER_MAX,
+ 		.may_unmap = 1,
++#ifdef CONFIG_DIRECT_RECLAIM_FILE_PAGES_ONLY
++		.may_swap = 0,
++#else
+ 		.may_swap = 1,
++#endif
+ 		.order = order,
+ 		.target_mem_cgroup = NULL,
+ 		.nodemask = nodemask,
+@@ -2594,8 +2647,12 @@ static bool pgdat_balanced(pg_data_t *pgdat, unsigned long balanced_pages,
+ 	for (i = 0; i <= classzone_idx; i++)
+ 		present_pages += pgdat->node_zones[i].present_pages;
+ 
++#ifdef CONFIG_TIGHT_PGDAT_BALANCE
++	return balanced_pages >= (present_pages >> 1);
++#else
+ 	/* A special case here: if zone has no page, we think it's balanced */
+ 	return balanced_pages >= (present_pages >> 2);
++#endif
+ }
+ 
+ /* is kswapd sleeping prematurely? */
+@@ -2670,7 +2727,7 @@ static bool sleeping_prematurely(pg_data_t *pgdat, int order, long remaining,
+ static unsigned long balance_pgdat(pg_data_t *pgdat, int order,
+ 							int *classzone_idx)
+ {
+-	int all_zones_ok;
++	struct zone *unbalanced_zone;
+ 	unsigned long balanced;
+ 	int priority;
+ 	int i;
+@@ -2708,7 +2765,7 @@ loop_again:
+ 		if (!priority)
+ 			disable_swap_token(NULL);
+ 
+-		all_zones_ok = 1;
++		unbalanced_zone = NULL;
+ 		balanced = 0;
+ 
+ 		/*
+@@ -2811,11 +2868,12 @@ loop_again:
+ 			 * Do not reclaim more than needed for compaction.
+ 			 */
+ 			testorder = order;
++#ifndef CONFIG_TIGHT_PGDAT_BALANCE
+ 			if (COMPACTION_BUILD && order &&
+ 					compaction_suitable(zone, order) !=
+ 						COMPACT_SKIPPED)
+ 				testorder = 0;
+-
++#endif
+ 			if ((buffer_heads_over_limit && is_highmem_idx(i)) ||
+ 				    !zone_watermark_ok_safe(zone, testorder,
+ 					high_wmark_pages(zone) + balance_gap,
+@@ -2848,7 +2906,7 @@ loop_again:
+ 
+ 			if (!zone_watermark_ok_safe(zone, testorder,
+ 					high_wmark_pages(zone), end_zone, 0)) {
+-				all_zones_ok = 0;
++				unbalanced_zone = zone;
+ 				/*
+ 				 * We are still under min water mark.  This
+ 				 * means that we have a GFP_ATOMIC allocation
+@@ -2871,7 +2929,7 @@ loop_again:
+ 			}
+ 
+ 		}
+-		if (all_zones_ok || (order && pgdat_balanced(pgdat, balanced, *classzone_idx)))
++		if (!unbalanced_zone || (order && pgdat_balanced(pgdat, balanced, *classzone_idx)))
+ 			break;		/* kswapd: all done */
+ 		/*
+ 		 * OK, kswapd is getting into trouble.  Take a nap, then take
+@@ -2881,7 +2939,7 @@ loop_again:
+ 			if (has_under_min_watermark_zone)
+ 				count_vm_event(KSWAPD_SKIP_CONGESTION_WAIT);
+ 			else
+-				congestion_wait(BLK_RW_ASYNC, HZ/10);
++				wait_iff_congested(unbalanced_zone, BLK_RW_ASYNC, HZ/10);
+ 		}
+ 
+ 		/*
+@@ -2900,7 +2958,7 @@ out:
+ 	 * high-order: Balanced zones must make up at least 25% of the node
+ 	 *             for the node to be balanced
+ 	 */
+-	if (!(all_zones_ok || (order && pgdat_balanced(pgdat, balanced, *classzone_idx)))) {
++	if (unbalanced_zone && (!order || !pgdat_balanced(pgdat, balanced, *classzone_idx))) {
+ 		cond_resched();
+ 
+ 		try_to_freeze();
+diff --git a/mm/zsmalloc.c b/mm/zsmalloc.c
+new file mode 100644
+index 0000000..eff0ca0
+--- /dev/null
++++ b/mm/zsmalloc.c
+@@ -0,0 +1,1117 @@
++/*
++ * zsmalloc memory allocator
++ *
++ * Copyright (C) 2011  Nitin Gupta
++ *
++ * This code is released using a dual license strategy: BSD/GPL
++ * You can choose the license that better fits your requirements.
++ *
++ * Released under the terms of 3-clause BSD License
++ * Released under the terms of GNU General Public License Version 2.0
++ */
++
++
++/*
++ * This allocator is designed for use with zcache and zram. Thus, the
++ * allocator is supposed to work well under low memory conditions. In
++ * particular, it never attempts higher order page allocation which is
++ * very likely to fail under memory pressure. On the other hand, if we
++ * just use single (0-order) pages, it would suffer from very high
++ * fragmentation -- any object of size PAGE_SIZE/2 or larger would occupy
++ * an entire page. This was one of the major issues with its predecessor
++ * (xvmalloc).
++ *
++ * To overcome these issues, zsmalloc allocates a bunch of 0-order pages
++ * and links them together using various 'struct page' fields. These linked
++ * pages act as a single higher-order page i.e. an object can span 0-order
++ * page boundaries. The code refers to these linked pages as a single entity
++ * called zspage.
++ *
++ * For simplicity, zsmalloc can only allocate objects of size up to PAGE_SIZE
++ * since this satisfies the requirements of all its current users (in the
++ * worst case, page is incompressible and is thus stored "as-is" i.e. in
++ * uncompressed form). For allocation requests larger than this size, failure
++ * is returned (see zs_malloc).
++ *
++ * Additionally, zs_malloc() does not return a dereferenceable pointer.
++ * Instead, it returns an opaque handle (unsigned long) which encodes actual
++ * location of the allocated object. The reason for this indirection is that
++ * zsmalloc does not keep zspages permanently mapped since that would cause
++ * issues on 32-bit systems where the VA region for kernel space mappings
++ * is very small. So, before using the allocating memory, the object has to
++ * be mapped using zs_map_object() to get a usable pointer and subsequently
++ * unmapped using zs_unmap_object().
++ *
++ * Following is how we use various fields and flags of underlying
++ * struct page(s) to form a zspage.
++ *
++ * Usage of struct page fields:
++ *	page->first_page: points to the first component (0-order) page
++ *	page->index (union with page->freelist): offset of the first object
++ *		starting in this page. For the first page, this is
++ *		always 0, so we use this field (aka freelist) to point
++ *		to the first free object in zspage.
++ *	page->lru: links together all component pages (except the first page)
++ *		of a zspage
++ *
++ *	For _first_ page only:
++ *
++ *	page->private (union with page->first_page): refers to the
++ *		component page after the first page
++ *	page->freelist: points to the first free object in zspage.
++ *		Free objects are linked together using in-place
++ *		metadata.
++ *	page->lru: links together first pages of various zspages.
++ *		Basically forming list of zspages in a fullness group.
++ *	page->mapping: class index and fullness group of the zspage
++ *
++ * Usage of struct page flags:
++ *	PG_private: identifies the first component page
++ *	PG_private2: identifies the last component page
++ *
++ */
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/bitops.h>
++#include <linux/errno.h>
++#include <linux/highmem.h>
++#include <linux/init.h>
++#include <linux/string.h>
++#include <linux/slab.h>
++#include <asm/tlbflush.h>
++#include <asm/pgtable.h>
++#include <linux/cpumask.h>
++#include <linux/cpu.h>
++#include <linux/vmalloc.h>
++#include <linux/hardirq.h>
++#include <linux/spinlock.h>
++#include <linux/types.h>
++
++#include <linux/zsmalloc.h>
++
++/*
++ * This must be power of 2 and greater than of equal to sizeof(link_free).
++ * These two conditions ensure that any 'struct link_free' itself doesn't
++ * span more than 1 page which avoids complex case of mapping 2 pages simply
++ * to restore link_free pointer values.
++ */
++#define ZS_ALIGN		8
++
++/*
++ * A single 'zspage' is composed of up to 2^N discontiguous 0-order (single)
++ * pages. ZS_MAX_ZSPAGE_ORDER defines upper limit on N.
++ */
++#define ZS_MAX_ZSPAGE_ORDER 2
++#define ZS_MAX_PAGES_PER_ZSPAGE (_AC(1, UL) << ZS_MAX_ZSPAGE_ORDER)
++
++/*
++ * Object location (<PFN>, <obj_idx>) is encoded as
++ * as single (unsigned long) handle value.
++ *
++ * Note that object index <obj_idx> is relative to system
++ * page <PFN> it is stored in, so for each sub-page belonging
++ * to a zspage, obj_idx starts with 0.
++ *
++ * This is made more complicated by various memory models and PAE.
++ */
++
++#ifndef MAX_PHYSMEM_BITS
++#ifdef CONFIG_HIGHMEM64G
++#define MAX_PHYSMEM_BITS 36
++#else /* !CONFIG_HIGHMEM64G */
++/*
++ * If this definition of MAX_PHYSMEM_BITS is used, OBJ_INDEX_BITS will just
++ * be PAGE_SHIFT
++ */
++#define MAX_PHYSMEM_BITS BITS_PER_LONG
++#endif
++#endif
++#define _PFN_BITS		(MAX_PHYSMEM_BITS - PAGE_SHIFT)
++#define OBJ_INDEX_BITS	(BITS_PER_LONG - _PFN_BITS)
++#define OBJ_INDEX_MASK	((_AC(1, UL) << OBJ_INDEX_BITS) - 1)
++
++#define MAX(a, b) ((a) >= (b) ? (a) : (b))
++/* ZS_MIN_ALLOC_SIZE must be multiple of ZS_ALIGN */
++#define ZS_MIN_ALLOC_SIZE \
++	MAX(32, (ZS_MAX_PAGES_PER_ZSPAGE << PAGE_SHIFT >> OBJ_INDEX_BITS))
++#define ZS_MAX_ALLOC_SIZE	PAGE_SIZE
++
++/*
++ * On systems with 4K page size, this gives 254 size classes! There is a
++ * trader-off here:
++ *  - Large number of size classes is potentially wasteful as free page are
++ *    spread across these classes
++ *  - Small number of size classes causes large internal fragmentation
++ *  - Probably its better to use specific size classes (empirically
++ *    determined). NOTE: all those class sizes must be set as multiple of
++ *    ZS_ALIGN to make sure link_free itself never has to span 2 pages.
++ *
++ *  ZS_MIN_ALLOC_SIZE and ZS_SIZE_CLASS_DELTA must be multiple of ZS_ALIGN
++ *  (reason above)
++ */
++#define ZS_SIZE_CLASS_DELTA	(PAGE_SIZE >> 8)
++#define ZS_SIZE_CLASSES		((ZS_MAX_ALLOC_SIZE - ZS_MIN_ALLOC_SIZE) / \
++					ZS_SIZE_CLASS_DELTA + 1)
++
++/*
++ * We do not maintain any list for completely empty or full pages
++ */
++enum fullness_group {
++	ZS_ALMOST_FULL,
++	ZS_ALMOST_EMPTY,
++	_ZS_NR_FULLNESS_GROUPS,
++
++	ZS_EMPTY,
++	ZS_FULL
++};
++
++/*
++ * We assign a page to ZS_ALMOST_EMPTY fullness group when:
++ *	n <= N / f, where
++ * n = number of allocated objects
++ * N = total number of objects zspage can store
++ * f = 1/fullness_threshold_frac
++ *
++ * Similarly, we assign zspage to:
++ *	ZS_ALMOST_FULL	when n > N / f
++ *	ZS_EMPTY	when n == 0
++ *	ZS_FULL		when n == N
++ *
++ * (see: fix_fullness_group())
++ */
++static const int fullness_threshold_frac = 4;
++
++struct size_class {
++	/*
++	 * Size of objects stored in this class. Must be multiple
++	 * of ZS_ALIGN.
++	 */
++	int size;
++	unsigned int index;
++
++	/* Number of PAGE_SIZE sized pages to combine to form a 'zspage' */
++	int pages_per_zspage;
++
++	spinlock_t lock;
++
++	/* stats */
++	u64 pages_allocated;
++
++	struct page *fullness_list[_ZS_NR_FULLNESS_GROUPS];
++};
++
++/*
++ * Placed within free objects to form a singly linked list.
++ * For every zspage, first_page->freelist gives head of this list.
++ *
++ * This must be power of 2 and less than or equal to ZS_ALIGN
++ */
++struct link_free {
++	/* Handle of next free chunk (encodes <PFN, obj_idx>) */
++	void *next;
++};
++
++struct zs_pool {
++	struct size_class size_class[ZS_SIZE_CLASSES];
++
++	struct zs_ops *ops;
++};
++
++/*
++ * A zspage's class index and fullness group
++ * are encoded in its (first)page->mapping
++ */
++#define CLASS_IDX_BITS	28
++#define FULLNESS_BITS	4
++#define CLASS_IDX_MASK	((1 << CLASS_IDX_BITS) - 1)
++#define FULLNESS_MASK	((1 << FULLNESS_BITS) - 1)
++
++struct mapping_area {
++#ifdef CONFIG_PGTABLE_MAPPING
++	struct vm_struct *vm; /* vm area for mapping object that span pages */
++#else
++	char *vm_buf; /* copy buffer for objects that span pages */
++#endif
++	char *vm_addr; /* address of kmap_atomic()'ed pages */
++	enum zs_mapmode vm_mm; /* mapping mode */
++};
++
++/* default page alloc/free ops */
++struct page *zs_alloc_page(gfp_t flags)
++{
++	return alloc_page(flags);
++}
++
++void zs_free_page(struct page *page)
++{
++	__free_page(page);
++}
++
++struct zs_ops zs_default_ops = {
++	.alloc = zs_alloc_page,
++	.free = zs_free_page
++};
++
++/* per-cpu VM mapping areas for zspage accesses that cross page boundaries */
++static DEFINE_PER_CPU(struct mapping_area, zs_map_area);
++
++static int is_first_page(struct page *page)
++{
++	return PagePrivate(page);
++}
++
++static int is_last_page(struct page *page)
++{
++	return PagePrivate2(page);
++}
++
++static void get_zspage_mapping(struct page *page, unsigned int *class_idx,
++				enum fullness_group *fullness)
++{
++	unsigned long m;
++	BUG_ON(!is_first_page(page));
++
++	m = (unsigned long)page->mapping;
++	*fullness = m & FULLNESS_MASK;
++	*class_idx = (m >> FULLNESS_BITS) & CLASS_IDX_MASK;
++}
++
++static void set_zspage_mapping(struct page *page, unsigned int class_idx,
++				enum fullness_group fullness)
++{
++	unsigned long m;
++	BUG_ON(!is_first_page(page));
++
++	m = ((class_idx & CLASS_IDX_MASK) << FULLNESS_BITS) |
++			(fullness & FULLNESS_MASK);
++	page->mapping = (struct address_space *)m;
++}
++
++/*
++ * zsmalloc divides the pool into various size classes where each
++ * class maintains a list of zspages where each zspage is divided
++ * into equal sized chunks. Each allocation falls into one of these
++ * classes depending on its size. This function returns index of the
++ * size class which has chunk size big enough to hold the give size.
++ */
++static int get_size_class_index(int size)
++{
++	int idx = 0;
++
++	if (likely(size > ZS_MIN_ALLOC_SIZE))
++		idx = DIV_ROUND_UP(size - ZS_MIN_ALLOC_SIZE,
++				ZS_SIZE_CLASS_DELTA);
++
++	return idx;
++}
++
++/*
++ * For each size class, zspages are divided into different groups
++ * depending on how "full" they are. This was done so that we could
++ * easily find empty or nearly empty zspages when we try to shrink
++ * the pool (not yet implemented). This function returns fullness
++ * status of the given page.
++ */
++static enum fullness_group get_fullness_group(struct page *page,
++					struct size_class *class)
++{
++	int inuse, max_objects;
++	enum fullness_group fg;
++	BUG_ON(!is_first_page(page));
++
++	inuse = page->inuse;
++	max_objects = class->pages_per_zspage * PAGE_SIZE / class->size;
++
++	if (inuse == 0)
++		fg = ZS_EMPTY;
++	else if (inuse == max_objects)
++		fg = ZS_FULL;
++	else if (inuse <= max_objects / fullness_threshold_frac)
++		fg = ZS_ALMOST_EMPTY;
++	else
++		fg = ZS_ALMOST_FULL;
++
++	return fg;
++}
++
++/*
++ * Each size class maintains various freelists and zspages are assigned
++ * to one of these freelists based on the number of live objects they
++ * have. This functions inserts the given zspage into the freelist
++ * identified by <class, fullness_group>.
++ */
++static void insert_zspage(struct page *page, struct size_class *class,
++				enum fullness_group fullness)
++{
++	struct page **head;
++
++	BUG_ON(!is_first_page(page));
++
++	if (fullness >= _ZS_NR_FULLNESS_GROUPS)
++		return;
++
++	head = &class->fullness_list[fullness];
++	if (*head)
++		list_add_tail(&page->lru, &(*head)->lru);
++
++	*head = page;
++}
++
++/*
++ * This function removes the given zspage from the freelist identified
++ * by <class, fullness_group>.
++ */
++static void remove_zspage(struct page *page, struct size_class *class,
++				enum fullness_group fullness)
++{
++	struct page **head;
++
++	BUG_ON(!is_first_page(page));
++
++	if (fullness >= _ZS_NR_FULLNESS_GROUPS)
++		return;
++
++	head = &class->fullness_list[fullness];
++	BUG_ON(!*head);
++	if (list_empty(&(*head)->lru))
++		*head = NULL;
++	else if (*head == page)
++		*head = (struct page *)list_entry((*head)->lru.next,
++					struct page, lru);
++
++	list_del_init(&page->lru);
++}
++
++/*
++ * Each size class maintains zspages in different fullness groups depending
++ * on the number of live objects they contain. When allocating or freeing
++ * objects, the fullness status of the page can change, say, from ALMOST_FULL
++ * to ALMOST_EMPTY when freeing an object. This function checks if such
++ * a status change has occurred for the given page and accordingly moves the
++ * page from the freelist of the old fullness group to that of the new
++ * fullness group.
++ */
++static enum fullness_group fix_fullness_group(struct zs_pool *pool,
++						struct page *page)
++{
++	int class_idx;
++	struct size_class *class;
++	enum fullness_group currfg, newfg;
++
++	BUG_ON(!is_first_page(page));
++
++	get_zspage_mapping(page, &class_idx, &currfg);
++	class = &pool->size_class[class_idx];
++	newfg = get_fullness_group(page, class);
++	if (newfg == currfg)
++		goto out;
++
++	remove_zspage(page, class, currfg);
++	insert_zspage(page, class, newfg);
++	set_zspage_mapping(page, class_idx, newfg);
++
++out:
++	return newfg;
++}
++
++/*
++ * We have to decide on how many pages to link together
++ * to form a zspage for each size class. This is important
++ * to reduce wastage due to unusable space left at end of
++ * each zspage which is given as:
++ *	wastage = Zp - Zp % size_class
++ * where Zp = zspage size = k * PAGE_SIZE where k = 1, 2, ...
++ *
++ * For example, for size class of 3/8 * PAGE_SIZE, we should
++ * link together 3 PAGE_SIZE sized pages to form a zspage
++ * since then we can perfectly fit in 8 such objects.
++ */
++static int get_pages_per_zspage(int class_size)
++{
++	int i, max_usedpc = 0;
++	/* zspage order which gives maximum used size per KB */
++	int max_usedpc_order = 1;
++
++	for (i = 1; i <= ZS_MAX_PAGES_PER_ZSPAGE; i++) {
++		int zspage_size;
++		int waste, usedpc;
++
++		zspage_size = i * PAGE_SIZE;
++		waste = zspage_size % class_size;
++		usedpc = (zspage_size - waste) * 100 / zspage_size;
++
++		if (usedpc > max_usedpc) {
++			max_usedpc = usedpc;
++			max_usedpc_order = i;
++		}
++	}
++
++	return max_usedpc_order;
++}
++
++/*
++ * A single 'zspage' is composed of many system pages which are
++ * linked together using fields in struct page. This function finds
++ * the first/head page, given any component page of a zspage.
++ */
++static struct page *get_first_page(struct page *page)
++{
++	if (is_first_page(page))
++		return page;
++	else
++		return page->first_page;
++}
++
++static struct page *get_next_page(struct page *page)
++{
++	struct page *next;
++
++	if (is_last_page(page))
++		next = NULL;
++	else if (is_first_page(page))
++		next = (struct page *)page->private;
++	else
++		next = list_entry(page->lru.next, struct page, lru);
++
++	return next;
++}
++
++/* Encode <page, obj_idx> as a single handle value */
++static void *obj_location_to_handle(struct page *page, unsigned long obj_idx)
++{
++	unsigned long handle;
++
++	if (!page) {
++		BUG_ON(obj_idx);
++		return NULL;
++	}
++
++	handle = page_to_pfn(page) << OBJ_INDEX_BITS;
++	handle |= (obj_idx & OBJ_INDEX_MASK);
++
++	return (void *)handle;
++}
++
++/* Decode <page, obj_idx> pair from the given object handle */
++static void obj_handle_to_location(unsigned long handle, struct page **page,
++				unsigned long *obj_idx)
++{
++	*page = pfn_to_page(handle >> OBJ_INDEX_BITS);
++	*obj_idx = handle & OBJ_INDEX_MASK;
++}
++
++static unsigned long obj_idx_to_offset(struct page *page,
++				unsigned long obj_idx, int class_size)
++{
++	unsigned long off = 0;
++
++	if (!is_first_page(page))
++		off = page->index;
++
++	return off + obj_idx * class_size;
++}
++
++static void reset_page(struct page *page)
++{
++	clear_bit(PG_private, &page->flags);
++	clear_bit(PG_private_2, &page->flags);
++	set_page_private(page, 0);
++	page->mapping = NULL;
++	page->freelist = NULL;
++	reset_page_mapcount(page);
++}
++
++static void free_zspage(struct zs_ops *ops, struct page *first_page)
++{
++	struct page *nextp, *tmp, *head_extra;
++
++	BUG_ON(!is_first_page(first_page));
++	BUG_ON(first_page->inuse);
++
++	head_extra = (struct page *)page_private(first_page);
++
++	reset_page(first_page);
++	ops->free(first_page);
++
++	/* zspage with only 1 system page */
++	if (!head_extra)
++		return;
++
++	list_for_each_entry_safe(nextp, tmp, &head_extra->lru, lru) {
++		list_del(&nextp->lru);
++		reset_page(nextp);
++		ops->free(nextp);
++	}
++	reset_page(head_extra);
++	ops->free(head_extra);
++}
++
++/* Initialize a newly allocated zspage */
++static void init_zspage(struct page *first_page, struct size_class *class)
++{
++	unsigned long off = 0;
++	struct page *page = first_page;
++
++	BUG_ON(!is_first_page(first_page));
++	while (page) {
++		struct page *next_page;
++		struct link_free *link;
++		unsigned int i, objs_on_page;
++
++		/*
++		 * page->index stores offset of first object starting
++		 * in the page. For the first page, this is always 0,
++		 * so we use first_page->index (aka ->freelist) to store
++		 * head of corresponding zspage's freelist.
++		 */
++		if (page != first_page)
++			page->index = off;
++
++		link = (struct link_free *)kmap_atomic(page) +
++						off / sizeof(*link);
++		objs_on_page = (PAGE_SIZE - off) / class->size;
++
++		for (i = 1; i <= objs_on_page; i++) {
++			off += class->size;
++			if (off < PAGE_SIZE) {
++				link->next = obj_location_to_handle(page, i);
++				link += class->size / sizeof(*link);
++			}
++		}
++
++		/*
++		 * We now come to the last (full or partial) object on this
++		 * page, which must point to the first object on the next
++		 * page (if present)
++		 */
++		next_page = get_next_page(page);
++		link->next = obj_location_to_handle(next_page, 0);
++		kunmap_atomic(link);
++		page = next_page;
++		off = (off + class->size) % PAGE_SIZE;
++	}
++}
++
++/*
++ * Allocate a zspage for the given size class
++ */
++static struct page *alloc_zspage(struct zs_ops *ops, struct size_class *class,
++				gfp_t flags)
++{
++	int i, error;
++	struct page *first_page = NULL, *uninitialized_var(prev_page);
++
++	/*
++	 * Allocate individual pages and link them together as:
++	 * 1. first page->private = first sub-page
++	 * 2. all sub-pages are linked together using page->lru
++	 * 3. each sub-page is linked to the first page using page->first_page
++	 *
++	 * For each size class, First/Head pages are linked together using
++	 * page->lru. Also, we set PG_private to identify the first page
++	 * (i.e. no other sub-page has this flag set) and PG_private_2 to
++	 * identify the last page.
++	 */
++	error = -ENOMEM;
++	for (i = 0; i < class->pages_per_zspage; i++) {
++		struct page *page;
++
++		page = ops->alloc(flags);
++		if (!page)
++			goto cleanup;
++
++		INIT_LIST_HEAD(&page->lru);
++		if (i == 0) {	/* first page */
++			SetPagePrivate(page);
++			set_page_private(page, 0);
++			first_page = page;
++			first_page->inuse = 0;
++		}
++		if (i == 1)
++			first_page->private = (unsigned long)page;
++		if (i >= 1)
++			page->first_page = first_page;
++		if (i >= 2)
++			list_add(&page->lru, &prev_page->lru);
++		if (i == class->pages_per_zspage - 1)	/* last page */
++			SetPagePrivate2(page);
++		prev_page = page;
++	}
++
++	init_zspage(first_page, class);
++
++	first_page->freelist = obj_location_to_handle(first_page, 0);
++
++	error = 0; /* Success */
++
++cleanup:
++	if (unlikely(error) && first_page) {
++		free_zspage(ops, first_page);
++		first_page = NULL;
++	}
++
++	return first_page;
++}
++
++static struct page *find_get_zspage(struct size_class *class)
++{
++	int i;
++	struct page *page;
++
++	for (i = 0; i < _ZS_NR_FULLNESS_GROUPS; i++) {
++		page = class->fullness_list[i];
++		if (page)
++			break;
++	}
++
++	return page;
++}
++
++#ifdef CONFIG_PGTABLE_MAPPING
++static inline int __zs_cpu_up(struct mapping_area *area)
++{
++	/*
++	 * Make sure we don't leak memory if a cpu UP notification
++	 * and zs_init() race and both call zs_cpu_up() on the same cpu
++	 */
++	if (area->vm)
++		return 0;
++	area->vm = alloc_vm_area(PAGE_SIZE * 2, NULL);
++	if (!area->vm)
++		return -ENOMEM;
++	return 0;
++}
++
++static inline void __zs_cpu_down(struct mapping_area *area)
++{
++	if (area->vm)
++		free_vm_area(area->vm);
++	area->vm = NULL;
++}
++
++static inline void *__zs_map_object(struct mapping_area *area,
++				struct page *pages[2], int off, int size)
++{
++	BUG_ON(map_vm_area(area->vm, PAGE_KERNEL, &pages));
++	area->vm_addr = area->vm->addr;
++	return area->vm_addr + off;
++}
++
++static inline void __zs_unmap_object(struct mapping_area *area,
++				struct page *pages[2], int off, int size)
++{
++	unsigned long addr = (unsigned long)area->vm_addr;
++	unsigned long end = addr + (PAGE_SIZE * 2);
++
++	flush_cache_vunmap(addr, end);
++	unmap_kernel_range_noflush(addr, PAGE_SIZE * 2);
++	flush_tlb_kernel_range(addr, end);
++}
++
++#else /* CONFIG_PGTABLE_MAPPING*/
++
++static inline int __zs_cpu_up(struct mapping_area *area)
++{
++	/*
++	 * Make sure we don't leak memory if a cpu UP notification
++	 * and zs_init() race and both call zs_cpu_up() on the same cpu
++	 */
++	if (area->vm_buf)
++		return 0;
++	area->vm_buf = (char *)__get_free_page(GFP_KERNEL);
++	if (!area->vm_buf)
++		return -ENOMEM;
++	return 0;
++}
++
++static inline void __zs_cpu_down(struct mapping_area *area)
++{
++	if (area->vm_buf)
++		free_page((unsigned long)area->vm_buf);
++	area->vm_buf = NULL;
++}
++
++static void *__zs_map_object(struct mapping_area *area,
++			struct page *pages[2], int off, int size)
++{
++	int sizes[2];
++	void *addr;
++	char *buf = area->vm_buf;
++
++	/* disable page faults to match kmap_atomic() return conditions */
++	pagefault_disable();
++
++	/* no read fastpath */
++	if (area->vm_mm == ZS_MM_WO)
++		goto out;
++
++	sizes[0] = PAGE_SIZE - off;
++	sizes[1] = size - sizes[0];
++
++	/* copy object to per-cpu buffer */
++	addr = kmap_atomic(pages[0]);
++	memcpy(buf, addr + off, sizes[0]);
++	kunmap_atomic(addr);
++	addr = kmap_atomic(pages[1]);
++	memcpy(buf + sizes[0], addr, sizes[1]);
++	kunmap_atomic(addr);
++out:
++	return area->vm_buf;
++}
++
++static void __zs_unmap_object(struct mapping_area *area,
++			struct page *pages[2], int off, int size)
++{
++	int sizes[2];
++	void *addr;
++	char *buf = area->vm_buf;
++
++	/* no write fastpath */
++	if (area->vm_mm == ZS_MM_RO)
++		goto out;
++
++	sizes[0] = PAGE_SIZE - off;
++	sizes[1] = size - sizes[0];
++
++	/* copy per-cpu buffer to object */
++	addr = kmap_atomic(pages[0]);
++	memcpy(addr + off, buf, sizes[0]);
++	kunmap_atomic(addr);
++	addr = kmap_atomic(pages[1]);
++	memcpy(addr, buf + sizes[0], sizes[1]);
++	kunmap_atomic(addr);
++
++out:
++	/* enable page faults to match kunmap_atomic() return conditions */
++	pagefault_enable();
++}
++
++#endif /* CONFIG_PGTABLE_MAPPING */
++
++static int zs_cpu_notifier(struct notifier_block *nb, unsigned long action,
++				void *pcpu)
++{
++	int ret, cpu = (long)pcpu;
++	struct mapping_area *area;
++
++	switch (action) {
++	case CPU_UP_PREPARE:
++		area = &per_cpu(zs_map_area, cpu);
++		ret = __zs_cpu_up(area);
++		if (ret)
++			return notifier_from_errno(ret);
++		break;
++	case CPU_DEAD:
++	case CPU_UP_CANCELED:
++		area = &per_cpu(zs_map_area, cpu);
++		__zs_cpu_down(area);
++		break;
++	}
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block zs_cpu_nb = {
++	.notifier_call = zs_cpu_notifier
++};
++
++static void zs_exit(void)
++{
++	int cpu;
++
++	for_each_online_cpu(cpu)
++		zs_cpu_notifier(NULL, CPU_DEAD, (void *)(long)cpu);
++	unregister_cpu_notifier(&zs_cpu_nb);
++}
++
++static int zs_init(void)
++{
++	int cpu, ret;
++
++	register_cpu_notifier(&zs_cpu_nb);
++	for_each_online_cpu(cpu) {
++		ret = zs_cpu_notifier(NULL, CPU_UP_PREPARE, (void *)(long)cpu);
++		if (notifier_to_errno(ret))
++			goto fail;
++	}
++	return 0;
++fail:
++	zs_exit();
++	return notifier_to_errno(ret);
++}
++
++/**
++ * zs_create_pool - Creates an allocation pool to work from.
++ * @flags: allocation flags used to allocate pool metadata
++ * @ops: allocation/free callbacks for expanding the pool
++ *
++ * This function must be called before anything when using
++ * the zsmalloc allocator.
++ *
++ * On success, a pointer to the newly created pool is returned,
++ * otherwise NULL.
++ */
++struct zs_pool *zs_create_pool(gfp_t flags, struct zs_ops *ops)
++{
++	int i, ovhd_size;
++	struct zs_pool *pool;
++
++	ovhd_size = roundup(sizeof(*pool), PAGE_SIZE);
++	pool = kzalloc(ovhd_size, flags);
++	if (!pool)
++		return NULL;
++
++	for (i = 0; i < ZS_SIZE_CLASSES; i++) {
++		int size;
++		struct size_class *class;
++
++		size = ZS_MIN_ALLOC_SIZE + i * ZS_SIZE_CLASS_DELTA;
++		if (size > ZS_MAX_ALLOC_SIZE)
++			size = ZS_MAX_ALLOC_SIZE;
++
++		class = &pool->size_class[i];
++		class->size = size;
++		class->index = i;
++		spin_lock_init(&class->lock);
++		class->pages_per_zspage = get_pages_per_zspage(size);
++
++	}
++
++	if (ops)
++		pool->ops = ops;
++	else
++		pool->ops = &zs_default_ops;
++
++	return pool;
++}
++EXPORT_SYMBOL_GPL(zs_create_pool);
++
++void zs_destroy_pool(struct zs_pool *pool)
++{
++	int i;
++
++	for (i = 0; i < ZS_SIZE_CLASSES; i++) {
++		int fg;
++		struct size_class *class = &pool->size_class[i];
++
++		for (fg = 0; fg < _ZS_NR_FULLNESS_GROUPS; fg++) {
++			if (class->fullness_list[fg]) {
++				pr_info("Freeing non-empty class with size "
++					"%db, fullness group %d\n",
++					class->size, fg);
++			}
++		}
++	}
++	kfree(pool);
++}
++EXPORT_SYMBOL_GPL(zs_destroy_pool);
++
++/**
++ * zs_malloc - Allocate block of given size from pool.
++ * @pool: pool to allocate from
++ * @size: size of block to allocate
++ *
++ * On success, handle to the allocated object is returned,
++ * otherwise 0.
++ * Allocation requests with size > ZS_MAX_ALLOC_SIZE will fail.
++ */
++unsigned long zs_malloc(struct zs_pool *pool, size_t size, gfp_t flags)
++{
++	unsigned long obj;
++	struct link_free *link;
++	int class_idx;
++	struct size_class *class;
++
++	struct page *first_page, *m_page;
++	unsigned long m_objidx, m_offset;
++
++	if (unlikely(!size || size > ZS_MAX_ALLOC_SIZE))
++		return 0;
++
++	class_idx = get_size_class_index(size);
++	class = &pool->size_class[class_idx];
++	BUG_ON(class_idx != class->index);
++
++	spin_lock(&class->lock);
++	first_page = find_get_zspage(class);
++
++	if (!first_page) {
++		spin_unlock(&class->lock);
++		first_page = alloc_zspage(pool->ops, class, flags);
++		if (unlikely(!first_page))
++			return 0;
++
++		set_zspage_mapping(first_page, class->index, ZS_EMPTY);
++		spin_lock(&class->lock);
++		class->pages_allocated += class->pages_per_zspage;
++	}
++
++	obj = (unsigned long)first_page->freelist;
++	obj_handle_to_location(obj, &m_page, &m_objidx);
++	m_offset = obj_idx_to_offset(m_page, m_objidx, class->size);
++
++	link = (struct link_free *)kmap_atomic(m_page) +
++					m_offset / sizeof(*link);
++	first_page->freelist = link->next;
++	memset(link, POISON_INUSE, sizeof(*link));
++	kunmap_atomic(link);
++
++	first_page->inuse++;
++	/* Now move the zspage to another fullness group, if required */
++	fix_fullness_group(pool, first_page);
++	spin_unlock(&class->lock);
++
++	return obj;
++}
++EXPORT_SYMBOL_GPL(zs_malloc);
++
++void zs_free(struct zs_pool *pool, unsigned long obj)
++{
++	struct link_free *link;
++	struct page *first_page, *f_page;
++	unsigned long f_objidx, f_offset;
++
++	int class_idx;
++	struct size_class *class;
++	enum fullness_group fullness;
++
++	if (unlikely(!obj))
++		return;
++
++	obj_handle_to_location(obj, &f_page, &f_objidx);
++	first_page = get_first_page(f_page);
++
++	get_zspage_mapping(first_page, &class_idx, &fullness);
++	class = &pool->size_class[class_idx];
++	f_offset = obj_idx_to_offset(f_page, f_objidx, class->size);
++
++	spin_lock(&class->lock);
++
++	/* Insert this object in containing zspage's freelist */
++	link = (struct link_free *)((unsigned char *)kmap_atomic(f_page)
++							+ f_offset);
++	link->next = first_page->freelist;
++	kunmap_atomic(link);
++	first_page->freelist = (void *)obj;
++
++	first_page->inuse--;
++	fullness = fix_fullness_group(pool, first_page);
++
++	if (fullness == ZS_EMPTY)
++		class->pages_allocated -= class->pages_per_zspage;
++
++	spin_unlock(&class->lock);
++
++	if (fullness == ZS_EMPTY)
++		free_zspage(pool->ops, first_page);
++}
++EXPORT_SYMBOL_GPL(zs_free);
++
++/**
++ * zs_map_object - get address of allocated object from handle.
++ * @pool: pool from which the object was allocated
++ * @handle: handle returned from zs_malloc
++ *
++ * Before using an object allocated from zs_malloc, it must be mapped using
++ * this function. When done with the object, it must be unmapped using
++ * zs_unmap_object.
++ *
++ * Only one object can be mapped per cpu at a time. There is no protection
++ * against nested mappings.
++ *
++ * This function returns with preemption and page faults disabled.
++*/
++void *zs_map_object(struct zs_pool *pool, unsigned long handle,
++			enum zs_mapmode mm)
++{
++	struct page *page;
++	unsigned long obj_idx, off;
++
++	unsigned int class_idx;
++	enum fullness_group fg;
++	struct size_class *class;
++	struct mapping_area *area;
++	struct page *pages[2];
++
++	BUG_ON(!handle);
++
++	/*
++	 * Because we use per-cpu mapping areas shared among the
++	 * pools/users, we can't allow mapping in interrupt context
++	 * because it can corrupt another users mappings.
++	 */
++	BUG_ON(in_interrupt());
++
++	obj_handle_to_location(handle, &page, &obj_idx);
++	get_zspage_mapping(get_first_page(page), &class_idx, &fg);
++	class = &pool->size_class[class_idx];
++	off = obj_idx_to_offset(page, obj_idx, class->size);
++
++	area = &get_cpu_var(zs_map_area);
++	area->vm_mm = mm;
++	if (off + class->size <= PAGE_SIZE) {
++		/* this object is contained entirely within a page */
++		area->vm_addr = kmap_atomic(page);
++		return area->vm_addr + off;
++	}
++
++	/* this object spans two pages */
++	pages[0] = page;
++	pages[1] = get_next_page(page);
++	BUG_ON(!pages[1]);
++
++	return __zs_map_object(area, pages, off, class->size);
++}
++EXPORT_SYMBOL_GPL(zs_map_object);
++
++void zs_unmap_object(struct zs_pool *pool, unsigned long handle)
++{
++	struct page *page;
++	unsigned long obj_idx, off;
++
++	unsigned int class_idx;
++	enum fullness_group fg;
++	struct size_class *class;
++	struct mapping_area *area;
++
++	BUG_ON(!handle);
++
++	obj_handle_to_location(handle, &page, &obj_idx);
++	get_zspage_mapping(get_first_page(page), &class_idx, &fg);
++	class = &pool->size_class[class_idx];
++	off = obj_idx_to_offset(page, obj_idx, class->size);
++
++	area = &__get_cpu_var(zs_map_area);
++	if (off + class->size <= PAGE_SIZE)
++		kunmap_atomic(area->vm_addr);
++	else {
++		struct page *pages[2];
++
++		pages[0] = page;
++		pages[1] = get_next_page(page);
++		BUG_ON(!pages[1]);
++
++		__zs_unmap_object(area, pages, off, class->size);
++	}
++	put_cpu_var(zs_map_area);
++}
++EXPORT_SYMBOL_GPL(zs_unmap_object);
++
++u64 zs_get_total_size_bytes(struct zs_pool *pool)
++{
++	int i;
++	u64 npages = 0;
++
++	for (i = 0; i < ZS_SIZE_CLASSES; i++)
++		npages += pool->size_class[i].pages_allocated;
++
++	return npages << PAGE_SHIFT;
++}
++EXPORT_SYMBOL_GPL(zs_get_total_size_bytes);
++
++module_init(zs_init);
++module_exit(zs_exit);
++
++MODULE_LICENSE("Dual BSD/GPL");
++MODULE_AUTHOR("Nitin Gupta <ngupta@vflare.org>");
+diff --git a/mm/zswap.c b/mm/zswap.c
+new file mode 100644
+index 0000000..50bf537
+--- /dev/null
++++ b/mm/zswap.c
+@@ -0,0 +1,1167 @@
++/*
++ * zswap.c - zswap driver file
++ *
++ * zswap is a backend for frontswap that takes pages that are in the
++ * process of being swapped out and attempts to compress them and store
++ * them in a RAM-based memory pool.  This results in a significant I/O
++ * reduction on the real swap device and, in the case of a slow swap
++ * device, can also improve workload performance.
++ *
++ * Copyright (C) 2012  Seth Jennings <sjenning@linux.vnet.ibm.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++*/
++
++#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
++
++#include <linux/module.h>
++#include <linux/cpu.h>
++#include <linux/highmem.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++#include <linux/types.h>
++#include <linux/atomic.h>
++#include <linux/frontswap.h>
++#include <linux/rbtree.h>
++#include <linux/swap.h>
++#include <linux/crypto.h>
++#include <linux/mempool.h>
++#include <linux/zsmalloc.h>
++
++#include <linux/mm_types.h>
++#include <linux/page-flags.h>
++#include <linux/swapops.h>
++#include <linux/writeback.h>
++#include <linux/pagemap.h>
++
++/*********************************
++* statistics
++**********************************/
++/* Number of memory pages used by the compressed pool */
++static atomic_t zswap_pool_pages = ATOMIC_INIT(0);
++/* The number of compressed pages currently stored in zswap */
++static atomic_t zswap_stored_pages = ATOMIC_INIT(0);
++/* The number of outstanding pages awaiting writeback */
++static atomic_t zswap_outstanding_writebacks = ATOMIC_INIT(0);
++
++/*
++ * The statistics below are not protected from concurrent access for
++ * performance reasons so they may not be a 100% accurate.  However,
++ * they do provide useful information on roughly how many times a
++ * certain event is occurring.
++*/
++static u64 zswap_pool_limit_hit;
++static u64 zswap_written_back_pages;
++static u64 zswap_reject_compress_poor;
++static u64 zswap_writeback_attempted;
++static u64 zswap_reject_tmppage_fail;
++static u64 zswap_reject_zsmalloc_fail;
++static u64 zswap_reject_kmemcache_fail;
++static u64 zswap_saved_by_writeback;
++static u64 zswap_duplicate_entry;
++
++/*********************************
++* tunables
++**********************************/
++/* Enable/disable zswap (enabled by default, fixed at boot for now) */
++static bool zswap_enabled = 1;
++module_param_named(enabled, zswap_enabled, bool, 0);
++
++/* Compressor to be used by zswap (fixed at boot for now) */
++#define ZSWAP_COMPRESSOR_DEFAULT "lzo"
++static char *zswap_compressor = ZSWAP_COMPRESSOR_DEFAULT;
++module_param_named(compressor, zswap_compressor, charp, 0);
++
++/* The maximum percentage of memory that the compressed pool can occupy */
++static unsigned int zswap_max_pool_percent = 20;
++module_param_named(max_pool_percent,
++			zswap_max_pool_percent, uint, 0644);
++
++/*
++ * Maximum compression ratio, as as percentage, for an acceptable
++ * compressed page. Any pages that do not compress by at least
++ * this ratio will be rejected.
++*/
++static unsigned int zswap_max_compression_ratio = 80;
++module_param_named(max_compression_ratio,
++			zswap_max_compression_ratio, uint, 0644);
++
++/*
++ * Maximum number of outstanding writebacks allowed at any given time.
++ * This is to prevent decompressing an unbounded number of compressed
++ * pages into the swap cache all at once, and to help with writeback
++ * congestion.
++*/
++#define ZSWAP_MAX_OUTSTANDING_FLUSHES 64
++
++/*********************************
++* compression functions
++**********************************/
++/* per-cpu compression transforms */
++static struct crypto_comp * __percpu *zswap_comp_pcpu_tfms;
++
++enum comp_op {
++	ZSWAP_COMPOP_COMPRESS,
++	ZSWAP_COMPOP_DECOMPRESS
++};
++
++static int zswap_comp_op(enum comp_op op, const u8 *src, unsigned int slen,
++				u8 *dst, unsigned int *dlen)
++{
++	struct crypto_comp *tfm;
++	int ret;
++
++	tfm = *per_cpu_ptr(zswap_comp_pcpu_tfms, get_cpu());
++	switch (op) {
++	case ZSWAP_COMPOP_COMPRESS:
++		ret = crypto_comp_compress(tfm, src, slen, dst, dlen);
++		break;
++	case ZSWAP_COMPOP_DECOMPRESS:
++		ret = crypto_comp_decompress(tfm, src, slen, dst, dlen);
++		break;
++	default:
++		ret = -EINVAL;
++	}
++
++	put_cpu();
++	return ret;
++}
++
++static int __init zswap_comp_init(void)
++{
++	if (!crypto_has_comp(zswap_compressor, 0, 0)) {
++		pr_info("%s compressor not available\n", zswap_compressor);
++		/* fall back to default compressor */
++		zswap_compressor = ZSWAP_COMPRESSOR_DEFAULT;
++		if (!crypto_has_comp(zswap_compressor, 0, 0))
++			/* can't even load the default compressor */
++			return -ENODEV;
++	}
++	pr_info("using %s compressor\n", zswap_compressor);
++
++	/* alloc percpu transforms */
++	zswap_comp_pcpu_tfms = alloc_percpu(struct crypto_comp *);
++	if (!zswap_comp_pcpu_tfms)
++		return -ENOMEM;
++	return 0;
++}
++
++static void zswap_comp_exit(void)
++{
++	/* free percpu transforms */
++	if (zswap_comp_pcpu_tfms)
++		free_percpu(zswap_comp_pcpu_tfms);
++}
++
++/*********************************
++* data structures
++**********************************/
++
++/*
++ * struct zswap_entry
++ *
++ * This structure contains the metadata for tracking a single compressed
++ * page within zswap.
++ *
++ * rbnode - links the entry into red-black tree for the appropriate swap type
++ * lru - links the entry into the lru list for the appropriate swap type
++ * refcount - the number of outstanding reference to the entry. This is needed
++ *            to protect against premature freeing of the entry by code
++ *            concurent calls to load, invalidate, and writeback.  The lock
++ *            for the zswap_tree structure that contains the entry must
++ *            be held while changing the refcount.  Since the lock must
++ *            be held, there is no reason to also make refcount atomic.
++ * type - the swap type for the entry.  Used to map back to the zswap_tree
++ *        structure that contains the entry.
++ * offset - the swap offset for the entry.  Index into the red-black tree.
++ * handle - zsmalloc allocation handle that stores the compressed page data
++ * length - the length in bytes of the compressed page data.  Needed during
++            decompression
++ */
++struct zswap_entry {
++	struct rb_node rbnode;
++	struct list_head lru;
++	int refcount;
++	pgoff_t offset;
++	unsigned long handle;
++	unsigned int length;
++};
++
++/*
++ * The tree lock in the zswap_tree struct protects a few things:
++ * - the rbtree
++ * - the lru list
++ * - the refcount field of each entry in the tree
++ */
++struct zswap_tree {
++	struct rb_root rbroot;
++	struct list_head lru;
++	spinlock_t lock;
++	struct zs_pool *pool;
++	unsigned type;
++};
++
++static struct zswap_tree *zswap_trees[MAX_SWAPFILES];
++
++/*********************************
++* zswap entry functions
++**********************************/
++#define ZSWAP_KMEM_CACHE_NAME "zswap_entry_cache"
++static struct kmem_cache *zswap_entry_cache;
++
++static inline int zswap_entry_cache_create(void)
++{
++	zswap_entry_cache =
++		kmem_cache_create(ZSWAP_KMEM_CACHE_NAME,
++			sizeof(struct zswap_entry), 0, 0, NULL);
++	return (zswap_entry_cache == NULL);
++}
++
++static inline void zswap_entry_cache_destory(void)
++{
++	kmem_cache_destroy(zswap_entry_cache);
++}
++
++static inline struct zswap_entry *zswap_entry_cache_alloc(gfp_t gfp)
++{
++	struct zswap_entry *entry;
++	entry = kmem_cache_alloc(zswap_entry_cache, gfp);
++	if (!entry)
++		return NULL;
++	INIT_LIST_HEAD(&entry->lru);
++	entry->refcount = 1;
++	return entry;
++}
++
++static inline void zswap_entry_cache_free(struct zswap_entry *entry)
++{
++	kmem_cache_free(zswap_entry_cache, entry);
++}
++
++static inline void zswap_entry_get(struct zswap_entry *entry)
++{
++	entry->refcount++;
++}
++
++static inline int zswap_entry_put(struct zswap_entry *entry)
++{
++	entry->refcount--;
++	return entry->refcount;
++}
++
++/*********************************
++* rbtree functions
++**********************************/
++static struct zswap_entry *zswap_rb_search(struct rb_root *root, pgoff_t offset)
++{
++	struct rb_node *node = root->rb_node;
++	struct zswap_entry *entry;
++
++	while (node) {
++		entry = rb_entry(node, struct zswap_entry, rbnode);
++		if (entry->offset > offset)
++			node = node->rb_left;
++		else if (entry->offset < offset)
++			node = node->rb_right;
++		else
++			return entry;
++	}
++	return NULL;
++}
++
++/*
++ * In the case that a entry with the same offset is found, it a pointer to
++ * the existing entry is stored in dupentry and the function returns -EEXIST
++*/
++static int zswap_rb_insert(struct rb_root *root, struct zswap_entry *entry,
++			struct zswap_entry **dupentry)
++{
++	struct rb_node **link = &root->rb_node, *parent = NULL;
++	struct zswap_entry *myentry;
++
++	while (*link) {
++		parent = *link;
++		myentry = rb_entry(parent, struct zswap_entry, rbnode);
++		if (myentry->offset > entry->offset)
++			link = &(*link)->rb_left;
++		else if (myentry->offset < entry->offset)
++			link = &(*link)->rb_right;
++		else {
++			*dupentry = myentry;
++			return -EEXIST;
++		}
++	}
++	rb_link_node(&entry->rbnode, parent, link);
++	rb_insert_color(&entry->rbnode, root);
++	return 0;
++}
++
++/*********************************
++* per-cpu code
++**********************************/
++static DEFINE_PER_CPU(u8 *, zswap_dstmem);
++
++static int __zswap_cpu_notifier(unsigned long action, unsigned long cpu)
++{
++	struct crypto_comp *tfm;
++	u8 *dst;
++
++	switch (action) {
++	case CPU_UP_PREPARE:
++		tfm = crypto_alloc_comp(zswap_compressor, 0, 0);
++		if (IS_ERR(tfm)) {
++			pr_err("can't allocate compressor transform\n");
++			return NOTIFY_BAD;
++		}
++		*per_cpu_ptr(zswap_comp_pcpu_tfms, cpu) = tfm;
++		dst = (u8 *)__get_free_pages(GFP_KERNEL, 1);
++		if (!dst) {
++			pr_err("can't allocate compressor buffer\n");
++			crypto_free_comp(tfm);
++			*per_cpu_ptr(zswap_comp_pcpu_tfms, cpu) = NULL;
++			return NOTIFY_BAD;
++		}
++		per_cpu(zswap_dstmem, cpu) = dst;
++		break;
++	case CPU_DEAD:
++	case CPU_UP_CANCELED:
++		tfm = *per_cpu_ptr(zswap_comp_pcpu_tfms, cpu);
++		if (tfm) {
++			crypto_free_comp(tfm);
++			*per_cpu_ptr(zswap_comp_pcpu_tfms, cpu) = NULL;
++		}
++		dst = per_cpu(zswap_dstmem, cpu);
++		if (dst) {
++			free_pages((unsigned long)dst, 1);
++			per_cpu(zswap_dstmem, cpu) = NULL;
++		}
++		break;
++	default:
++		break;
++	}
++	return NOTIFY_OK;
++}
++
++static int zswap_cpu_notifier(struct notifier_block *nb,
++				unsigned long action, void *pcpu)
++{
++	unsigned long cpu = (unsigned long)pcpu;
++	return __zswap_cpu_notifier(action, cpu);
++}
++
++static struct notifier_block zswap_cpu_notifier_block = {
++	.notifier_call = zswap_cpu_notifier
++};
++
++static int zswap_cpu_init(void)
++{
++	unsigned long cpu;
++
++	get_online_cpus();
++	for_each_online_cpu(cpu)
++		if (__zswap_cpu_notifier(CPU_UP_PREPARE, cpu) != NOTIFY_OK)
++			goto cleanup;
++	register_cpu_notifier(&zswap_cpu_notifier_block);
++	put_online_cpus();
++	return 0;
++
++cleanup:
++	for_each_online_cpu(cpu)
++		__zswap_cpu_notifier(CPU_UP_CANCELED, cpu);
++	put_online_cpus();
++	return -ENOMEM;
++}
++
++/*********************************
++* zsmalloc callbacks
++**********************************/
++static mempool_t *zswap_page_pool;
++
++static inline unsigned int zswap_max_pool_pages(void)
++{
++	return zswap_max_pool_percent * totalram_pages / 100;
++}
++
++static inline int zswap_page_pool_create(void)
++{
++	/* TODO: dynamically size mempool */
++	zswap_page_pool = mempool_create_page_pool(256, 0);
++	if (!zswap_page_pool)
++		return -ENOMEM;
++	return 0;
++}
++
++static inline void zswap_page_pool_destroy(void)
++{
++	mempool_destroy(zswap_page_pool);
++}
++
++static struct page *zswap_alloc_page(gfp_t flags)
++{
++	struct page *page;
++
++	if (atomic_read(&zswap_pool_pages) >= zswap_max_pool_pages()) {
++		zswap_pool_limit_hit++;
++		return NULL;
++	}
++	page = mempool_alloc(zswap_page_pool, flags);
++	if (page)
++		atomic_inc(&zswap_pool_pages);
++	return page;
++}
++
++static void zswap_free_page(struct page *page)
++{
++	if (!page)
++		return;
++	mempool_free(page, zswap_page_pool);
++	atomic_dec(&zswap_pool_pages);
++}
++
++static struct zs_ops zswap_zs_ops = {
++	.alloc = zswap_alloc_page,
++	.free = zswap_free_page
++};
++
++
++/*********************************
++* helpers
++**********************************/
++
++/*
++ * Carries out the common pattern of freeing and entry's zsmalloc allocation,
++ * freeing the entry itself, and decrementing the number of stored pages.
++ */
++static void zswap_free_entry(struct zswap_tree *tree, struct zswap_entry *entry)
++{
++	zs_free(tree->pool, entry->handle);
++	zswap_entry_cache_free(entry);
++	atomic_dec(&zswap_stored_pages);
++}
++
++/*********************************
++* writeback code
++**********************************/
++#ifdef CONFIG_ZSWAP_ENABLE_WRITEBACK
++static void zswap_end_swap_write(struct bio *bio, int err)
++{
++	end_swap_bio_write(bio, err);
++	atomic_dec(&zswap_outstanding_writebacks);
++	zswap_written_back_pages++;
++}
++
++/* return enum for zswap_get_swap_cache_page */
++enum zswap_get_swap_ret {
++	ZSWAP_SWAPCACHE_NEW,
++	ZSWAP_SWAPCACHE_EXIST,
++	ZSWAP_SWAPCACHE_NOMEM
++};
++
++/*
++ * zswap_get_swap_cache_page
++ *
++ * This is an adaption of read_swap_cache_async()
++ *
++ * This function tries to find a page with the given swap entry
++ * in the swapper_space address space (the swap cache).  If the page
++ * is found, it is returned in retpage.  Otherwise, a page is allocated,
++ * added to the swap cache, and returned in retpage.
++ *
++ * If success, the swap cache page is returned in retpage
++ * Returns 0 if page was already in the swap cache, page is not locked
++ * Returns 1 if the new page needs to be populated, page is locked
++ * Returns <0 on error
++ */
++static int zswap_get_swap_cache_page(swp_entry_t entry,
++				struct page **retpage)
++{
++	struct page *found_page, *new_page = NULL;
++	int err;
++
++	*retpage = NULL;
++	do {
++		/*
++		 * First check the swap cache.  Since this is normally
++		 * called after lookup_swap_cache() failed, re-calling
++		 * that would confuse statistics.
++		 */
++		found_page = find_get_page(&swapper_space, entry.val);
++		if (found_page)
++			break;
++
++		/*
++		 * Get a new page to read into from swap.
++		 */
++		if (!new_page) {
++			new_page = alloc_page(GFP_KERNEL);
++			if (!new_page)
++				break; /* Out of memory */
++		}
++
++		/*
++		 * call radix_tree_preload() while we can wait.
++		 */
++		err = radix_tree_preload(GFP_KERNEL);
++		if (err)
++			break;
++
++		/*
++		 * Swap entry may have been freed since our caller observed it.
++		 */
++		err = swapcache_prepare(entry);
++		if (err == -EEXIST) { /* seems racy */
++			radix_tree_preload_end();
++			continue;
++		}
++		if (err) { /* swp entry is obsolete ? */
++			radix_tree_preload_end();
++			break;
++		}
++
++		/* May fail (-ENOMEM) if radix-tree node allocation failed. */
++		__set_page_locked(new_page);
++		SetPageSwapBacked(new_page);
++		err = __add_to_swap_cache(new_page, entry);
++		if (likely(!err)) {
++			radix_tree_preload_end();
++			lru_cache_add_anon(new_page);
++			*retpage = new_page;
++			return ZSWAP_SWAPCACHE_NEW;
++		}
++		radix_tree_preload_end();
++		ClearPageSwapBacked(new_page);
++		__clear_page_locked(new_page);
++		/*
++		 * add_to_swap_cache() doesn't return -EEXIST, so we can safely
++		 * clear SWAP_HAS_CACHE flag.
++		 */
++		swapcache_free(entry, NULL);
++	} while (err != -ENOMEM);
++
++	if (new_page)
++		page_cache_release(new_page);
++	if (!found_page)
++		return ZSWAP_SWAPCACHE_NOMEM;
++	*retpage = found_page;
++	return ZSWAP_SWAPCACHE_EXIST;
++}
++
++/*
++ * Attempts to free and entry by adding a page to the swap cache,
++ * decompressing the entry data into the page, and issuing a
++ * bio write to write the page back to the swap device.
++ *
++ * This can be thought of as a "resumed writeback" of the page
++ * to the swap device.  We are basically resuming the same swap
++ * writeback path that was intercepted with the frontswap_store()
++ * in the first place.  After the page has been decompressed into
++ * the swap cache, the compressed version stored by zswap can be
++ * freed.
++ */
++static int zswap_writeback_entry(struct zswap_tree *tree, struct zswap_entry *entry)
++{
++	unsigned long type = tree->type;
++	struct page *page;
++	swp_entry_t swpentry;
++	u8 *src, *dst;
++	unsigned int dlen;
++	int ret;
++	struct writeback_control wbc = {
++		.sync_mode = WB_SYNC_NONE,
++	};
++
++	/* get/allocate page in the swap cache */
++	swpentry = swp_entry(type, entry->offset);
++
++	/* try to allocate swap cache page */
++	switch (zswap_get_swap_cache_page(swpentry, &page)) {
++
++	case ZSWAP_SWAPCACHE_NOMEM: /* no memory */
++		return -ENOMEM;
++		break; /* not reached */
++
++	case ZSWAP_SWAPCACHE_EXIST: /* page is unlocked */
++		/* page is already in the swap cache, ignore for now */
++		return -EEXIST;
++		break; /* not reached */
++
++	case ZSWAP_SWAPCACHE_NEW: /* page is locked */
++		/* decompress */
++		dlen = PAGE_SIZE;
++		src = zs_map_object(tree->pool, entry->handle, ZS_MM_RO);
++		dst = kmap_atomic(page);
++		ret = zswap_comp_op(ZSWAP_COMPOP_DECOMPRESS, src, entry->length,
++				dst, &dlen);
++		kunmap_atomic(dst);
++		zs_unmap_object(tree->pool, entry->handle);
++		BUG_ON(ret);
++		BUG_ON(dlen != PAGE_SIZE);
++
++		/* page is up to date */
++		SetPageUptodate(page);
++	}
++
++	/* start writeback */
++	SetPageReclaim(page);
++	/*
++	 * Return value is ignored here because it doesn't change anything
++	 * for us.  Page is returned unlocked.
++	 */
++	(void)__swap_writepage(page, &wbc, zswap_end_swap_write);
++	page_cache_release(page);
++	atomic_inc(&zswap_outstanding_writebacks);
++
++	return 0;
++}
++
++/*
++ * Attempts to free nr of entries via writeback to the swap device.
++ * The number of entries that were actually freed is returned.
++ */
++static int zswap_writeback_entries(struct zswap_tree *tree, int nr)
++{
++	struct zswap_entry *entry;
++	int i, ret, refcount, freed_nr = 0;
++
++	/*
++	 * This limits is arbitrary for now until a better
++	 * policy can be implemented. This is so we don't
++	 * eat all of RAM decompressing pages for writeback.
++	 */
++	if (atomic_read(&zswap_outstanding_writebacks) >
++		ZSWAP_MAX_OUTSTANDING_FLUSHES)
++		return 0;
++
++	for (i = 0; i < nr; i++) {
++		spin_lock(&tree->lock);
++
++		/* dequeue from lru */
++		if (list_empty(&tree->lru)) {
++			spin_unlock(&tree->lock);
++			break;
++		}
++		entry = list_first_entry(&tree->lru,
++				struct zswap_entry, lru);
++		list_del_init(&entry->lru);
++
++		/* so invalidate doesn't free the entry from under us */
++		zswap_entry_get(entry);
++
++		spin_unlock(&tree->lock);
++
++		/* attempt writeback */
++		ret = zswap_writeback_entry(tree, entry);
++
++		spin_lock(&tree->lock);
++
++		/* drop reference from above */
++		refcount = zswap_entry_put(entry);
++
++		if (!ret)
++			 /* drop the initial reference from entry creation */
++			refcount = zswap_entry_put(entry);
++
++		/*
++		 * There are three possible values for refcount here:
++		 * (1) refcount is 1, load is in progress or writeback failed;
++		 *     do not free entry, add back to LRU
++		 * (2) refcount is 0, (usual case) not invalidate yet;
++		 *     free entry
++		 * (3) refcount is -1, invalidate happened during writeback;
++		 *     free entry
++		 */
++		if (refcount > 0)
++			list_add(&entry->lru, &tree->lru);
++
++		if (refcount == 0) {
++			/* no invalidate yet, remove from rbtree */
++			rb_erase(&entry->rbnode, &tree->rbroot);
++		}
++		spin_unlock(&tree->lock);
++		if (refcount <= 0) {
++			/* free the entry */
++			zswap_free_entry(tree, entry);
++			freed_nr++;
++		}
++			
++		if (atomic_read(&zswap_outstanding_writebacks) >
++			ZSWAP_MAX_OUTSTANDING_FLUSHES)
++			break;
++	}
++	return freed_nr++;
++}
++#endif /* CONFIG_ZSWAP_ENABLE_WRITEBACK */
++
++/*******************************************
++* page pool for temporary compression result
++********************************************/
++#define ZSWAP_TMPPAGE_POOL_PAGES 16
++static LIST_HEAD(zswap_tmppage_list);
++static DEFINE_SPINLOCK(zswap_tmppage_lock);
++
++static void zswap_tmppage_pool_destroy(void)
++{
++	struct page *page, *tmppage;
++
++	spin_lock(&zswap_tmppage_lock);
++	list_for_each_entry_safe(page, tmppage, &zswap_tmppage_list, lru) {
++		list_del(&page->lru);
++		__free_pages(page, 1);
++	}
++	spin_unlock(&zswap_tmppage_lock);
++}
++
++static int zswap_tmppage_pool_create(void)
++{
++	int i;
++	struct page *page;
++
++	for (i = 0; i < ZSWAP_TMPPAGE_POOL_PAGES; i++) {
++		page = alloc_pages(GFP_KERNEL, 1);
++		if (!page) {
++			zswap_tmppage_pool_destroy();
++			return -ENOMEM;
++		}
++		spin_lock(&zswap_tmppage_lock);
++		list_add(&page->lru, &zswap_tmppage_list);
++		spin_unlock(&zswap_tmppage_lock);
++	}
++	return 0;
++}
++
++static inline struct page *zswap_tmppage_alloc(void)
++{
++	struct page *page;
++
++	spin_lock(&zswap_tmppage_lock);
++	if (list_empty(&zswap_tmppage_list)) {
++		spin_unlock(&zswap_tmppage_lock);
++		return NULL;
++	}
++	page = list_first_entry(&zswap_tmppage_list, struct page, lru);
++	list_del(&page->lru);
++	spin_unlock(&zswap_tmppage_lock);
++	return page;
++}
++
++static inline void zswap_tmppage_free(struct page *page)
++{
++	spin_lock(&zswap_tmppage_lock);
++	list_add(&page->lru, &zswap_tmppage_list);
++	spin_unlock(&zswap_tmppage_lock);
++}
++
++/*********************************
++* frontswap hooks
++**********************************/
++/* attempts to compress and store an single page */
++static int zswap_frontswap_store(unsigned type, pgoff_t offset,
++				struct page *page)
++{
++	struct zswap_tree *tree = zswap_trees[type];
++	struct zswap_entry *entry, *dupentry;
++	int ret;
++	unsigned int dlen = PAGE_SIZE;
++	unsigned long handle;
++	char *buf;
++	u8 *src, *dst;
++	struct page *tmppage;
++	bool writeback_attempted = 0;
++#ifdef CONFIG_ZSWAP_ENABLE_WRITEBACK
++	u8 *tmpdst;
++#endif
++
++	if (!tree) {
++		ret = -ENODEV;
++		goto reject;
++	}
++
++	/* allocate entry */
++	entry = zswap_entry_cache_alloc(GFP_KERNEL);
++	if (!entry) {
++		zswap_reject_kmemcache_fail++;
++		ret = -ENOMEM;
++		goto reject;
++	}
++
++	/* compress */
++	dst = get_cpu_var(zswap_dstmem);
++	src = kmap_atomic(page);
++	ret = zswap_comp_op(ZSWAP_COMPOP_COMPRESS, src, PAGE_SIZE, dst, &dlen);
++	kunmap_atomic(src);
++	if (ret) {
++		ret = -EINVAL;
++		goto freepage;
++	}
++	if ((dlen * 100 / PAGE_SIZE) > zswap_max_compression_ratio) {
++		zswap_reject_compress_poor++;
++		ret = -E2BIG;
++		goto freepage;
++	}
++
++	/* store */
++	handle = zs_malloc(tree->pool, dlen,
++		__GFP_NORETRY | __GFP_HIGHMEM | __GFP_NOMEMALLOC |
++			__GFP_NOWARN);
++	if (!handle) {
++		ret = -ENOMEM;
++		goto freepage;
++	}
++
++#ifdef CONFIG_ZSWAP_ENABLE_WRITEBACK
++	if (!handle) {
++		zswap_writeback_attempted++;
++		/*
++		 * Copy compressed buffer out of per-cpu storage so
++		 * we can re-enable preemption.
++		*/
++		tmppage = zswap_tmppage_alloc();
++		if (!tmppage) {
++			zswap_reject_tmppage_fail++;
++			ret = -ENOMEM;
++			goto freepage;
++		}
++		writeback_attempted = 1;
++		tmpdst = page_address(tmppage);
++		memcpy(tmpdst, dst, dlen);
++		dst = tmpdst;
++		put_cpu_var(zswap_dstmem);
++
++		/* try to free up some space */
++		/* TODO: replace with more targeted policy */
++		zswap_writeback_entries(tree, 16);
++		/* try again, allowing wait */
++		handle = zs_malloc(tree->pool, dlen,
++			__GFP_NORETRY | __GFP_HIGHMEM | __GFP_NOMEMALLOC |
++				__GFP_NOWARN);
++		if (!handle) {
++			/* still no space, fail */
++			zswap_reject_zsmalloc_fail++;
++			ret = -ENOMEM;
++			goto freepage;
++		}
++		zswap_saved_by_writeback++;
++	}
++#endif /* CONFIG_ZSWAP_ENABLE_WRITEBACK */
++
++	buf = zs_map_object(tree->pool, handle, ZS_MM_WO);
++	memcpy(buf, dst, dlen);
++	zs_unmap_object(tree->pool, handle);
++	if (writeback_attempted)
++		zswap_tmppage_free(tmppage);
++	else
++		put_cpu_var(zswap_dstmem);
++
++	/* populate entry */
++	entry->offset = offset;
++	entry->handle = handle;
++	entry->length = dlen;
++
++	/* map */
++	spin_lock(&tree->lock);
++	do {
++		ret = zswap_rb_insert(&tree->rbroot, entry, &dupentry);
++		if (ret == -EEXIST) {
++			zswap_duplicate_entry++;
++			/* remove from rbtree and lru */
++			rb_erase(&dupentry->rbnode, &tree->rbroot);
++			if (!list_empty(&dupentry->lru))
++				list_del_init(&dupentry->lru);
++			if (!zswap_entry_put(dupentry)) {
++				/* free */
++				zswap_free_entry(tree, dupentry);
++			}
++		}
++	} while (ret == -EEXIST);
++	list_add_tail(&entry->lru, &tree->lru);
++	spin_unlock(&tree->lock);
++
++	/* update stats */
++	atomic_inc(&zswap_stored_pages);
++
++	return 0;
++
++freepage:
++	if (writeback_attempted)
++		zswap_tmppage_free(tmppage);
++	else
++		put_cpu_var(zswap_dstmem);
++	zswap_entry_cache_free(entry);
++reject:
++	return ret;
++}
++
++/*
++ * returns 0 if the page was successfully decompressed
++ * return -1 on entry not found or error
++*/
++static int zswap_frontswap_load(unsigned type, pgoff_t offset,
++				struct page *page)
++{
++	struct zswap_tree *tree = zswap_trees[type];
++	struct zswap_entry *entry;
++	u8 *src, *dst;
++	unsigned int dlen;
++	int refcount;
++
++	/* find */
++	spin_lock(&tree->lock);
++	entry = zswap_rb_search(&tree->rbroot, offset);
++	if (!entry) {
++		/* entry was written_back */
++		spin_unlock(&tree->lock);
++		return -1;
++	}
++	zswap_entry_get(entry);
++
++	/* remove from lru */
++	if (!list_empty(&entry->lru))
++		list_del_init(&entry->lru);
++	spin_unlock(&tree->lock);
++
++	/* decompress */
++	dlen = PAGE_SIZE;
++	src = zs_map_object(tree->pool, entry->handle, ZS_MM_RO);
++	dst = kmap_atomic(page);
++	zswap_comp_op(ZSWAP_COMPOP_DECOMPRESS, src, entry->length,
++		dst, &dlen);
++	kunmap_atomic(dst);
++	zs_unmap_object(tree->pool, entry->handle);
++
++	spin_lock(&tree->lock);
++	refcount = zswap_entry_put(entry);
++	if (likely(refcount)) {
++		list_add_tail(&entry->lru, &tree->lru);
++		spin_unlock(&tree->lock);
++		return 0;
++	}
++	spin_unlock(&tree->lock);
++
++	/*
++	 * We don't have to unlink from the rbtree because
++	 * zswap_writeback_entry() or zswap_frontswap_invalidate page()
++	 * has already done this for us if we are the last reference.
++	 */
++	/* free */
++
++	zswap_free_entry(tree, entry);
++
++	return 0;
++}
++
++/* invalidates a single page */
++static void zswap_frontswap_invalidate_page(unsigned type, pgoff_t offset)
++{
++	struct zswap_tree *tree = zswap_trees[type];
++	struct zswap_entry *entry;
++	int refcount;
++
++	/* find */
++	spin_lock(&tree->lock);
++	entry = zswap_rb_search(&tree->rbroot, offset);
++	if (!entry) {
++		/* entry was written back */
++		spin_unlock(&tree->lock);
++		return;
++	}
++
++	/* remove from rbtree and lru */
++	rb_erase(&entry->rbnode, &tree->rbroot);
++	if (!list_empty(&entry->lru))
++		list_del_init(&entry->lru);
++
++	/* drop the initial reference from entry creation */
++	refcount = zswap_entry_put(entry);
++
++	spin_unlock(&tree->lock);
++
++	if (refcount) {
++		/* writeback in progress, writeback will free */
++		return;
++	}
++
++	/* free */
++	zswap_free_entry(tree, entry);
++}
++
++/* invalidates all pages for the given swap type */
++static void zswap_frontswap_invalidate_area(unsigned type)
++{
++	struct zswap_tree *tree = zswap_trees[type];
++	struct rb_node *node;
++	struct zswap_entry *entry;
++
++	if (!tree)
++		return;
++
++	/* walk the tree and free everything */
++	spin_lock(&tree->lock);
++	/*
++	 * TODO: Even though this code should not be executed because
++	 * the try_to_unuse() in swapoff should have emptied the tree,
++	 * it is very wasteful to rebalance the tree after every
++	 * removal when we are freeing the whole tree.
++	 *
++	 * If post-order traversal code is ever added to the rbtree
++	 * implementation, it should be used here.
++	 */
++	while ((node = rb_first(&tree->rbroot))) {
++		entry = rb_entry(node, struct zswap_entry, rbnode);
++		rb_erase(&entry->rbnode, &tree->rbroot);
++		zs_free(tree->pool, entry->handle);
++		zswap_entry_cache_free(entry);
++		atomic_dec(&zswap_stored_pages);
++	}
++	tree->rbroot = RB_ROOT;
++	INIT_LIST_HEAD(&tree->lru);
++	spin_unlock(&tree->lock);
++}
++
++/* NOTE: this is called in atomic context from swapon and must not sleep */
++static void zswap_frontswap_init(unsigned type)
++{
++	struct zswap_tree *tree;
++
++	tree = kzalloc(sizeof(struct zswap_tree), GFP_NOWAIT);
++	if (!tree)
++		goto err;
++	tree->pool = zs_create_pool(GFP_NOWAIT, &zswap_zs_ops);
++	if (!tree->pool)
++		goto freetree;
++	tree->rbroot = RB_ROOT;
++	INIT_LIST_HEAD(&tree->lru);
++	spin_lock_init(&tree->lock);
++	tree->type = type;
++	zswap_trees[type] = tree;
++	return;
++
++freetree:
++	kfree(tree);
++err:
++	pr_err("alloc failed, zswap disabled for swap type %d\n", type);
++}
++
++static struct frontswap_ops zswap_frontswap_ops = {
++	.store = zswap_frontswap_store,
++	.load = zswap_frontswap_load,
++	.invalidate_page = zswap_frontswap_invalidate_page,
++	.invalidate_area = zswap_frontswap_invalidate_area,
++	.init = zswap_frontswap_init
++};
++
++/*********************************
++* debugfs functions
++**********************************/
++#ifdef CONFIG_DEBUG_FS
++#include <linux/debugfs.h>
++
++static struct dentry *zswap_debugfs_root;
++
++static int __init zswap_debugfs_init(void)
++{
++	if (!debugfs_initialized())
++		return -ENODEV;
++
++	zswap_debugfs_root = debugfs_create_dir("zswap", NULL);
++	if (!zswap_debugfs_root)
++		return -ENOMEM;
++
++	debugfs_create_u64("saved_by_writeback", S_IRUGO,
++			zswap_debugfs_root, &zswap_saved_by_writeback);
++	debugfs_create_u64("pool_limit_hit", S_IRUGO,
++			zswap_debugfs_root, &zswap_pool_limit_hit);
++	debugfs_create_u64("reject_writeback_attempted", S_IRUGO,
++			zswap_debugfs_root, &zswap_writeback_attempted);
++	debugfs_create_u64("reject_tmppage_fail", S_IRUGO,
++			zswap_debugfs_root, &zswap_reject_tmppage_fail);
++	debugfs_create_u64("reject_zsmalloc_fail", S_IRUGO,
++			zswap_debugfs_root, &zswap_reject_zsmalloc_fail);
++	debugfs_create_u64("reject_kmemcache_fail", S_IRUGO,
++			zswap_debugfs_root, &zswap_reject_kmemcache_fail);
++	debugfs_create_u64("reject_compress_poor", S_IRUGO,
++			zswap_debugfs_root, &zswap_reject_compress_poor);
++	debugfs_create_u64("written_back_pages", S_IRUGO,
++			zswap_debugfs_root, &zswap_written_back_pages);
++	debugfs_create_u64("duplicate_entry", S_IRUGO,
++			zswap_debugfs_root, &zswap_duplicate_entry);
++	debugfs_create_atomic_t("pool_pages", S_IRUGO,
++			zswap_debugfs_root, &zswap_pool_pages);
++	debugfs_create_atomic_t("stored_pages", S_IRUGO,
++			zswap_debugfs_root, &zswap_stored_pages);
++	debugfs_create_atomic_t("outstanding_writebacks", S_IRUGO,
++			zswap_debugfs_root, &zswap_outstanding_writebacks);
++
++	return 0;
++}
++
++static void __exit zswap_debugfs_exit(void)
++{
++	debugfs_remove_recursive(zswap_debugfs_root);
++}
++#else
++static inline int __init zswap_debugfs_init(void)
++{
++	return 0;
++}
++
++static inline void __exit zswap_debugfs_exit(void) { }
++#endif
++
++/*********************************
++* module init and exit
++**********************************/
++static int __init init_zswap(void)
++{
++	if (!zswap_enabled)
++		return 0;
++
++	pr_info("loading zswap\n");
++	if (zswap_entry_cache_create()) {
++		pr_err("entry cache creation failed\n");
++		goto error;
++	}
++	if (zswap_page_pool_create()) {
++		pr_err("page pool initialization failed\n");
++		goto pagepoolfail;
++	}
++	if (zswap_tmppage_pool_create()) {
++		pr_err("workmem pool initialization failed\n");
++		goto tmppoolfail;
++	}
++	if (zswap_comp_init()) {
++		pr_err("compressor initialization failed\n");
++		goto compfail;
++	}
++	if (zswap_cpu_init()) {
++		pr_err("per-cpu initialization failed\n");
++		goto pcpufail;
++	}
++	frontswap_register_ops(&zswap_frontswap_ops);
++	if (zswap_debugfs_init())
++		pr_warn("debugfs initialization failed\n");
++	return 0;
++pcpufail:
++	zswap_comp_exit();
++compfail:
++	zswap_tmppage_pool_destroy();
++tmppoolfail:
++	zswap_page_pool_destroy();
++pagepoolfail:
++	zswap_entry_cache_destory();
++error:
++	return -ENOMEM;
++}
++/* must be late so crypto has time to come up */
++late_initcall(init_zswap);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Seth Jennings <sjenning@linux.vnet.ibm.com>");
++MODULE_DESCRIPTION("Compressed cache for swap pages");
+-- 
+1.7.9.5
+

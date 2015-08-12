@@ -1,0 +1,37 @@
+From 4c047cb36c138e3ff1a5439195a466cb610c302d Mon Sep 17 00:00:00 2001
+From: Feng Tang <feng.tang@intel.com>
+Date: Mon, 2 Jul 2012 14:29:10 +0800
+Subject: [PATCH 236/507] slab: Fix a typo in commit 8c138b "slab: Get rid of
+ obj_size macro"
+
+Commit  8c138b only sits in Pekka's and linux-next tree now, which tries
+to replace obj_size(cachep) with cachep->object_size, but has a typo in
+kmem_cache_free() by using "size" instead of "object_size", which casues
+some regressions.
+
+Reported-and-tested-by: Fengguang Wu <wfg@linux.intel.com>
+Signed-off-by: Feng Tang <feng.tang@intel.com>
+Cc: Christoph Lameter <cl@linux.com>
+Acked-by: Glauber Costa <glommer@parallels.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slab.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mm/slab.c b/mm/slab.c
+index 480ad07..8104c31 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -3884,7 +3884,7 @@ void kmem_cache_free(struct kmem_cache *cachep, void *objp)
+ 	unsigned long flags;
+ 
+ 	local_irq_save(flags);
+-	debug_check_no_locks_freed(objp, cachep->size);
++	debug_check_no_locks_freed(objp, cachep->object_size);
+ 	if (!(cachep->flags & SLAB_DEBUG_OBJECTS))
+ 		debug_check_no_obj_freed(objp, cachep->object_size);
+ 	__cache_free(cachep, objp, __builtin_return_address(0));
+-- 
+1.7.9.5
+

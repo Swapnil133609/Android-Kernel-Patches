@@ -1,0 +1,26 @@
+From ec630ceccfd46937aa9c20052f9ef26e50e0abc6 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Tue, 5 Nov 2013 18:23:07 -0600
+Subject: [PATCH 367/507] drivers/Makefile: add exFat support
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/Makefile |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/Makefile b/drivers/Makefile
+index d55b035..dcee0db 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -144,3 +144,7 @@ obj-$(CONFIG_MOBICORE_SUPPORT)  += gud/
+ obj-$(CONFIG_CORESIGHT)		+= coresight/
+ 
+ obj-$(CONFIG_BIF)		+= bif/
++
++ifeq (1, $(shell if [ -d drivers/exfat ] ; then echo 1 ; fi))
++obj-y   += exfat/
++endif
+-- 
+1.7.9.5
+

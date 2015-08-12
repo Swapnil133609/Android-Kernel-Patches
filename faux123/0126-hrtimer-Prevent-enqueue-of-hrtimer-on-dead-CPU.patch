@@ -1,0 +1,57 @@
+From 8372c1eb1f0a6581e2828bc16d6ee6f4c2d9fe1d Mon Sep 17 00:00:00 2001
+From: Michael Bohan <mbohan@codeaurora.org>
+Date: Fri, 12 Apr 2013 13:42:11 -0500
+Subject: [PATCH 126/507] hrtimer: Prevent enqueue of hrtimer on dead CPU
+
+Date	Wed, 10 Apr 2013 14:07:48 -0700
+
+When switching the hrtimer cpu_base, we briefly allow for
+preemption to become enabled by unlocking the cpu_base lock.
+During this time, the CPU corresponding to the new cpu_base
+that was selected may in fact go offline. In this scenario, the
+hrtimer is enqueued to a CPU that's not online, and therefore
+it never fires.
+
+As an example, consider this example:
+
+CPU #0                          CPU #1
+----                            ----
+...                             hrtimer_start()
+                                 lock_hrtimer_base()
+                                 switch_hrtimer_base()
+                                  cpu = hrtimer_get_target() -> 1
+                                  spin_unlock(&cpu_base->lock)
+                                <migrate thread to CPU #0>
+                                <offline>
+spin_lock(&new_base->lock)
+this_cpu = 0
+cpu != this_cpu
+enqueue_hrtimer(cpu_base #1)
+To prevent this scenario, verify that the CPU corresponding to
+the new cpu_base is indeed online before selecting it in
+hrtimer_switch_base(). If it's not online, fallback to using the
+base of the current CPU.
+
+Signed-off-by: Michael Bohan <mbohan@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/hrtimer.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/kernel/hrtimer.c b/kernel/hrtimer.c
+index 5799dfb..232a4be 100644
+--- a/kernel/hrtimer.c
++++ b/kernel/hrtimer.c
+@@ -227,7 +227,8 @@ again:
+ 
+ 		this_cpu = smp_processor_id();
+ 
+-		if (cpu != this_cpu && hrtimer_check_target(timer, new_base)) {
++		if (cpu != this_cpu && (hrtimer_check_target(timer, new_base)
++			|| !cpu_online(cpu))) {
+ 			raw_spin_unlock(&new_base->cpu_base->lock);
+ 			raw_spin_lock(&base->cpu_base->lock);
+ 			cpu = smp_processor_id();
+-- 
+1.7.9.5
+

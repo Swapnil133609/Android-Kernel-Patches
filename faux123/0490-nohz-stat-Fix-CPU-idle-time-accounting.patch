@@ -1,0 +1,70 @@
+From e1f851c061d98a20475611ab5bc059e2da5b8cfe Mon Sep 17 00:00:00 2001
+From: Bo Yan <byan@nvidia.com>
+Date: Fri, 22 Mar 2013 14:03:26 -0700
+Subject: [PATCH 490/507] nohz: stat: Fix CPU idle time accounting
+
+Since cpustat[CPUTIME_IDLE] is never connected to ts->idle_sleeptime,
+never read from cpustat[CPUTIME_IDLE] when reporting stats in
+/proc/stat.
+
+Note this was rejected by Michal Hocko when it was initially proposed
+by Martin Schwidefsky in LKML, so if you want to upstream it, better
+find an alternative (either completely disable cpustat[CPUTIME_IDLE]
+for CONFIG_NO_HZ or somehow connect them to keep them in sync.)
+
+bug 1190321
+
+Change-Id: Idc92488910b826aff850a010016d8326c7ab9e6c
+Signed-off-by: Bo Yan <byan@nvidia.com>
+Reviewed-on: http://git-master/r/214638
+Reviewed-by: Automatic_Commit_Validation_User
+GVS: Gerrit_Virtual_Submit
+Reviewed-by: Liang Cheng (SW) <licheng@nvidia.com>
+Tested-by: Liang Cheng (SW) <licheng@nvidia.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ fs/proc/stat.c           |    4 +++-
+ kernel/time/tick-sched.c |    5 +++--
+ 2 files changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/fs/proc/stat.c b/fs/proc/stat.c
+index aa24919..a928c29 100644
+--- a/fs/proc/stat.c
++++ b/fs/proc/stat.c
+@@ -45,7 +45,9 @@ static cputime64_t get_iowait_time(int cpu)
+ 
+ static u64 get_idle_time(int cpu)
+ {
+-	u64 idle, idle_time = get_cpu_idle_time_us(cpu, NULL);
++	u64 idle, idle_time = -1ULL;
++
++	idle_time = get_cpu_idle_time_us(cpu, NULL);
+ 
+ 	if (idle_time == -1ULL)
+ 		/* !NO_HZ so we can rely on cpustat.idle */
+diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
+index c6cd85b..6480947 100644
+--- a/kernel/time/tick-sched.c
++++ b/kernel/time/tick-sched.c
+@@ -223,7 +223,7 @@ u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time)
+ 		update_ts_time_stats(cpu, ts, now, last_update_time);
+ 		idle = ts->idle_sleeptime;
+ 	} else {
+-		if (ts->idle_active && !nr_iowait_cpu(cpu)) {
++		if (cpu_online(cpu) && ts->idle_active && !nr_iowait_cpu(cpu)) {
+ 			ktime_t delta = ktime_sub(now, ts->idle_entrytime);
+ 
+ 			idle = ktime_add(ts->idle_sleeptime, delta);
+@@ -264,7 +264,8 @@ u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time)
+ 		update_ts_time_stats(cpu, ts, now, last_update_time);
+ 		iowait = ts->iowait_sleeptime;
+ 	} else {
+-		if (ts->idle_active && nr_iowait_cpu(cpu) > 0) {
++		if (cpu_online(cpu) && ts->idle_active &&
++						nr_iowait_cpu(cpu) > 0) {
+ 			ktime_t delta = ktime_sub(now, ts->idle_entrytime);
+ 
+ 			iowait = ktime_add(ts->iowait_sleeptime, delta);
+-- 
+1.7.9.5
+

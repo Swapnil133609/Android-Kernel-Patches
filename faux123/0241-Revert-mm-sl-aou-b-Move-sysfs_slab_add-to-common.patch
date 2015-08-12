@@ -1,0 +1,175 @@
+From b1d7c58c527dff90cb970fbbb864327dc58d80ed Mon Sep 17 00:00:00 2001
+From: Pekka Enberg <penberg@kernel.org>
+Date: Wed, 5 Sep 2012 12:07:44 +0300
+Subject: [PATCH 241/338] Revert "mm/sl[aou]b: Move sysfs_slab_add to common"
+
+This reverts commit 96d17b7be0a9849d381442030886211dbb2a7061 which
+caused the following errors at boot:
+
+  [    1.114885] kobject (ffff88001a802578): tried to init an initialized object, something is seriously wrong.
+  [    1.114885] Pid: 1, comm: swapper/0 Tainted: G        W    3.6.0-rc1+ #6
+  [    1.114885] Call Trace:
+  [    1.114885]  [<ffffffff81273f37>] kobject_init+0x87/0xa0
+  [    1.115555]  [<ffffffff8127426a>] kobject_init_and_add+0x2a/0x90
+  [    1.115555]  [<ffffffff8127c870>] ? sprintf+0x40/0x50
+  [    1.115555]  [<ffffffff81124c60>] sysfs_slab_add+0x80/0x210
+  [    1.115555]  [<ffffffff81100175>] kmem_cache_create+0xa5/0x250
+  [    1.115555]  [<ffffffff81cf24cd>] ? md_init+0x144/0x144
+  [    1.115555]  [<ffffffff81cf25b6>] local_init+0xa4/0x11b
+  [    1.115555]  [<ffffffff81cf24e1>] dm_init+0x14/0x45
+  [    1.115836]  [<ffffffff810001ba>] do_one_initcall+0x3a/0x160
+  [    1.116834]  [<ffffffff81cc2c90>] kernel_init+0x133/0x1b7
+  [    1.117835]  [<ffffffff81cc25c4>] ? do_early_param+0x86/0x86
+  [    1.117835]  [<ffffffff8171aff4>] kernel_thread_helper+0x4/0x10
+  [    1.118401]  [<ffffffff81cc2b5d>] ? start_kernel+0x33f/0x33f
+  [    1.119832]  [<ffffffff8171aff0>] ? gs_change+0xb/0xb
+  [    1.120325] ------------[ cut here ]------------
+  [    1.120835] WARNING: at fs/sysfs/dir.c:536 sysfs_add_one+0xc1/0xf0()
+  [    1.121437] sysfs: cannot create duplicate filename '/kernel/slab/:t-0000016'
+  [    1.121831] Modules linked in:
+  [    1.122138] Pid: 1, comm: swapper/0 Tainted: G        W    3.6.0-rc1+ #6
+  [    1.122831] Call Trace:
+  [    1.123074]  [<ffffffff81195ce1>] ? sysfs_add_one+0xc1/0xf0
+  [    1.123833]  [<ffffffff8103adfa>] warn_slowpath_common+0x7a/0xb0
+  [    1.124405]  [<ffffffff8103aed1>] warn_slowpath_fmt+0x41/0x50
+  [    1.124832]  [<ffffffff81195ce1>] sysfs_add_one+0xc1/0xf0
+  [    1.125337]  [<ffffffff81195eb3>] create_dir+0x73/0xd0
+  [    1.125832]  [<ffffffff81196221>] sysfs_create_dir+0x81/0xe0
+  [    1.126363]  [<ffffffff81273d3d>] kobject_add_internal+0x9d/0x210
+  [    1.126832]  [<ffffffff812742a3>] kobject_init_and_add+0x63/0x90
+  [    1.127406]  [<ffffffff81124c60>] sysfs_slab_add+0x80/0x210
+  [    1.127832]  [<ffffffff81100175>] kmem_cache_create+0xa5/0x250
+  [    1.128384]  [<ffffffff81cf24cd>] ? md_init+0x144/0x144
+  [    1.128833]  [<ffffffff81cf25b6>] local_init+0xa4/0x11b
+  [    1.129831]  [<ffffffff81cf24e1>] dm_init+0x14/0x45
+  [    1.130305]  [<ffffffff810001ba>] do_one_initcall+0x3a/0x160
+  [    1.130831]  [<ffffffff81cc2c90>] kernel_init+0x133/0x1b7
+  [    1.131351]  [<ffffffff81cc25c4>] ? do_early_param+0x86/0x86
+  [    1.131830]  [<ffffffff8171aff4>] kernel_thread_helper+0x4/0x10
+  [    1.132392]  [<ffffffff81cc2b5d>] ? start_kernel+0x33f/0x33f
+  [    1.132830]  [<ffffffff8171aff0>] ? gs_change+0xb/0xb
+  [    1.133315] ---[ end trace 2703540871c8fab7 ]---
+  [    1.133830] ------------[ cut here ]------------
+  [    1.134274] WARNING: at lib/kobject.c:196 kobject_add_internal+0x1f5/0x210()
+  [    1.134829] kobject_add_internal failed for :t-0000016 with -EEXIST, don't try to register things with the same name in the same directory.
+  [    1.135829] Modules linked in:
+  [    1.136135] Pid: 1, comm: swapper/0 Tainted: G        W    3.6.0-rc1+ #6
+  [    1.136828] Call Trace:
+  [    1.137071]  [<ffffffff81273e95>] ? kobject_add_internal+0x1f5/0x210
+  [    1.137830]  [<ffffffff8103adfa>] warn_slowpath_common+0x7a/0xb0
+  [    1.138402]  [<ffffffff8103aed1>] warn_slowpath_fmt+0x41/0x50
+  [    1.138830]  [<ffffffff811955a3>] ? release_sysfs_dirent+0x73/0xf0
+  [    1.139419]  [<ffffffff81273e95>] kobject_add_internal+0x1f5/0x210
+  [    1.139830]  [<ffffffff812742a3>] kobject_init_and_add+0x63/0x90
+  [    1.140429]  [<ffffffff81124c60>] sysfs_slab_add+0x80/0x210
+  [    1.140830]  [<ffffffff81100175>] kmem_cache_create+0xa5/0x250
+  [    1.141829]  [<ffffffff81cf24cd>] ? md_init+0x144/0x144
+  [    1.142307]  [<ffffffff81cf25b6>] local_init+0xa4/0x11b
+  [    1.142829]  [<ffffffff81cf24e1>] dm_init+0x14/0x45
+  [    1.143307]  [<ffffffff810001ba>] do_one_initcall+0x3a/0x160
+  [    1.143829]  [<ffffffff81cc2c90>] kernel_init+0x133/0x1b7
+  [    1.144352]  [<ffffffff81cc25c4>] ? do_early_param+0x86/0x86
+  [    1.144829]  [<ffffffff8171aff4>] kernel_thread_helper+0x4/0x10
+  [    1.145405]  [<ffffffff81cc2b5d>] ? start_kernel+0x33f/0x33f
+  [    1.145828]  [<ffffffff8171aff0>] ? gs_change+0xb/0xb
+  [    1.146313] ---[ end trace 2703540871c8fab8 ]---
+
+Conflicts:
+
+	mm/slub.c
+
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+---
+ mm/slab.h        |  3 ---
+ mm/slab_common.c |  8 --------
+ mm/slub.c        | 19 +++++++++++++++++--
+ 3 files changed, 17 insertions(+), 13 deletions(-)
+
+diff --git a/mm/slab.h b/mm/slab.h
+index 67aeaa2..7deeb44 100644
+--- a/mm/slab.h
++++ b/mm/slab.h
+@@ -38,13 +38,10 @@ extern int __kmem_cache_create(struct kmem_cache *, unsigned long flags);
+ #ifdef CONFIG_SLUB
+ struct kmem_cache *__kmem_cache_alias(const char *name, size_t size,
+ 	size_t align, unsigned long flags, void (*ctor)(void *));
+-extern int sysfs_slab_add(struct kmem_cache *s);
+ #else
+ static inline struct kmem_cache *__kmem_cache_alias(const char *name, size_t size,
+ 	size_t align, unsigned long flags, void (*ctor)(void *))
+ { return NULL; }
+-static inline int sysfs_slab_add(struct kmem_cache *s) { return 0; }
+-
+ #endif
+ 
+ 
+diff --git a/mm/slab_common.c b/mm/slab_common.c
+index 651a3c6..9c21725 100644
+--- a/mm/slab_common.c
++++ b/mm/slab_common.c
+@@ -155,14 +155,6 @@ out_locked:
+ 		return NULL;
+ 	}
+ 
+-	if (s->refcount == 1) {
+-		err = sysfs_slab_add(s);
+-		if (err)
+-			printk(KERN_WARNING "kmem_cache_create(%s) failed to"
+-				" create sysfs entry. Error %d\n",
+-					name, err);
+-	}
+-
+ 	return s;
+ }
+ EXPORT_SYMBOL(kmem_cache_create);
+diff --git a/mm/slub.c b/mm/slub.c
+index 040b937..e39b657 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -202,10 +202,12 @@ struct track {
+ enum track_item { TRACK_ALLOC, TRACK_FREE };
+ 
+ #ifdef CONFIG_SYSFS
++static int sysfs_slab_add(struct kmem_cache *);
+ static int sysfs_slab_alias(struct kmem_cache *, const char *);
+ static void sysfs_slab_remove(struct kmem_cache *);
+ 
+ #else
++static inline int sysfs_slab_add(struct kmem_cache *s) { return 0; }
+ static inline int sysfs_slab_alias(struct kmem_cache *s, const char *p)
+ 							{ return 0; }
+ static inline void sysfs_slab_remove(struct kmem_cache *s) { }
+@@ -3947,7 +3949,20 @@ struct kmem_cache *__kmem_cache_alias(const char *name, size_t size,
+ 
+ int __kmem_cache_create(struct kmem_cache *s, unsigned long flags)
+ {
+-	return kmem_cache_open(s, flags);
++	int err;
++
++	err = kmem_cache_open(s, flags);
++	if (err)
++		return err;
++
++	mutex_unlock(&slab_mutex);
++	err = sysfs_slab_add(s);
++	mutex_lock(&slab_mutex);
++
++	if (err)
++		kmem_cache_close(s);
++
++	return err;
+ }
+ 
+ #ifdef CONFIG_SMP
+@@ -5237,7 +5252,7 @@ static char *create_unique_id(struct kmem_cache *s)
+ 	return name;
+ }
+ 
+-int sysfs_slab_add(struct kmem_cache *s)
++static int sysfs_slab_add(struct kmem_cache *s)
+ {
+ 	int err;
+ 	const char *name;
+-- 
+1.8.1.2
+

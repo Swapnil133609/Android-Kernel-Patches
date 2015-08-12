@@ -1,0 +1,321 @@
+From 0ebc4c0eb1354fe3564361fc759ebb2b2e0bcce2 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sat, 2 Nov 2013 19:11:54 -0500
+Subject: [PATCH 317/338] powersuspend: new PM kernel driver for Android w/o
+ early_suspend
+
+Android early_suspend/late_resume PM kernel driver framework has been
+deprecated by Google. This new powersuspend PM kernel driver is a replacement
+for it and existing early_suspend drivers can be easily adapted to use this
+new replacement driver
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+
+powersuspend: fix logci derps :p
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ include/linux/powersuspend.h |  32 +++++++
+ kernel/power/Kconfig         |   7 ++
+ kernel/power/Makefile        |   1 +
+ kernel/power/powersuspend.c  | 219 +++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 259 insertions(+)
+ create mode 100644 include/linux/powersuspend.h
+ create mode 100644 kernel/power/powersuspend.c
+
+diff --git a/include/linux/powersuspend.h b/include/linux/powersuspend.h
+new file mode 100644
+index 0000000..a365114
+--- /dev/null
++++ b/include/linux/powersuspend.h
+@@ -0,0 +1,32 @@
++/* include/linux/powersuspend.h
++ *
++ * Copyright (C) 2007-2008 Google, Inc.
++ * Copyright (C) 2013 Paul Reioux 
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _LINUX_POWERSUSPEND_H
++#define _LINUX_POWERSUSPEND_H
++
++#include <linux/list.h>
++
++struct power_suspend {
++	struct list_head link;
++	void (*suspend)(struct power_suspend *h);
++	void (*resume)(struct power_suspend *h);
++};
++
++void register_power_suspend(struct power_suspend *handler);
++void unregister_power_suspend(struct power_suspend *handler);
++
++#endif
++
+diff --git a/kernel/power/Kconfig b/kernel/power/Kconfig
+index 904fc66..9d2f9b2 100644
+--- a/kernel/power/Kconfig
++++ b/kernel/power/Kconfig
+@@ -26,6 +26,13 @@ config WAKELOCK
+ 	bool
+ 	default y
+ 
++config POWERSUSPEND
++	bool "Power suspend"
++	default y
++	---help---
++	  Call early suspend handlers when the user requested sleep state
++	  changes.
++
+ config HIBERNATE_CALLBACKS
+ 	bool
+ 
+diff --git a/kernel/power/Makefile b/kernel/power/Makefile
+index 29472bf..4cec17d 100644
+--- a/kernel/power/Makefile
++++ b/kernel/power/Makefile
+@@ -9,6 +9,7 @@ obj-$(CONFIG_SUSPEND)		+= suspend.o
+ obj-$(CONFIG_PM_TEST_SUSPEND)	+= suspend_test.o
+ obj-$(CONFIG_HIBERNATION)	+= hibernate.o snapshot.o swap.o user.o \
+ 				   block_io.o
++obj-$(CONFIG_POWERSUSPEND)	+= powersuspend.o
+ obj-$(CONFIG_PM_AUTOSLEEP)	+= autosleep.o
+ obj-$(CONFIG_PM_WAKELOCKS)	+= wakelock.o
+ 
+diff --git a/kernel/power/powersuspend.c b/kernel/power/powersuspend.c
+new file mode 100644
+index 0000000..cc647c5
+--- /dev/null
++++ b/kernel/power/powersuspend.c
+@@ -0,0 +1,219 @@
++/* kernel/power/powersuspend.c
++ *
++ * Copyright (C) 2005-2008 Google, Inc.
++ * Copyright (C) 2013 Paul Reioux
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/powersuspend.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/workqueue.h>
++
++#define MAJOR_VERSION	1
++#define MINOR_VERSION	0
++
++struct workqueue_struct *suspend_work_queue;
++
++static DEFINE_MUTEX(power_suspend_lock);
++static LIST_HEAD(power_suspend_handlers);
++static void power_suspend(struct work_struct *work);
++static void power_resume(struct work_struct *work);
++static DECLARE_WORK(power_suspend_work, power_suspend);
++static DECLARE_WORK(power_resume_work, power_resume);
++static DEFINE_SPINLOCK(state_lock);
++
++static int state;
++
++void register_power_suspend(struct power_suspend *handler)
++{
++	struct list_head *pos;
++
++	mutex_lock(&power_suspend_lock);
++	list_for_each(pos, &power_suspend_handlers) {
++		struct power_suspend *p;
++		p = list_entry(pos, struct power_suspend, link);
++	}
++	list_add_tail(&handler->link, pos);
++	mutex_unlock(&power_suspend_lock);
++}
++EXPORT_SYMBOL(register_power_suspend);
++
++void unregister_power_suspend(struct power_suspend *handler)
++{
++	mutex_lock(&power_suspend_lock);
++	list_del(&handler->link);
++	mutex_unlock(&power_suspend_lock);
++}
++EXPORT_SYMBOL(unregister_power_suspend);
++
++static void power_suspend(struct work_struct *work)
++{
++	struct power_suspend *pos;
++	unsigned long irqflags;
++	int abort = 0;
++
++	mutex_lock(&power_suspend_lock);
++	spin_lock_irqsave(&state_lock, irqflags);
++	if (state != 1)
++		abort = 1;
++	spin_unlock_irqrestore(&state_lock, irqflags);
++
++	if (abort) {
++		mutex_unlock(&power_suspend_lock);
++		return;
++	}
++
++	list_for_each_entry(pos, &power_suspend_handlers, link) {
++		if (pos->suspend != NULL) {
++			pos->suspend(pos);
++		}
++	}
++	mutex_unlock(&power_suspend_lock);
++}
++
++static void power_resume(struct work_struct *work)
++{
++	struct power_suspend *pos;
++	unsigned long irqflags;
++	int abort = 0;
++
++	mutex_lock(&power_suspend_lock);
++	spin_lock_irqsave(&state_lock, irqflags);
++	if (state == 1)
++		abort = 1;
++	spin_unlock_irqrestore(&state_lock, irqflags);
++
++	if (abort) {
++		goto abort;
++	}
++	list_for_each_entry_reverse(pos, &power_suspend_handlers, link) {
++		if (pos->resume != NULL) {
++			pos->resume(pos);
++		}
++	}
++abort:
++	mutex_unlock(&power_suspend_lock);
++}
++
++static void set_power_suspend_state(int new_state)
++{
++	unsigned long irqflags;
++	int old_sleep;
++
++	spin_lock_irqsave(&state_lock, irqflags);
++	old_sleep = state;
++	if (!old_sleep && new_state == 1) {
++		state = new_state;
++		queue_work(suspend_work_queue, &power_suspend_work);
++	} else if (!old_sleep || new_state == 0) {
++		state = new_state;
++		queue_work(suspend_work_queue, &power_resume_work);
++	}
++	spin_unlock_irqrestore(&state_lock, irqflags);
++}
++
++static ssize_t power_suspend_show(struct kobject *kobj,
++		struct kobj_attribute *attr, char *buf)
++{
++        return sprintf(buf, "%u\n", state);
++}
++
++static ssize_t power_suspend_store(struct kobject *kobj,
++		struct kobj_attribute *attr, const char *buf, size_t count)
++{
++	int data = 0;
++
++	sscanf(buf, "%d\n", &data);
++
++	if(data == 1 || data == 0) {
++		set_power_suspend_state(data);
++		pr_info("power suspend state requested => %d\n", data);
++	}
++	return count;
++}
++
++static ssize_t power_suspend_version_show(struct kobject *kobj,
++		struct kobj_attribute *attr, char *buf)
++{
++	return sprintf(buf, "version: %d.%d\n", MAJOR_VERSION, MINOR_VERSION);
++}
++
++static struct kobj_attribute power_suspend_attribute =
++        __ATTR(power_suspend_state, 0666,
++		power_suspend_show,
++		power_suspend_store);
++
++static struct kobj_attribute power_suspend_version_attribute =
++        __ATTR(power_suspend_version, 0444,
++		power_suspend_version_show,
++		NULL);
++
++static struct attribute *power_suspend_attrs[] =
++{
++	&power_suspend_attribute.attr,
++	&power_suspend_version_attribute.attr,
++	NULL,
++};
++
++static struct attribute_group power_suspend_attr_group =
++{
++	.attrs = power_suspend_attrs,
++};
++
++static struct kobject *power_suspend_kobj;
++
++static int __init power_suspend_init(void)
++{
++
++	int sysfs_result;
++
++        power_suspend_kobj = kobject_create_and_add("power_suspend",
++				kernel_kobj);
++        if (!power_suspend_kobj) {
++                pr_err("%s kobject create failed!\n", __FUNCTION__);
++                return -ENOMEM;
++        }
++
++        sysfs_result = sysfs_create_group(power_suspend_kobj,
++			&power_suspend_attr_group);
++
++        if (sysfs_result) {
++                pr_info("%s group create failed!\n", __FUNCTION__);
++                kobject_put(power_suspend_kobj);
++                return -ENOMEM;
++        }
++
++	suspend_work_queue = create_singlethread_workqueue("p-suspend");
++
++	if (suspend_work_queue == NULL) {
++		return -ENOMEM;
++	}
++	return 0;
++}
++
++static void __exit power_suspend_exit(void)
++{
++	if (power_suspend_kobj != NULL)
++		kobject_put(power_suspend_kobj);
++
++	destroy_workqueue(suspend_work_queue);
++} 
++
++core_initcall(power_suspend_init);
++module_exit(power_suspend_exit);
++
++MODULE_AUTHOR("Paul Reioux <reioux@gmail.com>");
++MODULE_DESCRIPTION("power_suspend - A replacement kernel PM driver for"
++        "Android's deprecated early_suspend/late_resume PM driver!");
++MODULE_LICENSE("GPL v2");
++
+-- 
+1.8.1.2
+

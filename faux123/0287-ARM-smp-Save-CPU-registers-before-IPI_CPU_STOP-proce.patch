@@ -1,0 +1,52 @@
+From 58ffdda32bfd015e11ba191e1ffd35062b5e1f8a Mon Sep 17 00:00:00 2001
+From: Tingting Yang <tingting@codeaurora.org>
+Date: Thu, 8 Aug 2013 01:57:42 +0000
+Subject: [PATCH 287/338] ARM: smp: Save CPU registers before IPI_CPU_STOP
+ processing
+
+When a kernel panic occurs on one CPU, other CPUs are instructed to stop
+execution via the IPI_CPU_STOP message. These other CPUs dump their stack,
+which may not be good enough to reconstruct their context to perform
+post-mortem analysis. Dump each CPU's context
+(before it started procesing the IPI) into a globally accessible structure
+to allow for easier post-mortem debugging.
+
+Change-Id: I68ac75f73d7ddaebaff9122b23e341bcb00e8fb9
+Signed-off-by: Tingting Yang <tingting@codeaurora.org>
+---
+ arch/arm/kernel/smp.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index cf10056..b341c51 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -555,13 +555,15 @@ static void percpu_timer_stop(void)
+ 
+ static DEFINE_RAW_SPINLOCK(stop_lock);
+ 
++static struct pt_regs __percpu regs_before_stop;
+ /*
+  * ipi_cpu_stop - handle IPI from smp_send_stop()
+  */
+-static void ipi_cpu_stop(unsigned int cpu)
++static void ipi_cpu_stop(unsigned int cpu, struct pt_regs *regs)
+ {
+ 	if (system_state == SYSTEM_BOOTING ||
+ 	    system_state == SYSTEM_RUNNING) {
++		per_cpu(regs_before_stop, cpu) = *regs;
+ 		raw_spin_lock(&stop_lock);
+ 		printk(KERN_CRIT "CPU%u: stopping\n", cpu);
+ 		dump_stack();
+@@ -674,7 +676,7 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 
+ 	case IPI_CPU_STOP:
+ 		irq_enter();
+-		ipi_cpu_stop(cpu);
++		ipi_cpu_stop(cpu, regs);
+ 		irq_exit();
+ 		break;
+ 
+-- 
+1.8.1.2
+

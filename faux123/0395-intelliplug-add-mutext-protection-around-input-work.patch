@@ -1,0 +1,38 @@
+From 3454bd3aef66bd2c54f75d5e908e45f686600ac5 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Tue, 12 Nov 2013 12:19:22 -0600
+Subject: [PATCH 395/507] intelliplug: add mutext protection around input work
+
+once in a while, during atomic ops, new input event could cause atomic
+violations
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/intelli_plug.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/mach-msm/intelli_plug.c b/arch/arm/mach-msm/intelli_plug.c
+index 95337aa..5e77a00 100644
+--- a/arch/arm/mach-msm/intelli_plug.c
++++ b/arch/arm/mach-msm/intelli_plug.c
+@@ -344,6 +344,8 @@ static void intelli_plug_input_event(struct input_handle *handle,
+ #ifdef DEBUG_INTELLI_PLUG
+ 	pr_info("intelli_plug touched!\n");
+ #endif
++
++	mutex_lock(&intelli_plug_mutex);
+ 	cancel_delayed_work_sync(&intelli_plug_work);
+ 
+ 	sampling_time = BUSY_SAMPLING_MS;
+@@ -351,6 +353,7 @@ static void intelli_plug_input_event(struct input_handle *handle,
+ 
+         schedule_delayed_work_on(0, &intelli_plug_work,
+                 msecs_to_jiffies(sampling_time));
++	mutex_unlock(&intelli_plug_mutex);
+ }
+ 
+ static int input_dev_filter(const char *input_dev_name)
+-- 
+1.7.9.5
+

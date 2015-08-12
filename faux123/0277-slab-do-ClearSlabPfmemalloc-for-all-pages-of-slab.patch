@@ -1,0 +1,53 @@
+From f14feeca18e72e3dabdd26be7a5014a1b5efa8c6 Mon Sep 17 00:00:00 2001
+From: Mel Gorman <mgorman@suse.de>
+Date: Mon, 17 Sep 2012 14:09:03 -0700
+Subject: [PATCH 277/507] slab: do ClearSlabPfmemalloc() for all pages of slab
+
+Right now, we call ClearSlabPfmemalloc() for first page of slab when we
+clear SlabPfmemalloc flag.  This is fine for most swap-over-network use
+cases as it is expected that order-0 pages are in use.  Unfortunately it
+is possible that that __ac_put_obj() checks SlabPfmemalloc on a tail
+page and while this is harmless, it is sloppy.  This patch ensures that
+the head page is always used.
+
+This problem was originally identified by Joonsoo Kim.
+
+[js1304@gmail.com: Original implementation and problem identification]
+Signed-off-by: Mel Gorman <mgorman@suse.de>
+Cc: David Miller <davem@davemloft.net>
+Cc: Chuck Lever <chuck.lever@oracle.com>
+Cc: Joonsoo Kim <js1304@gmail.com>
+Cc: David Rientjes <rientjes@google.com>
+Cc: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slab.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/mm/slab.c b/mm/slab.c
+index 018f574..30d1a3e 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -993,7 +993,7 @@ static void *__ac_get_obj(struct kmem_cache *cachep, struct array_cache *ac,
+ 		l3 = cachep->nodelists[numa_mem_id()];
+ 		if (!list_empty(&l3->slabs_free) && force_refill) {
+ 			struct slab *slabp = virt_to_slab(objp);
+-			ClearPageSlabPfmemalloc(virt_to_page(slabp->s_mem));
++			ClearPageSlabPfmemalloc(virt_to_head_page(slabp->s_mem));
+ 			clear_obj_pfmemalloc(&objp);
+ 			recheck_pfmemalloc_active(cachep, ac);
+ 			return objp;
+@@ -1025,7 +1025,7 @@ static void *__ac_put_obj(struct kmem_cache *cachep, struct array_cache *ac,
+ {
+ 	if (unlikely(pfmemalloc_active)) {
+ 		/* Some pfmemalloc slabs exist, check if this is one */
+-		struct page *page = virt_to_page(objp);
++		struct page *page = virt_to_head_page(objp);
+ 		if (PageSlabPfmemalloc(page))
+ 			set_obj_pfmemalloc(&objp);
+ 	}
+-- 
+1.7.9.5
+

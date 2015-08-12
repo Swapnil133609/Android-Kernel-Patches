@@ -1,0 +1,45 @@
+From c6252b14d133ea541dd919164bacf82320e64faf Mon Sep 17 00:00:00 2001
+From: Jason Low <jason.low2@hp.com>
+Date: Sat, 31 Aug 2013 01:47:10 -0500
+Subject: [PATCH 170/338] sched: Reduce overestimating rq->avg_idle
+
+Date	Thu, 29 Aug 2013 13:05:34 -0700
+
+When updating avg_idle, if the delta exceeds some max value, then avg_idle
+gets set to the max, regardless of what the previous avg was. This can cause
+avg_idle to often be overestimated.
+
+This patch modifies the way we update avg_idle by always updating it with the
+function call to update_avg() first. Then, if avg_idle exceeds the max, we set
+it to the max.
+
+Signed-off-by: Jason Low <jason.low2@hp.com>
+Reviewed-by: Rik van Riel <riel@redhat.com>
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ kernel/sched/core.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index f2bc009..aedb4ae 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -1433,10 +1433,11 @@ ttwu_do_wakeup(struct rq *rq, struct task_struct *p, int wake_flags)
+ 		u64 delta = rq->clock - rq->idle_stamp;
+ 		u64 max = 2*sysctl_sched_migration_cost;
+ 
+-		if (delta > max)
++		update_avg(&rq->avg_idle, delta);
++
++		if (rq->avg_idle > max)
+ 			rq->avg_idle = max;
+-		else
+-			update_avg(&rq->avg_idle, delta);
++
+ 		rq->idle_stamp = 0;
+ 	}
+ #endif
+-- 
+1.8.1.2
+

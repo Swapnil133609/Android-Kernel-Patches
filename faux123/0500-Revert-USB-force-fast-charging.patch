@@ -1,0 +1,210 @@
+From 2751b7eac49d3a2e507abca51938113f3fe8b1f0 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Tue, 31 Dec 2013 15:41:39 -0800
+Subject: [PATCH 500/507] Revert "USB force fast charging"
+
+This DOES NOT WORK :p at all... :(
+
+This reverts commit 7710f23ded8a24604bfe4e3f6182bfe897b75213.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/Kconfig   |    7 ----
+ arch/arm/mach-msm/Makefile  |    1 -
+ arch/arm/mach-msm/fastchg.c |   95 -------------------------------------------
+ drivers/usb/otg/msm_otg.c   |   14 +------
+ include/linux/fastchg.h     |   23 -----------
+ 5 files changed, 1 insertion(+), 139 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/fastchg.c
+ delete mode 100644 include/linux/fastchg.h
+
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index b9bb487..66e4216 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -3091,11 +3091,4 @@ config WALL_CLK_SYSFS
+ 	 Support the wallclk directory in sysfs filesystem to enable the
+ 	 wall clock simulation and read the current SFN.
+ 
+-config FORCE_FAST_CHARGE
+-	bool "Force AC charge mode at will"
+-	default y
+-	help
+-	  A simple sysfs interface to force adapters that
+-	  are detected as USB to charge as AC.
+-
+ endif
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index 8e64a49..7e95bfc 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -436,4 +436,3 @@ obj-$(CONFIG_INTELLI_PLUG) += intelli_plug.o
+ obj-$(CONFIG_WALL_CLK) += wallclk.o
+ obj-$(CONFIG_WALL_CLK_SYSFS) += wallclk_sysfs.o
+ obj-$(CONFIG_MSM_CPUFREQ_LIMITER) += cpufreq_limit.o
+-obj-$(CONFIG_FORCE_FAST_CHARGE) += fastchg.o
+diff --git a/arch/arm/mach-msm/fastchg.c b/arch/arm/mach-msm/fastchg.c
+deleted file mode 100644
+index 9da2cab..0000000
+--- a/arch/arm/mach-msm/fastchg.c
++++ /dev/null
+@@ -1,95 +0,0 @@
+-/*
+- * Author: Chad Froebel <chadfroebel@gmail.com>
+- *
+- * Simple port to Nexus 4 : motley <motley.slate@gmail.com>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-/*
+- * Possible values for "force_fast_charge" are :
+- *
+- *   0 - disabled (default)
+- *   1 - substitute AC to USB unconditional
+-*/
+-
+-#include <linux/kobject.h>
+-#include <linux/sysfs.h>
+-#include <linux/fastchg.h>
+-
+-int force_fast_charge;
+-
+-/* sysfs interface for "force_fast_charge" */
+-static ssize_t force_fast_charge_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+-{
+-return sprintf(buf, "%d\n", force_fast_charge);
+-}
+-
+-static ssize_t force_fast_charge_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+-{
+-
+-int new_force_fast_charge;
+-
+-sscanf(buf, "%du", &new_force_fast_charge);
+-
+-if (new_force_fast_charge >= FAST_CHARGE_DISABLED && new_force_fast_charge <= FAST_CHARGE_FORCE_AC) {
+-	/* update only if valid value provided */
+-	force_fast_charge = new_force_fast_charge;
+-}
+-
+-return count;
+-}
+-
+-static struct kobj_attribute force_fast_charge_attribute =
+-__ATTR(force_fast_charge, 0666, force_fast_charge_show, force_fast_charge_store);
+-
+-static struct attribute *force_fast_charge_attrs[] = {
+-&force_fast_charge_attribute.attr,
+-NULL,
+-};
+-
+-static struct attribute_group force_fast_charge_attr_group = {
+-.attrs = force_fast_charge_attrs,
+-};
+-
+-/* Initialize fast charge sysfs folder */
+-static struct kobject *force_fast_charge_kobj;
+-
+-int force_fast_charge_init(void)
+-{
+-	int force_fast_charge_retval;
+-
+-	force_fast_charge = FAST_CHARGE_DISABLED; /* Forced fast charge disabled by default */
+-
+-	force_fast_charge_kobj = kobject_create_and_add("fast_charge", kernel_kobj);
+-	if (!force_fast_charge_kobj) {
+-			return -ENOMEM;
+-	}
+-
+-	force_fast_charge_retval = sysfs_create_group(force_fast_charge_kobj, &force_fast_charge_attr_group);
+-
+-	if (force_fast_charge_retval)
+-		kobject_put(force_fast_charge_kobj);
+-
+-	if (force_fast_charge_retval)
+-		kobject_put(force_fast_charge_kobj);
+-
+-	return (force_fast_charge_retval);
+-}
+-
+-void force_fast_charge_exit(void)
+-{
+-	kobject_put(force_fast_charge_kobj);
+-}
+-
+-module_init(force_fast_charge_init);
+-module_exit(force_fast_charge_exit);
+-
+diff --git a/drivers/usb/otg/msm_otg.c b/drivers/usb/otg/msm_otg.c
+index f922ef7..0fd2c8b 100644
+--- a/drivers/usb/otg/msm_otg.c
++++ b/drivers/usb/otg/msm_otg.c
+@@ -48,11 +48,6 @@
+ #include <mach/msm_bus.h>
+ #include <mach/rpm-regulator.h>
+ 
+-#ifdef CONFIG_FORCE_FAST_CHARGE
+-#include <linux/fastchg.h>
+-#define USB_FASTCHG_LOAD 1000 /* uA */
+-#endif
+-
+ #define MSM_USB_BASE	(motg->regs)
+ #define DRIVER_NAME	"msm_otg"
+ 
+@@ -1335,14 +1330,7 @@ static void msm_otg_notify_charger(struct msm_otg *motg, unsigned mA)
+ 
+ 	if (motg->cur_power == mA)
+ 		return;
+-#ifdef CONFIG_FORCE_FAST_CHARGE
+-	if (force_fast_charge == 1) {
+-			mA = USB_FASTCHG_LOAD;
+-			pr_info("USB fast charging is ON - 1000mA.\n");
+-	} else {
+-		pr_info("USB fast charging is OFF.\n");
+-	}
+-#endif
++
+ 	dev_info(motg->phy.dev, "Avail curr from USB = %u\n", mA);
+ 
+ 	/*
+diff --git a/include/linux/fastchg.h b/include/linux/fastchg.h
+deleted file mode 100644
+index 0570e03..0000000
+--- a/include/linux/fastchg.h
++++ /dev/null
+@@ -1,23 +0,0 @@
+-/*
+- * Author: Chad Froebel <chadfroebel@gmail.com>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-#ifndef _LINUX_FASTCHG_H
+-#define _LINUX_FASTCHG_H
+-
+-extern int force_fast_charge;
+-
+-#define FAST_CHARGE_DISABLED 0	/* default */
+-#define FAST_CHARGE_FORCE_AC 1
+-
+-#endif
+-- 
+1.7.9.5
+

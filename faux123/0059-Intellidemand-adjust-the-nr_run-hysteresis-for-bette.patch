@@ -1,0 +1,35 @@
+From 3a1946f2931d95e2aa7940a75e5479415b1a63ac Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Sun, 16 Dec 2012 13:11:51 -0800
+Subject: [PATCH 059/507] Intellidemand: adjust the nr_run hysteresis for
+ better UI response
+
+Signed-off-by: faux123 <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_intellidemand.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_intellidemand.c b/drivers/cpufreq/cpufreq_intellidemand.c
+index eb77701..213eac1 100644
+--- a/drivers/cpufreq/cpufreq_intellidemand.c
++++ b/drivers/cpufreq/cpufreq_intellidemand.c
+@@ -1207,13 +1207,13 @@ static unsigned int calculate_thread_stats(void)
+ 
+ 	if (!eco_mode_active) {
+ 		threshold_size =  ARRAY_SIZE(nr_run_thresholds_full);
+-		nr_run_hysteresis = 4;
++		nr_run_hysteresis = 8;
+ 		nr_fshift = 3;
+ 		//pr_info("intelldemand: full mode active!");
+ 	}
+ 	else {
+ 		threshold_size =  ARRAY_SIZE(nr_run_thresholds_eco);
+-		nr_run_hysteresis = 2;
++		nr_run_hysteresis = 4;
+ 		nr_fshift = 1;
+ 		//pr_info("intelldemand: eco mode active!");
+ 	}
+-- 
+1.7.9.5
+

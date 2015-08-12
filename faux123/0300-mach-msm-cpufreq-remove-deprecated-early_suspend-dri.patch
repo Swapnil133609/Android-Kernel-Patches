@@ -1,0 +1,78 @@
+From d264f3d8b90e7c38a0430c9663506f197df6470a Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sat, 2 Nov 2013 19:02:47 -0500
+Subject: [PATCH 300/338] mach-msm: cpufreq: remove deprecated early_suspend
+ drivers
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ arch/arm/mach-msm/cpufreq.c | 39 ---------------------------------------
+ 1 file changed, 39 deletions(-)
+
+diff --git a/arch/arm/mach-msm/cpufreq.c b/arch/arm/mach-msm/cpufreq.c
+index d933274..3dc6166 100644
+--- a/arch/arm/mach-msm/cpufreq.c
++++ b/arch/arm/mach-msm/cpufreq.c
+@@ -17,7 +17,6 @@
+  *
+  */
+ 
+-#include <linux/earlysuspend.h>
+ #include <linux/init.h>
+ #include <linux/module.h>
+ #include <linux/cpufreq.h>
+@@ -317,43 +316,6 @@ static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_CPU_FREQ_GOV_INTELLIDEMAND
+-extern bool lmf_screen_state;
+-#endif
+-
+-static void msm_cpu_early_suspend(struct early_suspend *h)
+-{
+-#ifdef CONFIG_CPUFREQ_LIMIT_MAX_FREQ
+-	int cpu = 0;
+-
+-	for_each_possible_cpu(cpu) {
+-		mutex_lock(&per_cpu(cpufreq_suspend, cpu).suspend_mutex);
+-		lmf_screen_state = false;
+-		mutex_unlock(&per_cpu(cpufreq_suspend, cpu).suspend_mutex);
+-	}
+-#endif
+-}
+-
+-static void msm_cpu_late_resume(struct early_suspend *h)
+-{
+-#ifdef CONFIG_CPUFREQ_LIMIT_MAX_FREQ
+-	int cpu = 0;
+-
+-	for_each_possible_cpu(cpu) {
+-
+-		mutex_lock(&per_cpu(cpufreq_suspend, cpu).suspend_mutex);
+-		lmf_screen_state = true;
+-		mutex_unlock(&per_cpu(cpufreq_suspend, cpu).suspend_mutex);
+-	}
+-#endif
+-}
+-
+-static struct early_suspend msm_cpu_early_suspend_handler = {
+-	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN,
+-	.suspend = msm_cpu_early_suspend,
+-	.resume = msm_cpu_late_resume,
+-};
+-
+ static int __cpuinit msm_cpufreq_cpu_callback(struct notifier_block *nfb,
+ 		unsigned long action, void *hcpu)
+ 
+@@ -442,7 +404,6 @@ static int __init msm_cpufreq_register(void)
+ 	msm_cpufreq_wq = alloc_workqueue("msm-cpufreq", WQ_HIGHPRI, 0);
+ 	register_hotcpu_notifier(&msm_cpufreq_cpu_notifier);
+ 
+-	register_early_suspend(&msm_cpu_early_suspend_handler);
+ 	return cpufreq_register_driver(&msm_cpufreq_driver);
+ }
+ 
+-- 
+1.8.1.2
+

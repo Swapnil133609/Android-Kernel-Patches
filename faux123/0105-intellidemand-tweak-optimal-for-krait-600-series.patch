@@ -1,0 +1,26 @@
+From 473c8b9d1726b917dd01ddc3714687d8b8765052 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Thu, 23 May 2013 13:13:48 -0500
+Subject: [PATCH 105/338] intellidemand: tweak optimal for krait 600 series
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ drivers/cpufreq/cpufreq_intellidemand.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/cpufreq_intellidemand.c b/drivers/cpufreq/cpufreq_intellidemand.c
+index e4f0b26..bd4a639 100644
+--- a/drivers/cpufreq/cpufreq_intellidemand.c
++++ b/drivers/cpufreq/cpufreq_intellidemand.c
+@@ -59,7 +59,7 @@
+ #define BOOSTED_SAMPLING_RATE			(15000)
+ #define DBS_INPUT_EVENT_MIN_FREQ		(1026000)
+ #define DBS_SYNC_FREQ				(702000)
+-#define DBS_OPTIMAL_FREQ			(1296000)
++#define DBS_OPTIMAL_FREQ			(1566000)
+ 
+ static u64 freq_boosted_time;
+ /*
+-- 
+1.8.1.2
+

@@ -1,0 +1,40 @@
+From 98c5a2627ea60833a2a507ff7c550a872e0ca866 Mon Sep 17 00:00:00 2001
+From: Viresh Kumar <viresh.kumar@linaro.org>
+Date: Mon, 17 Jun 2013 12:41:16 -0500
+Subject: [PATCH 183/507] sched: don't call get_group() for covered cpus
+
+Date	Tue, 11 Jun 2013 16:32:44 +0530
+
+In build_sched_groups() we don't need to call get_group() for cpus which are
+already covered in previous iterations. So, call get_group() after checking if
+cpu is covered or not.
+
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/sched/core.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index a1befdb..a4b56d8 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -6222,12 +6222,12 @@ build_sched_groups(struct sched_domain *sd, int cpu)
+ 
+ 	for_each_cpu(i, span) {
+ 		struct sched_group *sg;
+-		int group = get_group(i, sdd, &sg);
+-		int j;
++		int group, j;
+ 
+ 		if (cpumask_test_cpu(i, covered))
+ 			continue;
+ 
++		group = get_group(i, sdd, &sg);
+ 		cpumask_clear(sched_group_cpus(sg));
+ 		sg->sgp->power = 0;
+ 
+-- 
+1.7.9.5
+

@@ -1,0 +1,31 @@
+From ac35837691194906ffcaaca8d8b0d10806b6214a Mon Sep 17 00:00:00 2001
+From: Thierry Reding <thierry.reding@avionic-design.de>
+Date: Fri, 22 Jun 2012 19:42:49 +0200
+Subject: [PATCH 203/338] mm, slab: Build fix for recent kmem_cache changes
+
+Commit 3b0efdf ("mm, sl[aou]b: Extract common fields from struct
+kmem_cache") renamed the kmem_cache structure's "next" field to "list"
+but forgot to update one instance in leaks_show().
+
+Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+---
+ mm/slab.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mm/slab.c b/mm/slab.c
+index 356ecf9..480ad07 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -4527,7 +4527,7 @@ static void show_symbol(struct seq_file *m, unsigned long address)
+ 
+ static int leaks_show(struct seq_file *m, void *p)
+ {
+-	struct kmem_cache *cachep = list_entry(p, struct kmem_cache, next);
++	struct kmem_cache *cachep = list_entry(p, struct kmem_cache, list);
+ 	struct slab *slabp;
+ 	struct kmem_list3 *l3;
+ 	const char *name;
+-- 
+1.8.1.2
+

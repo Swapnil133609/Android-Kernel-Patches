@@ -1,0 +1,63 @@
+From 447e7e1c4a2424247c2da22ce620958cbab41227 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sun, 8 Sep 2013 17:41:26 -0500
+Subject: [PATCH 251/507] mm/slub: Use kmem_cache for the kmem_cache structure
+
+Do not use kmalloc() but kmem_cache_alloc() for the allocation
+of the kmem_cache structures in slub.
+
+Reviewed-by: Glauber Costa <glommer@parallels.com>
+Acked-by: David Rientjes <rientjes@google.com>
+Signed-off-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+backported for Linux 3.4
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slub.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/mm/slub.c b/mm/slub.c
+index 40c78ea..9f0df34 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -213,7 +213,7 @@ static inline int sysfs_slab_alias(struct kmem_cache *s, const char *p)
+ static inline void sysfs_slab_remove(struct kmem_cache *s)
+ {
+ 	kfree(s->name);
+-	kfree(s);
++	kmem_cache_free(kmem_cache, s);
+ }
+ 
+ #endif
+@@ -3973,7 +3973,7 @@ struct kmem_cache *__kmem_cache_create(const char *name, size_t size,
+ 	if (!n)
+ 		return NULL;
+ 
+-	s = kmalloc(kmem_size, GFP_KERNEL);
++	s = kmem_cache_alloc(kmem_cache, GFP_KERNEL);
+ 	if (s) {
+ 		if (kmem_cache_open(s, n,
+ 				size, align, flags, ctor)) {
+@@ -3990,7 +3990,7 @@ struct kmem_cache *__kmem_cache_create(const char *name, size_t size,
+ 			kmem_cache_close(s);
+ 		}
+ 		kfree(n);
+-		kfree(s);
++		kmem_cache_free(kmem_cache, s);
+ 	}
+ 	return NULL;
+ }
+@@ -5227,7 +5227,7 @@ static void kmem_cache_release(struct kobject *kobj)
+ 	struct kmem_cache *s = to_slab(kobj);
+ 
+ 	kfree(s->name);
+-	kfree(s);
++	kmem_cache_free(kmem_cache, s);
+ }
+ 
+ static const struct sysfs_ops slab_sysfs_ops = {
+-- 
+1.7.9.5
+

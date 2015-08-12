@@ -1,0 +1,104 @@
+From ba4245a0cde47763379e93d6f4d43c037360a418 Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Tue, 18 Dec 2012 22:43:52 -0800
+Subject: [PATCH 028/338] cpufreq: Avoid using smp_processor_id() in
+ preemptible context
+
+Even though this work item runs on only one cpu at a time (due to
+queue_work_on()) it is possible for the work item to be preempted
+and so use of smp_processor_id() is illegal.
+
+BUG: using smp_processor_id() in preemptible [00000000]
+code: kworker/3:1/4162 caller is dbs_refresh_callback+0xc/0x188
+[<c00151b0>] (unwind_backtrace+0x0/0x120) from [<c0279058>]
+(debug_smp_processor_id+0xbc/0xf0)
+[<c0279058>] (debug_smp_processor_id+0xbc/0xf0) from [<c0454b54>]
+(dbs_refresh_callback+0xc/0x188)
+[<c0454b54>] (dbs_refresh_callback+0xc/0x188) from [<c0087290>]
+(process_one_work+0x354/0x648)
+[<c0087290>] (process_one_work+0x354/0x648) from [<c0089754>]
+(worker_thread+0x1a8/0x2a8)
+[<c0089754>] (worker_thread+0x1a8/0x2a8) from [<c008e480>]
+(kthread+0x90/0xa0)
+[<c008e480>] (kthread+0x90/0xa0) from [<c000f438>]
+(kernel_thread_exit+0x0/0x8)
+
+The intent of the code is to determine which CPU this work item
+is running on, which we can easily do by passing that information
+in a wrapper struct around the work struct. Do this so we avoid
+this problem.
+
+Change-Id: I05ca0ff2b3cbaa239930463ea0760e3e9d75145f
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+adapted for Intellidemand from CAF reference
+
+Signed-off-by: faux123 <reioux@gmail.com>
+---
+ drivers/cpufreq/cpufreq_intellidemand.c | 26 +++++++++++++++++++-------
+ 1 file changed, 19 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_intellidemand.c b/drivers/cpufreq/cpufreq_intellidemand.c
+index 213eac1..bf0626e 100644
+--- a/drivers/cpufreq/cpufreq_intellidemand.c
++++ b/drivers/cpufreq/cpufreq_intellidemand.c
+@@ -147,7 +147,12 @@ static DEFINE_MUTEX(dbs_mutex);
+ 
+ static struct workqueue_struct *input_wq;
+ 
+-static DEFINE_PER_CPU(struct work_struct, dbs_refresh_work);
++struct dbs_work_struct {
++	struct work_struct work;
++	unsigned int cpu;
++};
++
++static DEFINE_PER_CPU(struct dbs_work_struct, dbs_refresh_work);
+ 
+ static struct dbs_tuners {
+ 	unsigned int sampling_rate;
+@@ -1627,11 +1632,15 @@ static int should_io_be_busy(void)
+ #endif
+ }
+ 
+-static void dbs_refresh_callback(struct work_struct *unused)
++static void dbs_refresh_callback(struct work_struct *work)
+ {
+ 	struct cpufreq_policy *policy;
+ 	struct cpu_dbs_info_s *this_dbs_info;
+-	unsigned int cpu = smp_processor_id();
++	struct dbs_work_struct *dbs_work;
++	unsigned int cpu;
++
++	dbs_work = container_of(work, struct dbs_work_struct, work);
++	cpu = dbs_work->cpu;
+ 
+ 	get_online_cpus();
+ 
+@@ -1682,9 +1691,8 @@ static void dbs_input_event(struct input_handle *handle, unsigned int type,
+ 			sampling_rate_boosted = 1;
+ 		}
+ 
+-		for_each_online_cpu(i) {
+-			queue_work_on(i, input_wq, &per_cpu(dbs_refresh_work, i));
+-		}
++		for_each_online_cpu(i)
++			queue_work_on(i, input_wq, &per_cpu(dbs_refresh_work, i).work);
+ 	}
+ }
+ 
+@@ -1924,8 +1932,12 @@ static int __init cpufreq_gov_dbs_init(void)
+ 	for_each_possible_cpu(i) {
+ 		struct cpu_dbs_info_s *this_dbs_info =
+ 			&per_cpu(od_cpu_dbs_info, i);
++		struct dbs_work_struct *dbs_work =
++			&per_cpu(dbs_refresh_work, i);
++
+ 		mutex_init(&this_dbs_info->timer_mutex);
+-		INIT_WORK(&per_cpu(dbs_refresh_work, i), dbs_refresh_callback);
++		INIT_WORK(&dbs_work->work, dbs_refresh_callback);
++		dbs_work->cpu = i;
+ 	}
+ 
+ #ifdef CONFIG_EARLYSUSPEND
+-- 
+1.8.1.2
+

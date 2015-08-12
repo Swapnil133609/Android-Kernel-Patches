@@ -1,0 +1,75 @@
+From 6776902d5c00bbc130f25bef6e6964241fd02ba5 Mon Sep 17 00:00:00 2001
+From: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
+Date: Fri, 9 Aug 2013 13:07:32 -0500
+Subject: [PATCH 169/338] LZ4: compression/decompression signedness mismatch
+ (v2)
+
+LZ4 compression and decompression functions require different
+in signedness input/output parameters: unsigned char for
+compression and signed char for decompression.
+
+Change decompression API to require "(const) unsigned char *".
+
+v2: minor coding style fix.
+
+Signed-off-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ include/linux/lz4.h      | 8 ++++----
+ lib/lz4/lz4_decompress.c | 8 ++++----
+ 2 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/include/linux/lz4.h b/include/linux/lz4.h
+index cd7ff31..312f449 100644
+--- a/include/linux/lz4.h
++++ b/include/linux/lz4.h
+@@ -64,8 +64,8 @@ int lz4hc_compress(const unsigned char *src, size_t src_len,
+  *	note :  Destination buffer must be already allocated.
+  *		a bit faster than lz4_decompress_unknownoutputsize()
+  */
+-int lz4_decompress(const char *src, size_t *src_len, char *dest,
+-		size_t actual_dest_len);
++int lz4_decompress(const unsigned char *src, size_t *src_len,
++		unsigned char *dest, size_t actual_dest_len);
+ 
+ /*
+  * lz4_decompress_unknownoutputsize()
+@@ -79,6 +79,6 @@ int lz4_decompress(const char *src, size_t *src_len, char *dest,
+  *		  Error if return (< 0)
+  *	note :  Destination buffer must be already allocated.
+  */
+-int lz4_decompress_unknownoutputsize(const char *src, size_t src_len,
+-		char *dest, size_t *dest_len);
++int lz4_decompress_unknownoutputsize(const unsigned char *src, size_t src_len,
++		unsigned char *dest, size_t *dest_len);
+ #endif
+diff --git a/lib/lz4/lz4_decompress.c b/lib/lz4/lz4_decompress.c
+index f58eaca..5e7f2db 100644
+--- a/lib/lz4/lz4_decompress.c
++++ b/lib/lz4/lz4_decompress.c
+@@ -288,8 +288,8 @@ _output_error:
+ 	return (int) (-(((char *)ip) - source));
+ }
+ 
+-int lz4_decompress(const char *src, size_t *src_len, char *dest,
+-		size_t actual_dest_len)
++int lz4_decompress(const unsigned char *src, size_t *src_len,
++		unsigned char *dest, size_t actual_dest_len)
+ {
+ 	int ret = -1;
+ 	int input_len = 0;
+@@ -307,8 +307,8 @@ exit_0:
+ EXPORT_SYMBOL_GPL(lz4_decompress);
+ #endif
+ 
+-int lz4_decompress_unknownoutputsize(const char *src, size_t src_len,
+-		char *dest, size_t *dest_len)
++int lz4_decompress_unknownoutputsize(const unsigned char *src, size_t src_len,
++		unsigned char *dest, size_t *dest_len)
+ {
+ 	int ret = -1;
+ 	int out_len = 0;
+-- 
+1.8.1.2
+

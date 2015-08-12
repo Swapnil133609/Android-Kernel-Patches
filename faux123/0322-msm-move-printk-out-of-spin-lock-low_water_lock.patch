@@ -1,0 +1,50 @@
+From 8df93ee4f66974ba83b8acfa7150d25a8cbda1d4 Mon Sep 17 00:00:00 2001
+From: Tingting Yang <tingting@codeaurora.org>
+Date: Tue, 6 Aug 2013 11:12:52 +0800
+Subject: [PATCH 322/507] msm: move printk out of spin lock low_water_lock
+
+cpu3 stuck in printk more time in spin lock low_water_lock cause cpu0
+get spin lock fail and system crashed.
+
+CRs-Fixed: 521570
+Change-Id: I75356a4b4171ae2888ce6cce792f569b5ca8cdcf
+Signed-off-by: Tingting Yang <tingting@codeaurora.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/exit.c |    9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/exit.c b/kernel/exit.c
+index bc7d690..9989b75 100644
+--- a/kernel/exit.c
++++ b/kernel/exit.c
+@@ -880,6 +880,7 @@ static void check_stack_usage(void)
+ 	static DEFINE_SPINLOCK(low_water_lock);
+ 	static int lowest_to_date = THREAD_SIZE;
+ 	unsigned long free;
++	int islower = false;
+ 
+ 	free = stack_not_used(current);
+ 
+@@ -888,12 +889,16 @@ static void check_stack_usage(void)
+ 
+ 	spin_lock(&low_water_lock);
+ 	if (free < lowest_to_date) {
++		lowest_to_date = free;
++		islower = true;
++	}
++	spin_unlock(&low_water_lock);
++
++	if (islower) {
+ 		printk(KERN_WARNING "%s used greatest stack depth: %lu bytes "
+ 				"left\n",
+ 				current->comm, free);
+-		lowest_to_date = free;
+ 	}
+-	spin_unlock(&low_water_lock);
+ }
+ #else
+ static inline void check_stack_usage(void) {}
+-- 
+1.7.9.5
+

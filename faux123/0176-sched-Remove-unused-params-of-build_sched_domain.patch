@@ -1,0 +1,47 @@
+From 1cc25374e9c38ae2f13ad61322964b964b23ce14 Mon Sep 17 00:00:00 2001
+From: Viresh Kumar <viresh.kumar@linaro.org>
+Date: Thu, 6 Jun 2013 18:31:22 -0500
+Subject: [PATCH 176/507] sched: Remove unused params of build_sched_domain()
+
+Date	Tue, 4 Jun 2013 16:50:19 +0530
+
+build_sched_domain() never uses parameter struct s_data *d and so passing it is
+useless.
+
+Remove it.
+
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/sched/core.c |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 5a973a5..1edae0c 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -6526,9 +6526,8 @@ static void __sdt_free(const struct cpumask *cpu_map)
+ }
+ 
+ struct sched_domain *build_sched_domain(struct sched_domain_topology_level *tl,
+-		struct s_data *d, const struct cpumask *cpu_map,
+-		struct sched_domain_attr *attr, struct sched_domain *child,
+-		int cpu)
++		const struct cpumask *cpu_map, struct sched_domain_attr *attr,
++		struct sched_domain *child, int cpu)
+ {
+ 	struct sched_domain *sd = tl->init(tl, cpu);
+ 	if (!sd)
+@@ -6568,7 +6567,7 @@ static int build_sched_domains(const struct cpumask *cpu_map,
+ 
+ 		sd = NULL;
+ 		for (tl = sched_domain_topology; tl->init; tl++) {
+-			sd = build_sched_domain(tl, &d, cpu_map, attr, sd, i);
++			sd = build_sched_domain(tl, cpu_map, attr, sd, i);
+ 			if (tl == sched_domain_topology)
+ 				*per_cpu_ptr(d.sd, i) = sd;
+ 			if (tl->flags & SDTL_OVERLAP || sched_feat(FORCE_SD_OVERLAP))
+-- 
+1.7.9.5
+

@@ -1,0 +1,76 @@
+From 9dcc72dbde08727aa852f547652aff7a541927fd Mon Sep 17 00:00:00 2001
+From: Puneet Kumar <puneetster@chromium.org>
+Date: Wed, 7 Nov 2012 23:47:01 -0800
+Subject: [PATCH 344/507] CHROMIUM: mm: Fix calculation of dirtyable memory
+
+The system uses global_dirtyable_memory() to calculate
+number of dirtyable pages/pages that can be allocated
+to the page cache.  A bug causes an underflow thus making
+the page count look like a big unsigned number.  This in turn
+confuses the dirty writeback throttling to aggressively write
+back pages as they become dirty (usually 1 page at a time).
+
+Fix is to ensure there is no underflow while doing the math.
+
+Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+Signed-off-by: Puneet Kumar <puneetster@chromium.org>
+
+BUG=chrome-os-partner:16011
+TEST=Manual; boot kernel, powerwash, login with testaccount and
+make sure no jank occurs on sync of applications
+
+Change-Id: I614e7c3156e014f0f28a4ef9bdd8cb8a2cd07b2a
+Reviewed-on: https://gerrit.chromium.org/gerrit/37612
+Reviewed-by: Kees Cook <keescook@chromium.org>
+Reviewed-by: Olof Johansson <olofj@chromium.org>
+Commit-Ready: Puneet Kumar <puneetster@chromium.org>
+Reviewed-by: Puneet Kumar <puneetster@chromium.org>
+Tested-by: Puneet Kumar <puneetster@chromium.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/page-writeback.c |   17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/mm/page-writeback.c b/mm/page-writeback.c
+index 26adea8..ec5c91b 100644
+--- a/mm/page-writeback.c
++++ b/mm/page-writeback.c
+@@ -180,11 +180,18 @@ static unsigned long highmem_dirtyable_memory(unsigned long total)
+ 	unsigned long x = 0;
+ 
+ 	for_each_node_state(node, N_HIGH_MEMORY) {
++		unsigned long nr_pages;
+ 		struct zone *z =
+ 			&NODE_DATA(node)->node_zones[ZONE_HIGHMEM];
+ 
+-		x += zone_page_state(z, NR_FREE_PAGES) +
+-		     zone_reclaimable_pages(z) - z->dirty_balance_reserve;
++		nr_pages = zone_page_state(z, NR_FREE_PAGES) +
++		  zone_reclaimable_pages(z);
++		/*
++		 * make sure that the number of pages for this node
++		 * is never "negative".
++		 */
++		nr_pages -= min(nr_pages, z->dirty_balance_reserve);
++		x += nr_pages;
+ 	}
+ 	/*
+ 	 * Make sure that the number of highmem pages is never larger
+@@ -208,11 +215,11 @@ unsigned long global_dirtyable_memory(void)
+ {
+ 	unsigned long x;
+ 
+-	x = global_page_state(NR_FREE_PAGES) + global_reclaimable_pages() -
+-	    dirty_balance_reserve;
++	x = global_page_state(NR_FREE_PAGES) + global_reclaimable_pages();
++	x -= min(x, dirty_balance_reserve);
+ 
+ 	if (!vm_highmem_is_dirtyable)
+-		x -= highmem_dirtyable_memory(x);
++		x -= min(x, highmem_dirtyable_memory(x));
+ 
+ 	return x + 1;	/* Ensure that we never return 0 */
+ }
+-- 
+1.7.9.5
+

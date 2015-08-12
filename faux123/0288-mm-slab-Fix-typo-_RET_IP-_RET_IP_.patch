@@ -1,0 +1,32 @@
+From 4a0576b73ac5c00fc58b11816669b1f7dbaae26c Mon Sep 17 00:00:00 2001
+From: Ezequiel Garcia <elezegarcia@gmail.com>
+Date: Tue, 25 Sep 2012 08:07:08 -0300
+Subject: [PATCH 288/507] mm/slab: Fix typo _RET_IP -> _RET_IP_
+
+The bug was introduced by commit 7c0cb9c64f83 ("mm, slab: Replace
+'caller' type, void* -> unsigned long").
+
+Reported-by: Fengguang Wu <fengguang.wu@intel.com>
+Signed-off-by: Ezequiel Garcia <elezegarcia@gmail.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/slab.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mm/slab.c b/mm/slab.c
+index b08addc..ca29ee6 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -3823,7 +3823,7 @@ void *kmem_cache_alloc_node_trace(struct kmem_cache *cachep,
+ {
+ 	void *ret;
+ 
+-	ret = slab_alloc_node(cachep, flags, nodeid, _RET_IP);
++	ret = slab_alloc_node(cachep, flags, nodeid, _RET_IP_);
+ 
+ 	trace_kmalloc_node(_RET_IP_, ret,
+ 			   size, cachep->size,
+-- 
+1.7.9.5
+

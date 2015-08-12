@@ -1,0 +1,55 @@
+From a22bf4a3c89fb93ca7dbd3be9b0f4f1d95304870 Mon Sep 17 00:00:00 2001
+From: Pekka Enberg <penberg@kernel.org>
+Date: Thu, 16 Aug 2012 10:12:18 +0300
+Subject: [PATCH 227/338] Revert "mm/slab_common.c: cleanup"
+
+This reverts commit 455ce9eb1cfa083da0def023094190aeb133855a. Andrew
+sent a better version.
+
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+---
+ mm/slab_common.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/mm/slab_common.c b/mm/slab_common.c
+index 281600b..aa3ca5b 100644
+--- a/mm/slab_common.c
++++ b/mm/slab_common.c
+@@ -53,17 +53,19 @@ struct kmem_cache *kmem_cache_create(const char *name, size_t size, size_t align
+ {
+ 	struct kmem_cache *s = NULL;
+ 
+-	get_online_cpus();
+-	mutex_lock(&slab_mutex);
+-
+ #ifdef CONFIG_DEBUG_VM
+ 	if (!name || in_interrupt() || size < sizeof(void *) ||
+ 		size > KMALLOC_MAX_SIZE) {
+ 		printk(KERN_ERR "kmem_cache_create(%s) integrity check"
+-				" failed\n", name);
+-		goto oops;
++			" failed\n", name);
++		goto out;
+ 	}
++#endif
++
++	get_online_cpus();
++	mutex_lock(&slab_mutex);
+ 
++#ifdef CONFIG_DEBUG_VM
+ 	list_for_each_entry(s, &slab_caches, list) {
+ 		char tmp;
+ 		int res;
+@@ -102,6 +104,9 @@ oops:
+ 	mutex_unlock(&slab_mutex);
+ 	put_online_cpus();
+ 
++#ifdef CONFIG_DEBUG_VM
++out:
++#endif
+ 	if (!s && (flags & SLAB_PANIC))
+ 		panic("kmem_cache_create: Failed to create slab '%s'\n", name);
+ 
+-- 
+1.8.1.2
+

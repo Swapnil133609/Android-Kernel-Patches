@@ -1,0 +1,34 @@
+From 5f49524f5baed53b42a6ceeac3be9db56033d3fa Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Thu, 21 Mar 2013 01:43:13 -0500
+Subject: [PATCH 044/338] cpufreq: intellidemand: Set MIN_LATENCY_MULTIPLIER to
+ 20
+
+Currently MIN_LATENCY_MULTIPLIER is set defined as 100 and so on a system with
+transition latency of 1 ms, the minimum sampling time comes to be around 100 ms.
+That is quite big if you want to get better performance for your system.
+
+Redefine MIN_LATENCY_MULTIPLIER to 20 so that we can support 20ms sampling rate
+for such platforms.
+
+Signed-off-by: faux123 <reioux@gmail.com>
+---
+ drivers/cpufreq/cpufreq_intellidemand.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/cpufreq_intellidemand.c b/drivers/cpufreq/cpufreq_intellidemand.c
+index 9d75d20..6f7e3ce 100644
+--- a/drivers/cpufreq/cpufreq_intellidemand.c
++++ b/drivers/cpufreq/cpufreq_intellidemand.c
+@@ -80,7 +80,7 @@ static unsigned long stored_sampling_rate;
+ #endif
+ 
+ #define LATENCY_MULTIPLIER			(1000)
+-#define MIN_LATENCY_MULTIPLIER			(100)
++#define MIN_LATENCY_MULTIPLIER			(20)
+ #define TRANSITION_LATENCY_LIMIT		(10 * 1000 * 1000)
+ 
+ #define POWERSAVE_BIAS_MAXLEVEL			(1000)
+-- 
+1.8.1.2
+

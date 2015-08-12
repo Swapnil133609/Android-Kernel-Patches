@@ -1,0 +1,131 @@
+From 375d23ca559ecfc8a42730680fb93dc1dd3bb61d Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Thu, 9 May 2013 14:47:50 -0700
+Subject: [PATCH 012/338] scheduler: Re-compute time-average nr_running on read
+
+Re-compute time-average nr_running when it is read. This would
+prevent reading stalled average value if there were no run-queue
+changes for a long time. New average value is returned to the reader,
+but not stored to avoid concurrent writes. Light-weight sequential
+counter synchronization is used to assure data consistency for
+re-computing average.
+
+Change-Id: I8e4ea1b28ea00b3ddaf6ef7cdcd27866f87d360b
+Signed-off-by: Alex Frid <afrid@nvidia.com>
+(cherry picked from commit 527a759d9b40bf57958eb002edd2bb82014dab99)
+Reviewed-on: http://git-master/r/111637
+Reviewed-by: Sai Gurrappadi <sgurrappadi@nvidia.com>
+Tested-by: Sai Gurrappadi <sgurrappadi@nvidia.com>
+Reviewed-by: Automatic_Commit_Validation_User
+Reviewed-by: Peter Boonstoppel <pboonstoppel@nvidia.com>
+Reviewed-by: Yu-Huan Hsu <yhsu@nvidia.com>
+
+forward ported to Linux 3.4 for use on Mako
+
+Signed-off-by: faux123 <reioux@gmail.com>
+
+Conflicts:
+
+	kernel/sched/sched.h
+---
+ kernel/sched/core.c  | 21 +++++++++++++++++++--
+ kernel/sched/sched.h | 23 ++++++++++++++++-------
+ 2 files changed, 35 insertions(+), 9 deletions(-)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 951b0fa..51b76c1 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -2169,9 +2169,26 @@ unsigned long nr_iowait(void)
+ unsigned long avg_nr_running(void)
+ {
+ 	unsigned long i, sum = 0;
++	unsigned int seqcnt, ave_nr_running;
+ 
+-	for_each_online_cpu(i)
+-		sum += cpu_rq(i)->ave_nr_running;
++	for_each_online_cpu(i) {
++		struct rq *q = cpu_rq(i);
++
++		/*
++		 * Update average to avoid reading stalled value if there were
++		 * no run-queue changes for a long time. On the other hand if
++		 * the changes are happening right now, just read current value
++		 * directly.
++		 */
++		seqcnt = read_seqcount_begin(&q->ave_seqcnt);
++		ave_nr_running = do_avg_nr_running(q);
++		if (read_seqcount_retry(&q->ave_seqcnt, seqcnt)) {
++			read_seqcount_begin(&q->ave_seqcnt);
++			ave_nr_running = q->ave_nr_running;
++		}
++
++		sum += ave_nr_running;
++	}
+ 
+ 	return sum;
+ }
+diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+index 4bb4221..b3e5538 100644
+--- a/kernel/sched/sched.h
++++ b/kernel/sched/sched.h
+@@ -368,6 +368,7 @@ struct rq {
+ 	/* time-based average load */
+ 	u64 nr_last_stamp;
+ 	unsigned int ave_nr_running;
++	seqcount_t ave_seqcnt;
+ 
+ 	/* capture load from *all* tasks on this cpu: */
+ 	struct load_weight load;
+@@ -938,33 +939,41 @@ static inline void cpuacct_charge(struct task_struct *tsk, u64 cputime) {}
+ #define NR_AVE_PERIOD		(1 << NR_AVE_PERIOD_EXP)
+ #define NR_AVE_DIV_PERIOD(x)	((x) >> NR_AVE_PERIOD_EXP)
+ 
+-static inline void do_avg_nr_running(struct rq *rq)
++static inline unsigned int do_avg_nr_running(struct rq *rq)
+ {
+ 	s64 nr, deltax;
++	unsigned int ave_nr_running = rq->ave_nr_running;
+ 
+ 	deltax = rq->clock_task - rq->nr_last_stamp;
+-	rq->nr_last_stamp = rq->clock_task;
+ 	nr = NR_AVE_SCALE(rq->nr_running);
+ 
+ 	if (deltax > NR_AVE_PERIOD)
+-		rq->ave_nr_running = nr;
++		ave_nr_running = nr;
+ 	else
+-		rq->ave_nr_running +=
+-			NR_AVE_DIV_PERIOD(deltax * (nr - rq->ave_nr_running));
++		ave_nr_running +=
++			NR_AVE_DIV_PERIOD(deltax * (nr - ave_nr_running));
++
++	return ave_nr_running;
+ }
+ 
+ static inline void inc_nr_running(struct rq *rq)
+ {
+ 	sched_update_nr_prod(cpu_of(rq), rq->nr_running, true);
+-	do_avg_nr_running(rq);
++	write_seqcount_begin(&rq->ave_seqcnt);
++	rq->ave_nr_running = do_avg_nr_running(rq);
++	rq->nr_last_stamp = rq->clock_task;
+ 	rq->nr_running++;
++	write_seqcount_end(&rq->ave_seqcnt);
+ }
+ 
+ static inline void dec_nr_running(struct rq *rq)
+ {
+ 	sched_update_nr_prod(cpu_of(rq), rq->nr_running, false);
+-	do_avg_nr_running(rq);
++	write_seqcount_begin(&rq->ave_seqcnt);
++	rq->ave_nr_running = do_avg_nr_running(rq);
++	rq->nr_last_stamp = rq->clock_task;
+ 	rq->nr_running--;
++	write_seqcount_end(&rq->ave_seqcnt);
+ }
+ 
+ extern void update_rq_clock(struct rq *rq);
+-- 
+1.8.1.2
+

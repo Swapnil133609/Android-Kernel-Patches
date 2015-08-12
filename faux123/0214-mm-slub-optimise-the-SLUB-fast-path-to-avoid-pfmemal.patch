@@ -1,0 +1,77 @@
+From ea9f5d36e4498e56b2e89eea13a5b00687a89dc5 Mon Sep 17 00:00:00 2001
+From: Christoph Lameter <cl@linux.com>
+Date: Tue, 31 Jul 2012 16:44:00 -0700
+Subject: [PATCH 214/338] mm: slub: optimise the SLUB fast path to avoid
+ pfmemalloc checks
+
+This patch removes the check for pfmemalloc from the alloc hotpath and
+puts the logic after the election of a new per cpu slab.  For a pfmemalloc
+page we do not use the fast path but force the use of the slow path which
+is also used for the debug case.
+
+This has the side-effect of weakening pfmemalloc processing in the
+following way;
+
+1. A process that is allocating for network swap calls __slab_alloc.
+   pfmemalloc_match is true so the freelist is loaded and c->freelist is
+   now pointing to a pfmemalloc page.
+
+2. A process that is attempting normal allocations calls slab_alloc,
+   finds the pfmemalloc page on the freelist and uses it because it did
+   not check pfmemalloc_match()
+
+The patch allows non-pfmemalloc allocations to use pfmemalloc pages with
+the kmalloc slabs being the most vunerable caches on the grounds they
+are most likely to have a mix of pfmemalloc and !pfmemalloc requests. A
+later patch will still protect the system as processes will get throttled
+if the pfmemalloc reserves get depleted but performance will not degrade
+as smoothly.
+
+[mgorman@suse.de: Expanded changelog]
+Signed-off-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Mel Gorman <mgorman@suse.de>
+Cc: David Miller <davem@davemloft.net>
+Cc: Neil Brown <neilb@suse.de>
+Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Cc: Mike Christie <michaelc@cs.wisc.edu>
+Cc: Eric B Munson <emunson@mgebm.net>
+Cc: Eric Dumazet <eric.dumazet@gmail.com>
+Cc: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
+Cc: Mel Gorman <mgorman@suse.de>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ mm/slub.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/mm/slub.c b/mm/slub.c
+index 9dc9ddf..7df87f5 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -2279,11 +2279,11 @@ new_slab:
+ 	}
+ 
+ 	page = c->page;
+-	if (likely(!kmem_cache_debug(s)))
++	if (likely(!kmem_cache_debug(s) && pfmemalloc_match(page, gfpflags)))
+ 		goto load_freelist;
+ 
+ 	/* Only entered in the debug case */
+-	if (!alloc_debug_processing(s, page, freelist, addr))
++	if (kmem_cache_debug(s) && !alloc_debug_processing(s, page, freelist, addr))
+ 		goto new_slab;	/* Slab failed checks. Next slab needed */
+ 
+ 	deactivate_slab(s, page, get_freepointer(s, freelist));
+@@ -2340,8 +2340,7 @@ redo:
+ 
+ 	object = c->freelist;
+ 	page = c->page;
+-	if (unlikely(!object || !node_match(page, node) ||
+-					!pfmemalloc_match(page, gfpflags)))
++	if (unlikely(!object || !node_match(page, node)))
+ 		object = __slab_alloc(s, gfpflags, node, addr, c);
+ 
+ 	else {
+-- 
+1.8.1.2
+

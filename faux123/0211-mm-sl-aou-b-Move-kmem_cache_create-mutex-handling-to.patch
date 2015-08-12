@@ -1,0 +1,222 @@
+From 1d3d2fbb51d9cd1aed5e01a55f1ae11512823a48 Mon Sep 17 00:00:00 2001
+From: Christoph Lameter <cl@linux.com>
+Date: Sun, 8 Sep 2013 17:35:51 -0500
+Subject: [PATCH 211/338] mm, sl[aou]b: Move kmem_cache_create mutex handling
+ to common code
+
+Move the mutex handling into the common kmem_cache_create()
+function.
+
+Then we can also move more checks out of SLAB's kmem_cache_create()
+into the common code.
+
+Reviewed-by: Glauber Costa <glommer@parallels.com>
+Signed-off-by: Christoph Lameter <cl@linux.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ mm/slab.c        | 52 +---------------------------------------------------
+ mm/slab_common.c | 41 ++++++++++++++++++++++++++++++++++++++++-
+ mm/slub.c        | 27 ++++++++++++---------------
+ 3 files changed, 53 insertions(+), 67 deletions(-)
+
+diff --git a/mm/slab.c b/mm/slab.c
+index fd7dac6..1fcf3ac 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -2228,55 +2228,10 @@ __kmem_cache_create (const char *name, size_t size, size_t align,
+ 	unsigned long flags, void (*ctor)(void *))
+ {
+ 	size_t left_over, slab_size, ralign;
+-	struct kmem_cache *cachep = NULL, *pc;
++	struct kmem_cache *cachep = NULL;
+ 	gfp_t gfp;
+ 
+-	/*
+-	 * Sanity checks... these are all serious usage bugs.
+-	 */
+-	if (!name || in_interrupt() || (size < BYTES_PER_WORD) ||
+-	    size > KMALLOC_MAX_SIZE) {
+-		printk(KERN_ERR "%s: Early error in slab %s\n", __func__,
+-				name);
+-		BUG();
+-	}
+-
+-	/*
+-	 * We use cache_chain_mutex to ensure a consistent view of
+-	 * cpu_online_mask as well.  Please see cpuup_callback
+-	 */
+-	if (slab_is_available()) {
+-		get_online_cpus();
+-		mutex_lock(&slab_mutex);
+-	}
+-
+-	list_for_each_entry(pc, &slab_caches, list) {
+-		char tmp;
+-		int res;
+-
+-		/*
+-		 * This happens when the module gets unloaded and doesn't
+-		 * destroy its slab cache and no-one else reuses the vmalloc
+-		 * area of the module.  Print a warning.
+-		 */
+-		res = probe_kernel_address(pc->name, tmp);
+-		if (res) {
+-			printk(KERN_ERR
+-			       "SLAB: cache with size %d has lost its name\n",
+-			       pc->size);
+-			continue;
+-		}
+-
+-		if (!strcmp(pc->name, name)) {
+-			printk(KERN_ERR
+-			       "kmem_cache_create: duplicate cache %s\n", name);
+-			dump_stack();
+-			goto oops;
+-		}
+-	}
+-
+ #if DEBUG
+-	WARN_ON(strchr(name, ' '));	/* It confuses parsers */
+ #if FORCED_DEBUG
+ 	/*
+ 	 * Enable redzoning and last user accounting, except for caches with
+@@ -2495,11 +2450,6 @@ __kmem_cache_create (const char *name, size_t size, size_t align,
+ 
+ 	/* cache setup completed, link it into the list */
+ 	list_add(&cachep->list, &slab_caches);
+-oops:
+-	if (slab_is_available()) {
+-		mutex_unlock(&slab_mutex);
+-		put_online_cpus();
+-	}
+ 	return cachep;
+ }
+ 
+diff --git a/mm/slab_common.c b/mm/slab_common.c
+index 50e1ff1..12637ce 100644
+--- a/mm/slab_common.c
++++ b/mm/slab_common.c
+@@ -11,7 +11,8 @@
+ #include <linux/memory.h>
+ #include <linux/compiler.h>
+ #include <linux/module.h>
+-
++#include <linux/cpu.h>
++#include <linux/uaccess.h>
+ #include <asm/cacheflush.h>
+ #include <asm/tlbflush.h>
+ #include <asm/page.h>
+@@ -61,8 +62,46 @@ struct kmem_cache *kmem_cache_create(const char *name, size_t size, size_t align
+ 	}
+ #endif
+ 
++	get_online_cpus();
++	mutex_lock(&slab_mutex);
++
++#ifdef CONFIG_DEBUG_VM
++	list_for_each_entry(s, &slab_caches, list) {
++		char tmp;
++		int res;
++
++		/*
++		 * This happens when the module gets unloaded and doesn't
++		 * destroy its slab cache and no-one else reuses the vmalloc
++		 * area of the module.  Print a warning.
++		 */
++		res = probe_kernel_address(s->name, tmp);
++		if (res) {
++			printk(KERN_ERR
++			       "Slab cache with size %d has lost its name\n",
++			       s->object_size);
++			continue;
++		}
++
++		if (!strcmp(s->name, name)) {
++			printk(KERN_ERR "kmem_cache_create(%s): Cache name"
++				" already exists.\n",
++				name);
++			dump_stack();
++			s = NULL;
++			goto oops;
++		}
++	}
++
++	WARN_ON(strchr(name, ' '));	/* It confuses parsers */
++#endif
++
+ 	s = __kmem_cache_create(name, size, align, flags, ctor);
+ 
++oops:
++	mutex_unlock(&slab_mutex);
++	put_online_cpus();
++
+ #ifdef CONFIG_DEBUG_VM
+ out:
+ #endif
+diff --git a/mm/slub.c b/mm/slub.c
+index b321951..6273c0a 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -3915,7 +3915,6 @@ struct kmem_cache *__kmem_cache_create(const char *name, size_t size,
+ 	struct kmem_cache *s;
+ 	char *n;
+ 
+-	mutex_lock(&slab_mutex);
+ 	s = find_mergeable(size, align, flags, name, ctor);
+ 	if (s) {
+ 		s->refcount++;
+@@ -3928,37 +3927,35 @@ struct kmem_cache *__kmem_cache_create(const char *name, size_t size,
+ 
+ 		if (sysfs_slab_alias(s, name)) {
+ 			s->refcount--;
+-			goto err;
++			return NULL;
+ 		}
+-		mutex_unlock(&slab_mutex);
+ 		return s;
+ 	}
+ 
+ 	n = kstrdup(name, GFP_KERNEL);
+ 	if (!n)
+-		goto err;
++		return NULL;
+ 
+ 	s = kmalloc(kmem_size, GFP_KERNEL);
+ 	if (s) {
+ 		if (kmem_cache_open(s, n,
+ 				size, align, flags, ctor)) {
++			int r;
+ 			list_add(&s->list, &slab_caches);
+ 			mutex_unlock(&slab_mutex);
+-			if (sysfs_slab_add(s)) {
+-				mutex_lock(&slab_mutex);
+-				list_del(&s->list);
+-				kfree(n);
+-				kfree(s);
+-				goto err;
+-			}
+-			return s;
++			r = sysfs_slab_add(s);
++			mutex_lock(&slab_mutex);
++
++			if (!r)
++				return s;
++
++			list_del(&s->list);
++			kmem_cache_close(s);
+ 		}
+ 		kfree(n);
+ 		kfree(s);
+ 	}
+-err:
+-	mutex_unlock(&slab_mutex);
+-	return s;
++	return NULL;
+ }
+ 
+ #ifdef CONFIG_SMP
+-- 
+1.8.1.2
+

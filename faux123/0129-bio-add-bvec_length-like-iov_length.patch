@@ -1,0 +1,36 @@
+From 288da2484260e3a481b6f43e965fb458bde096ad Mon Sep 17 00:00:00 2001
+From: faux123 <reioux@gmail.com>
+Date: Sat, 2 Feb 2013 17:22:49 -0800
+Subject: [PATCH 129/338] bio: add bvec_length(), like iov_length()
+
+Signed-off-by: Dave Kleikamp <dave.kleikamp@oracle.com>
+Cc: Zach Brown <zab@zabbo.net>
+modified for Mako from LKML reference
+
+Signed-off-by: faux123 <reioux@gmail.com>
+---
+ include/linux/bio.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/include/linux/bio.h b/include/linux/bio.h
+index 4d94eb8..3f5756e 100644
+--- a/include/linux/bio.h
++++ b/include/linux/bio.h
+@@ -269,6 +269,14 @@ extern struct bio_vec *bvec_alloc_bs(gfp_t, int, unsigned long *, struct bio_set
+ extern void bvec_free_bs(struct bio_set *, struct bio_vec *, unsigned int);
+ extern unsigned int bvec_nr_vecs(unsigned short idx);
+ 
++static inline ssize_t bvec_length(const struct bio_vec *bvec, unsigned long nr)
++{
++	ssize_t bytes = 0;
++	while (nr--)
++		bytes += (bvec++)->bv_len;
++	return bytes;
++}
++
+ /*
+  * bio_set is used to allow other portions of the IO system to
+  * allocate their own private memory pools for bio and iovec structures.
+-- 
+1.8.1.2
+

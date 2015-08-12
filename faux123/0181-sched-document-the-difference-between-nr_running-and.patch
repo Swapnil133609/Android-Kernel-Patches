@@ -1,0 +1,35 @@
+From ba0f7457c33789155119926ba5ec3ec02b17db61 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Sun, 8 Sep 2013 17:24:39 -0500
+Subject: [PATCH 181/338] sched: document the difference between nr_running and
+ h_nr_running
+
+Date    Sun, 18 Aug 2013 16:25:22 +0800
+
+Signed-off-by: Lei Wen <leiwen@marvell.com>
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+---
+ kernel/sched/sched.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+index 685c1f1..ca43f9b 100644
+--- a/kernel/sched/sched.h
++++ b/kernel/sched/sched.h
+@@ -203,6 +203,12 @@ struct cfs_bandwidth { };
+ /* CFS-related fields in a runqueue */
+ struct cfs_rq {
+ 	struct load_weight load;
++	/*
++	 * The difference between nr_running and h_nr_running is:
++	 * nr_running:   present how many entity would take part in the sharing
++	 *               the cpu power of that cfs_rq
++	 * h_nr_running: present how many tasks in current cfs runqueue
++	 */
+ 	unsigned long nr_running, h_nr_running;
+ 
+ 	u64 exec_clock;
+-- 
+1.8.1.2
+

@@ -1,0 +1,118 @@
+From a63d6325a0fcc7c37d9a8dd10deeef1b217ce12b Mon Sep 17 00:00:00 2001
+From: Neil Zhang <zhangwm@marvell.com>
+Date: Fri, 28 Dec 2012 10:00:26 +0000
+Subject: [PATCH 489/507] sched: remove redundant update_runtime notifier
+
+migration_call() will do all the things that update_runtime() does.
+So it seems update_runtime() is a redundant notifier, remove it.
+
+Furthermore, there is potential risk that the current code will catch
+BUG_ON at line 687 of rt.c when do cpu hotplug while there are realtime
+threads running because of enable runtime twice.
+
+Change-Id: I0fdad8d5a1cebb845d3f308b205dbd6517c3e4de
+Cc: bitbucket@online.de
+Signed-off-by: Neil Zhang <zhangwm@marvell.com>
+Reviewed-on: http://git-master/r/215596
+(cherry picked from commit 8f646de983f24361814d9a6ca679845fb2265807)
+Reviewed-on: http://git-master/r/223067
+Reviewed-by: Peter Boonstoppel <pboonstoppel@nvidia.com>
+Tested-by: Peter Boonstoppel <pboonstoppel@nvidia.com>
+Reviewed-by: Paul Walmsley <pwalmsley@nvidia.com>
+Reviewed-by: Automatic_Commit_Validation_User
+GVS: Gerrit_Virtual_Submit
+Reviewed-by: Diwakar Tundlam <dtundlam@nvidia.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/sched/core.c  |    3 ---
+ kernel/sched/rt.c    |   40 ----------------------------------------
+ kernel/sched/sched.h |    1 -
+ 3 files changed, 44 deletions(-)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 79e050d..b2d6124 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -6949,9 +6949,6 @@ void __init sched_init_smp(void)
+ 	hotcpu_notifier(cpuset_cpu_active, CPU_PRI_CPUSET_ACTIVE);
+ 	hotcpu_notifier(cpuset_cpu_inactive, CPU_PRI_CPUSET_INACTIVE);
+ 
+-	/* RT runtime code needs to handle some hotplug events */
+-	hotcpu_notifier(update_runtime, 0);
+-
+ 	init_hrtick();
+ 
+ 	/* Move init over to a non-isolated CPU */
+diff --git a/kernel/sched/rt.c b/kernel/sched/rt.c
+index 732b213..ff3400a 100644
+--- a/kernel/sched/rt.c
++++ b/kernel/sched/rt.c
+@@ -691,15 +691,6 @@ balanced:
+ 	}
+ }
+ 
+-static void disable_runtime(struct rq *rq)
+-{
+-	unsigned long flags;
+-
+-	raw_spin_lock_irqsave(&rq->lock, flags);
+-	__disable_runtime(rq);
+-	raw_spin_unlock_irqrestore(&rq->lock, flags);
+-}
+-
+ static void __enable_runtime(struct rq *rq)
+ {
+ 	rt_rq_iter_t iter;
+@@ -724,37 +715,6 @@ static void __enable_runtime(struct rq *rq)
+ 	}
+ }
+ 
+-static void enable_runtime(struct rq *rq)
+-{
+-	unsigned long flags;
+-
+-	raw_spin_lock_irqsave(&rq->lock, flags);
+-	__enable_runtime(rq);
+-	raw_spin_unlock_irqrestore(&rq->lock, flags);
+-}
+-
+-int update_runtime(struct notifier_block *nfb, unsigned long action, void *hcpu)
+-{
+-	int cpu = (int)(long)hcpu;
+-
+-	switch (action) {
+-	case CPU_DOWN_PREPARE:
+-	case CPU_DOWN_PREPARE_FROZEN:
+-		disable_runtime(cpu_rq(cpu));
+-		return NOTIFY_OK;
+-
+-	case CPU_DOWN_FAILED:
+-	case CPU_DOWN_FAILED_FROZEN:
+-	case CPU_ONLINE:
+-	case CPU_ONLINE_FROZEN:
+-		enable_runtime(cpu_rq(cpu));
+-		return NOTIFY_OK;
+-
+-	default:
+-		return NOTIFY_DONE;
+-	}
+-}
+-
+ static int balance_runtime(struct rt_rq *rt_rq)
+ {
+ 	int more = 0;
+diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+index 0e549a0..6c5c6a3 100644
+--- a/kernel/sched/sched.h
++++ b/kernel/sched/sched.h
+@@ -891,7 +891,6 @@ extern void sysrq_sched_debug_show(void);
+ extern void sched_init_granularity(void);
+ extern void update_max_interval(void);
+ extern void update_group_power(struct sched_domain *sd, int cpu);
+-extern int update_runtime(struct notifier_block *nfb, unsigned long action, void *hcpu);
+ extern void init_sched_rt_class(void);
+ extern void init_sched_fair_class(void);
+ 
+-- 
+1.7.9.5
+

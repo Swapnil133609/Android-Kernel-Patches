@@ -1,0 +1,40 @@
+From 1d86bd9b36c470d02342e69b76b378cd44cd840a Mon Sep 17 00:00:00 2001
+From: Fengguang Wu <fengguang.wu@intel.com>
+Date: Fri, 28 Sep 2012 16:34:05 +0800
+Subject: [PATCH 250/338] slub: init_kmem_cache_cpus() and put_cpu_partial()
+ can be static
+
+Acked-by: Glauber Costa <glommer@parallels.com>
+Acked-by: Christoph Lameter <cl@linux.com>
+Acked-by: David Rientjes <rientjes@google.com>
+Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+Signed-off-by: Pekka Enberg <penberg@kernel.org>
+---
+ mm/slub.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/mm/slub.c b/mm/slub.c
+index 822090e..989eafe 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -1715,7 +1715,7 @@ static inline void note_cmpxchg_failure(const char *n,
+ 	stat(s, CMPXCHG_DOUBLE_CPU_FAIL);
+ }
+ 
+-void init_kmem_cache_cpus(struct kmem_cache *s)
++static void init_kmem_cache_cpus(struct kmem_cache *s)
+ {
+ 	int cpu;
+ 
+@@ -1940,7 +1940,7 @@ static void unfreeze_partials(struct kmem_cache *s)
+  * If we did not find a slot then simply move all the partials to the
+  * per node partial list.
+  */
+-int put_cpu_partial(struct kmem_cache *s, struct page *page, int drain)
++static int put_cpu_partial(struct kmem_cache *s, struct page *page, int drain)
+ {
+ 	struct page *oldpage;
+ 	int pages;
+-- 
+1.8.1.2
+

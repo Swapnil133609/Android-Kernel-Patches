@@ -1,0 +1,49 @@
+From 74a1c6fe5a1a199cfda83b5a4c9455a86f1d21c4 Mon Sep 17 00:00:00 2001
+From: Alex Frid <afrid@nvidia.com>
+Date: Wed, 16 May 2012 14:27:13 -0700
+Subject: [PATCH 011/338] proc: enhance time-average nr_running stats
+
+Add time-average nr_running to loadavg printout
+
+Bug 958978
+
+Change-Id: I5c6904efb52a86f4964eb66c1576fc91f60f5b1d
+Signed-off-by: Alex Frid <afrid@nvidia.com>
+(cherry picked from commit 86f3642cc44a69d1e4798719bd9182cd6923f526)
+Reviewed-on: http://git-master/r/111636
+Reviewed-by: Sai Gurrappadi <sgurrappadi@nvidia.com>
+Tested-by: Sai Gurrappadi <sgurrappadi@nvidia.com>
+Reviewed-by: Automatic_Commit_Validation_User
+Reviewed-by: Peter Boonstoppel <pboonstoppel@nvidia.com>
+Reviewed-by: Yu-Huan Hsu <yhsu@nvidia.com>
+---
+ fs/proc/loadavg.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/fs/proc/loadavg.c b/fs/proc/loadavg.c
+index 1afa4dd..8d95888 100644
+--- a/fs/proc/loadavg.c
++++ b/fs/proc/loadavg.c
+@@ -13,15 +13,17 @@
+ static int loadavg_proc_show(struct seq_file *m, void *v)
+ {
+ 	unsigned long avnrun[3];
++	unsigned long time_avnrun = avg_nr_running();
+ 
+ 	get_avenrun(avnrun, FIXED_1/200, 0);
+ 
+-	seq_printf(m, "%lu.%02lu %lu.%02lu %lu.%02lu %ld/%d %d\n",
++	seq_printf(m, "%lu.%02lu %lu.%02lu %lu.%02lu %ld/%d %d %lu.%02lu\n",
+ 		LOAD_INT(avnrun[0]), LOAD_FRAC(avnrun[0]),
+ 		LOAD_INT(avnrun[1]), LOAD_FRAC(avnrun[1]),
+ 		LOAD_INT(avnrun[2]), LOAD_FRAC(avnrun[2]),
+ 		nr_running(), nr_threads,
+-		task_active_pid_ns(current)->last_pid);
++		task_active_pid_ns(current)->last_pid,
++		LOAD_INT(time_avnrun), LOAD_FRAC(time_avnrun));
+ 	return 0;
+ }
+ 
+-- 
+1.8.1.2
+
