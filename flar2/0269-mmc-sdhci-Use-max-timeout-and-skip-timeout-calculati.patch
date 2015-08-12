@@ -1,0 +1,40 @@
+From 297fa46bc39659154dee8262239ceb9a71cc290c Mon Sep 17 00:00:00 2001
+From: Asutosh Das <asutoshd@codeaurora.org>
+Date: Mon, 21 Oct 2013 17:17:03 +0530
+Subject: [PATCH 269/276] mmc: sdhci: Use max timeout and skip timeout
+ calculation
+
+Several data-timeout issues were seen, most of which were
+due to the card taking a longer time to respond. This patch
+increases the timeout of the controller to 0xF i.e. max
+possible.
+
+Change-Id: I6739de3eb5d9cccf8e39d9dc4730056782334162
+CRs-Fixed: 536832
+Signed-off-by: Asutosh Das <asutoshd@codeaurora.org>
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/mmc/host/sdhci.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 3b3b420..342ebf3 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -718,6 +718,12 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+ 	if (host->quirks & SDHCI_QUIRK_BROKEN_TIMEOUT_VAL)
+ 		return 0xE;
+ 
++	/* During initialization, don't use max timeout as the clock is slow */
++	if ((host->quirks2 & SDHCI_QUIRK2_USE_RESERVED_MAX_TIMEOUT) &&
++		(host->clock > 400000)) {
++		return 0xF;
++	}
++
+ 	/* Unspecified timeout, assume max */
+ 	if (!data && !cmd->cmd_timeout_ms)
+ 		return 0xE;
+-- 
+1.7.9.5
+

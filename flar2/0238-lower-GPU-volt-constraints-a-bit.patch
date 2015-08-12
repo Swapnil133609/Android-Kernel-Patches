@@ -1,0 +1,29 @@
+From 5ee56b8372f91d96f0ecf838e8ea3b5b30498186 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Thu, 26 Dec 2013 01:19:23 -0500
+Subject: [PATCH 238/276] lower GPU volt constraints a bit
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/boot/dts/msm8974-regulator.dtsi |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/msm8974-regulator.dtsi b/arch/arm/boot/dts/msm8974-regulator.dtsi
+index 6a38980..62ade52 100644
+--- a/arch/arm/boot/dts/msm8974-regulator.dtsi
++++ b/arch/arm/boot/dts/msm8974-regulator.dtsi
+@@ -135,8 +135,8 @@
+ 	rpm-regulator-smpb4 {
+ 		status = "okay";
+ 		pm8841_s4: regulator-s4 {
+-			regulator-min-microvolt = <815000>;
+-			regulator-max-microvolt = <900000>;
++			regulator-min-microvolt = <700000>;
++			regulator-max-microvolt = <875000>;
+ 			status = "okay";
+ 		};
+ 		pm8841_s4_corner: regulator-s4-corner {
+-- 
+1.7.9.5
+

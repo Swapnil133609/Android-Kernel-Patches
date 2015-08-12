@@ -1,0 +1,46 @@
+From f25b5924a43f4f57a7b01d36e61c9a0711d04661 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Sun, 15 Dec 2013 22:58:31 -0500
+Subject: [PATCH 222/276] update defconfig
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/configs/elementalx_defconfig |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/configs/elementalx_defconfig b/arch/arm/configs/elementalx_defconfig
+index ead8202..89aa7e9 100644
+--- a/arch/arm/configs/elementalx_defconfig
++++ b/arch/arm/configs/elementalx_defconfig
+@@ -41,7 +41,7 @@ CONFIG_IRQ_WORK=y
+ CONFIG_EXPERIMENTAL=y
+ CONFIG_INIT_ENV_ARG_LIMIT=32
+ CONFIG_CROSS_COMPILE=""
+-CONFIG_LOCALVERSION="-ElementalX-0.15"
++CONFIG_LOCALVERSION="-ElementalX-0.16"
+ # CONFIG_LOCALVERSION_AUTO is not set
+ CONFIG_HAVE_KERNEL_GZIP=y
+ CONFIG_HAVE_KERNEL_LZMA=y
+@@ -679,7 +679,9 @@ CONFIG_ZBOOT_ROM_BSS=0
+ # CONFIG_ARM_APPENDED_DTB is not set
+ CONFIG_CMDLINE=""
+ # CONFIG_XIP_KERNEL is not set
+-# CONFIG_KEXEC is not set
++CONFIG_KEXEC=y
++CONFIG_ATAGS_PROC=y
++CONFIG_KEXEC_HARDBOOT=y
+ # CONFIG_CRASH_DUMP is not set
+ # CONFIG_AUTO_ZRELADDR is not set
+ 
+@@ -3261,6 +3263,7 @@ CONFIG_NLS_ISO8859_1=y
+ # CONFIG_NLS_KOI8_R is not set
+ # CONFIG_NLS_KOI8_U is not set
+ CONFIG_NLS_UTF8=y
++CONFIG_ASYNC_FSYNC=y
+ CONFIG_RESTRICT_ROOTFS_SLAVE=y
+ 
+ #
+-- 
+1.7.9.5
+

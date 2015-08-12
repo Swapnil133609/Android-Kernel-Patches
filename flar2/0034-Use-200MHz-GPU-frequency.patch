@@ -1,0 +1,27 @@
+From fff277b1fc25d95da04b53ecb3a5665045e07e07 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Mon, 11 Nov 2013 15:07:56 -0500
+Subject: [PATCH 034/276] Use 200MHz GPU frequency
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/boot/dts/msm8974-v2.2.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/msm8974-v2.2.dtsi b/arch/arm/boot/dts/msm8974-v2.2.dtsi
+index 09455b1..d5578f2 100644
+--- a/arch/arm/boot/dts/msm8974-v2.2.dtsi
++++ b/arch/arm/boot/dts/msm8974-v2.2.dtsi
+@@ -23,7 +23,7 @@
+ 	/* Updated chip ID */
+ 	qcom,chipid = <0x03030001>;
+ 
+-	qcom,initial-pwrlevel = <4>;
++	qcom,initial-pwrlevel = <6>;
+ 
+ 	/* Updated bus bandwidth requirements */
+ 	qcom,msm-bus,vectors-KBps =
+-- 
+1.7.9.5
+

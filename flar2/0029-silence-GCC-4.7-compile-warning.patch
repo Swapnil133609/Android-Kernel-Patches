@@ -1,0 +1,27 @@
+From 6b42bf4c4d6ccfbee39e8ef240c43ca17ebcc959 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Sat, 9 Nov 2013 23:35:03 -0500
+Subject: [PATCH 029/276] silence GCC 4.7 compile warning
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ net/sunrpc/Makefile |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/net/sunrpc/Makefile b/net/sunrpc/Makefile
+index 8209a04..83c6834 100644
+--- a/net/sunrpc/Makefile
++++ b/net/sunrpc/Makefile
+@@ -1,7 +1,7 @@
+ #
+ # Makefile for Linux kernel SUN RPC
+ #
+-
++ccflags-y  := -Wno-maybe-uninitialized
+ 
+ obj-$(CONFIG_SUNRPC) += sunrpc.o
+ obj-$(CONFIG_SUNRPC_GSS) += auth_gss/
+-- 
+1.7.9.5
+

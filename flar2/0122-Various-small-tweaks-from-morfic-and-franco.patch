@@ -1,0 +1,178 @@
+From c736f506bd9fda5c901f5b5cea83eb4b60818ccf Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Fri, 29 Nov 2013 23:04:10 -0500
+Subject: [PATCH 122/276] Various small tweaks from morfic and franco
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ Makefile                                           |   12 ++++++------
+ arch/arm/Kconfig                                   |   10 +++++-----
+ arch/arm/Kconfig.debug                             |    2 +-
+ arch/arm/Makefile                                  |    4 ----
+ .../dts/msm8974-hammerhead/msm8974-hammerhead.dtsi |    4 ++--
+ drivers/staging/android/Kconfig                    |    1 +
+ kernel/sched/Makefile                              |    9 ---------
+ kernel/trace/Kconfig                               |    4 +++-
+ 8 files changed, 18 insertions(+), 28 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 2aeef57..20d9fca 100644
+--- a/Makefile
++++ b/Makefile
+@@ -583,18 +583,18 @@ endif
+ # Use make W=1 to enable this warning (see scripts/Makefile.build)
+ KBUILD_CFLAGS += $(call cc-disable-warning, unused-but-set-variable)
+ 
+-ifdef CONFIG_FRAME_POINTER
+-KBUILD_CFLAGS	+= -fno-omit-frame-pointer -fno-optimize-sibling-calls
+-else
++#ifdef CONFIG_FRAME_POINTER
++#KBUILD_CFLAGS	+= -fno-omit-frame-pointer -fno-optimize-sibling-calls
++#else
+ # Some targets (ARM with Thumb2, for example), can't be built with frame
+ # pointers.  For those, we don't have FUNCTION_TRACER automatically
+ # select FRAME_POINTER.  However, FUNCTION_TRACER adds -pg, and this is
+ # incompatible with -fomit-frame-pointer with current GCC, so we don't use
+ # -fomit-frame-pointer with FUNCTION_TRACER.
+-ifndef CONFIG_FUNCTION_TRACER
++#ifndef CONFIG_FUNCTION_TRACER
+ KBUILD_CFLAGS	+= -fomit-frame-pointer
+-endif
+-endif
++#endif
++#endif
+ 
+ ifdef CONFIG_DEBUG_INFO
+ KBUILD_CFLAGS	+= -g
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2530489..4d83b45 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -12,13 +12,13 @@ config ARM
+ 	select GENERIC_ATOMIC64 if (CPU_V6 || !CPU_32v6K || !AEABI)
+ 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
+ 	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL
+-	select HAVE_ARCH_KGDB
++	#select HAVE_ARCH_KGDB
+ 	select HAVE_KPROBES if !XIP_KERNEL
+ 	select HAVE_KRETPROBES if (HAVE_KPROBES)
+-	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
+-	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+-	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
+-	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
++	#select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
++	#select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
++	#select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
++	#select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
+ 	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
+ 	select HAVE_GENERIC_DMA_COHERENT
+ 	select HAVE_KERNEL_GZIP
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 6ffa1fe..665a553 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -44,7 +44,7 @@ config ARM_UNWIND
+ config OLD_MCOUNT
+ 	bool
+ 	depends on FUNCTION_TRACER && FRAME_POINTER
+-	default y
++	default n
+ 
+ config DEBUG_USER
+ 	bool "Verbose user fault messages"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index b19985c..6567b71 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -33,10 +33,6 @@ ifeq ($(CONFIG_MMU),)
+ MMUEXT		:= -nommu
+ endif
+ 
+-ifeq ($(CONFIG_FRAME_POINTER),y)
+-KBUILD_CFLAGS	+=-fno-omit-frame-pointer -mapcs -mno-sched-prolog
+-endif
+-
+ ifeq ($(CONFIG_CC_STACKPROTECTOR),y)
+ KBUILD_CFLAGS	+=-fstack-protector
+ endif
+diff --git a/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead.dtsi b/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead.dtsi
+index b4225be..2ef6e43 100644
+--- a/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead.dtsi
++++ b/arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead.dtsi
+@@ -716,9 +716,9 @@
+ &rpm_bus {
+ 	rpm-regulator-ldoa22 {
+ 		pm8941_l22: regulator-l22 {
+-			regulator-min-microvolt = <3000000>;
++			regulator-min-microvolt = <2700000>;
+ 			regulator-max-microvolt = <3300000>;
+-			qcom,init-voltage = <3100000>;
++			qcom,init-voltage = <2700000>;
+ 		};
+ 	};
+ 
+diff --git a/drivers/staging/android/Kconfig b/drivers/staging/android/Kconfig
+index 43d17c2..815cd7a 100644
+--- a/drivers/staging/android/Kconfig
++++ b/drivers/staging/android/Kconfig
+@@ -43,6 +43,7 @@ config PERSISTENT_TRACER
+ 	depends on HAVE_FUNCTION_TRACER
+ 	select FUNCTION_TRACER
+ 	select ANDROID_PERSISTENT_RAM
++	default n
+ 	help
+ 	  persistent_trace traces function calls into a persistent ram
+ 	  buffer that can be decoded and dumped after reboot through
+diff --git a/kernel/sched/Makefile b/kernel/sched/Makefile
+index 3ede7d9..4ef7dde 100644
+--- a/kernel/sched/Makefile
++++ b/kernel/sched/Makefile
+@@ -2,15 +2,6 @@ ifdef CONFIG_FUNCTION_TRACER
+ CFLAGS_REMOVE_clock.o = -pg
+ endif
+ 
+-ifneq ($(CONFIG_SCHED_OMIT_FRAME_POINTER),y)
+-# According to Alan Modra <alan@linuxcare.com.au>, the -fno-omit-frame-pointer is
+-# needed for x86 only.  Why this used to be enabled for all architectures is beyond
+-# me.  I suspect most platforms don't need this, but until we know that for sure
+-# I turn this off for IA-64 only.  Andreas Schwab says it's also needed on m68k
+-# to get a correct value for the wait-channel (WCHAN in ps). --davidm
+-CFLAGS_core.o := $(PROFILING) -fno-omit-frame-pointer
+-endif
+-
+ obj-y += core.o clock.o idle_task.o fair.o rt.o stop_task.o sched_avg.o
+ obj-$(CONFIG_SMP) += cpupri.o
+ obj-$(CONFIG_SCHED_AUTOGROUP) += auto_group.o
+diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
+index 5ba1770..b06453e 100644
+--- a/kernel/trace/Kconfig
++++ b/kernel/trace/Kconfig
+@@ -145,6 +145,7 @@ config FUNCTION_TRACER
+ 	select KALLSYMS
+ 	select GENERIC_TRACER
+ 	select CONTEXT_SWITCH_TRACER
++	default n
+ 	help
+ 	  Enable the kernel to trace every kernel function. This is done
+ 	  by using a compiler feature to insert a small, 5-byte No-Operation
+@@ -325,6 +326,7 @@ config STACK_TRACER
+ 	select FUNCTION_TRACER
+ 	select STACKTRACE
+ 	select KALLSYMS
++	default n
+ 	help
+ 	  This special tracer records the maximum stack footprint of the
+ 	  kernel and displays it in /sys/kernel/debug/tracing/stack_trace.
+@@ -389,7 +391,7 @@ config DYNAMIC_FTRACE
+ 	bool "enable/disable ftrace tracepoints dynamically"
+ 	depends on FUNCTION_TRACER
+ 	depends on HAVE_DYNAMIC_FTRACE
+-	default y
++	default n
+ 	help
+           This option will modify all the calls to ftrace dynamically
+ 	  (will patch them out of the binary image and replace them
+-- 
+1.7.9.5
+

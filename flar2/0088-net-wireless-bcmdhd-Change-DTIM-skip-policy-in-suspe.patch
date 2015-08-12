@@ -1,0 +1,130 @@
+From 4362f0354b95e9bc04a6babd7176261f06fcea41 Mon Sep 17 00:00:00 2001
+From: Ecco Park <eccopark@broadcom.com>
+Date: Wed, 6 Nov 2013 09:56:48 +0900
+Subject: [PATCH 088/276] net: wireless: bcmdhd: Change DTIM skip policy in
+ suspend
+
+	issue : WiFi continuously disconnects
+	Root cause :
+	Sometimes we got link down event due to beacon
+	lost when device goes to suspend.
+	This problem sometimes happens in case that DTIM is 3 and beacon
+	100ms because we wake up on 900ms (100ms * 3 * 3) during
+	suspend.
+	This value(900ms) is too big to STA for sync up with AP time.
+	This causes STA out of sync for time with the AP.
+	Eventually STA got lost of beacon during long time (4secs).
+
+	Solution :
+	If the total dtim skip interval (beacon_interval *
+	DTIM * 3) is greater than 300ms, we will not extend DTIM to DTIM
+	* 3.
+	Instead of that, we will use original value (DTIM) for wake up
+	in suspend.
+	Bug : 1343127 WiFi continuously disconnects
+
+Signed-off-by: Ecco Park <eccopark@broadcom.com>
+
+Change-Id: I6d89bd1c56127befe4d9606869396ee25b7911ef
+Conflicts:
+	drivers/net/wireless/bcmdhd/dhd.h
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/net/wireless/bcmdhd/dhd.h        |    5 +++--
+ drivers/net/wireless/bcmdhd/dhd_common.c |   27 ++++++++++++++++-----------
+ 2 files changed, 19 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/net/wireless/bcmdhd/dhd.h b/drivers/net/wireless/bcmdhd/dhd.h
+index 22dd810..a6f587e 100644
+--- a/drivers/net/wireless/bcmdhd/dhd.h
++++ b/drivers/net/wireless/bcmdhd/dhd.h
+@@ -791,8 +791,9 @@ extern uint dhd_force_tx_queueing;
+ #endif
+ #endif /* WLTDLS */
+ 
+-
+-#define MAX_DTIM_SKIP_BEACON_ITERVAL	100 /* max allowed associated AP beacon for dtim skip */
++#define MAX_DTIM_SKIP_BEACON_INTERVAL	100 /* max allowed associated AP beacon for DTIM skip */
++#define MAX_DTIM_ALLOWED_INTERVAL 300 /* max allowed total beacon interval for DTIM skip */
++#define NO_DTIM_SKIP 1
+ 
+ #ifdef SDTEST
+ /* Echo packet generator (SDIO), pkts/s */
+diff --git a/drivers/net/wireless/bcmdhd/dhd_common.c b/drivers/net/wireless/bcmdhd/dhd_common.c
+index c8cb2f8..57fc2d0 100644
+--- a/drivers/net/wireless/bcmdhd/dhd_common.c
++++ b/drivers/net/wireless/bcmdhd/dhd_common.c
+@@ -1860,9 +1860,9 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd)
+ {
+ 	int bcn_li_dtim = 1; /* deafult no dtim skip setting */
+ 	int ret = -1;
+-	int dtim_assoc = 0;
++	int dtim_period = 0;
+ 	int ap_beacon = 0;
+-
++	int allowed_skip_dtim_cnt = 0;
+ 	/* Check if associated */
+ 	if (dhd_is_associated(dhd, NULL, NULL) == FALSE) {
+ 		DHD_TRACE(("%s NOT assoc ret %d\n", __FUNCTION__, ret));
+@@ -1877,20 +1877,20 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd)
+ 	}
+ 
+ 	/* if associated APs Beacon more  that 100msec do no dtim skip */
+-	if (ap_beacon > MAX_DTIM_SKIP_BEACON_ITERVAL) {
++	if (ap_beacon > MAX_DTIM_SKIP_BEACON_INTERVAL) {
+ 		DHD_ERROR(("%s NO dtim skip for AP with beacon %d ms\n", __FUNCTION__, ap_beacon));
+ 		goto exit;
+ 	}
+ 
+ 	/* read associated ap's dtim setup */
+ 	if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_GET_DTIMPRD,
+-		&dtim_assoc, sizeof(dtim_assoc), FALSE, 0)) < 0) {
++		&dtim_period, sizeof(dtim_period), FALSE, 0)) < 0) {
+ 		DHD_ERROR(("%s failed code %d\n", __FUNCTION__, ret));
+ 		goto exit;
+ 	}
+ 
+ 	/* if not assocated just eixt */
+-	if (dtim_assoc == 0) {
++	if (dtim_period == 0) {
+ 		goto exit;
+ 	}
+ 
+@@ -1898,22 +1898,27 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd)
+ 	bcn_li_dtim = dhd->suspend_bcn_li_dtim;
+ 
+ 	/* check if sta listen interval fits into AP dtim */
+-	if (dtim_assoc > CUSTOM_LISTEN_INTERVAL) {
++	if (dtim_period > CUSTOM_LISTEN_INTERVAL) {
+ 		/* AP DTIM to big for our Listen Interval : no dtim skiping */
+-		bcn_li_dtim = 1;
++		bcn_li_dtim = NO_DTIM_SKIP;
+ 		DHD_ERROR(("%s DTIM=%d > Listen=%d : too big ...\n",
+-			__FUNCTION__, dtim_assoc, CUSTOM_LISTEN_INTERVAL));
++			__FUNCTION__, dtim_period, CUSTOM_LISTEN_INTERVAL));
+ 		goto exit;
+ 	}
+ 
+-	if ((bcn_li_dtim * dtim_assoc) > CUSTOM_LISTEN_INTERVAL) {
++	if ((dtim_period * ap_beacon * bcn_li_dtim) > MAX_DTIM_ALLOWED_INTERVAL) {
++		 allowed_skip_dtim_cnt = MAX_DTIM_ALLOWED_INTERVAL / (dtim_period * ap_beacon);
++		 bcn_li_dtim = (allowed_skip_dtim_cnt != 0) ? allowed_skip_dtim_cnt : NO_DTIM_SKIP;
++	}
++
++	if ((bcn_li_dtim * dtim_period) > CUSTOM_LISTEN_INTERVAL) {
+ 		/* Round up dtim_skip to fit into STAs Listen Interval */
+-		bcn_li_dtim = (int)(CUSTOM_LISTEN_INTERVAL / dtim_assoc);
++		bcn_li_dtim = (int)(CUSTOM_LISTEN_INTERVAL / dtim_period);
+ 		DHD_TRACE(("%s agjust dtim_skip as %d\n", __FUNCTION__, bcn_li_dtim));
+ 	}
+ 
+ 	DHD_ERROR(("%s beacon=%d bcn_li_dtim=%d DTIM=%d Listen=%d\n",
+-		__FUNCTION__, ap_beacon, bcn_li_dtim, dtim_assoc, CUSTOM_LISTEN_INTERVAL));
++		__FUNCTION__, ap_beacon, bcn_li_dtim, dtim_period, CUSTOM_LISTEN_INTERVAL));
+ 
+ exit:
+ 	return bcn_li_dtim;
+-- 
+1.7.9.5
+

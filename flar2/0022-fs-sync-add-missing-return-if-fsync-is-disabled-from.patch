@@ -1,0 +1,30 @@
+From cf86a04b8e41a7f73157bfe7ed637a41e769b99c Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Tue, 7 May 2013 03:12:19 +0100
+Subject: [PATCH 022/276] fs: sync: add missing return if fsync is disabled
+ from userspace.
+
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ fs/sync.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/fs/sync.c b/fs/sync.c
+index f9c190e..3c506d8 100644
+--- a/fs/sync.c
++++ b/fs/sync.c
+@@ -215,6 +215,9 @@ static int do_fsync(unsigned int fd, int datasync)
+ 
+ SYSCALL_DEFINE1(fsync, unsigned int, fd)
+ {
++	if (!fsync_enabled)
++		return 0;
++	
+ 	return do_fsync(fd, 0);
+ }
+ 
+-- 
+1.7.9.5
+

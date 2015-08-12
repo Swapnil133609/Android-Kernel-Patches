@@ -1,0 +1,60 @@
+From 4253e41cf5e74af9e6caab9b5ca7a5b0cb95f714 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Wed, 20 Nov 2013 21:39:18 -0500
+Subject: [PATCH 084/276] [sweep2wake] Add option for sweep2sleep only
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/sweep2wake.c  |    5 ++++-
+ drivers/video/msm/mdss/mdss_dsi_panel.c |    4 ++--
+ 2 files changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/input/touchscreen/sweep2wake.c b/drivers/input/touchscreen/sweep2wake.c
+index 9c93ee2..c5532cb 100644
+--- a/drivers/input/touchscreen/sweep2wake.c
++++ b/drivers/input/touchscreen/sweep2wake.c
+@@ -91,6 +91,9 @@ static int __init read_s2w_cmdline(char *s2w)
+ 	if (strcmp(s2w, "1") == 0) {
+ 		pr_info("[cmdline_s2w]: Sweep2Wake enabled. | s2w='%s'\n", s2w);
+ 		s2w_switch = 1;
++	} else if (strcmp(s2w, "2") == 0) {
++		pr_info("[cmdline_s2w]: Sweep2Wake disabled. | s2w='%s'\n", s2w);
++		s2w_switch = 2;
+ 	} else if (strcmp(s2w, "0") == 0) {
+ 		pr_info("[cmdline_s2w]: Sweep2Wake disabled. | s2w='%s'\n", s2w);
+ 		s2w_switch = 0;
+@@ -140,7 +143,7 @@ static void detect_sweep2wake(int x, int y, bool st)
+                 x, y, (single_touch) ? "true" : "false");
+ #endif
+ 	//left->right
+-	if ((single_touch) && (scr_suspended == true) && (s2w_switch > 0)) {
++	if ((single_touch) && (scr_suspended == true) && (s2w_switch == 1)) {
+ 		prevx = 0;
+ 		nextx = S2W_X_B1;
+ 		if ((barrier[0] == true) ||
+diff --git a/drivers/video/msm/mdss/mdss_dsi_panel.c b/drivers/video/msm/mdss/mdss_dsi_panel.c
+index 998b40f..2beea12 100644
+--- a/drivers/video/msm/mdss/mdss_dsi_panel.c
++++ b/drivers/video/msm/mdss/mdss_dsi_panel.c
+@@ -189,7 +189,7 @@ void mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
+ 	bool prevent_sleep = false;
+ #endif
+ #if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE)
+-	prevent_sleep = (s2w_switch > 0);
++	prevent_sleep = (s2w_switch == 1);
+ #endif
+ #if defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
+ 	prevent_sleep = prevent_sleep || (dt2w_switch > 0);
+@@ -354,7 +354,7 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
+ 	bool prevent_sleep = false;
+ #endif
+ #if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE)
+-	prevent_sleep = (s2w_switch > 0);
++	prevent_sleep = (s2w_switch == 1);
+ #endif
+ #if defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
+ 	prevent_sleep = prevent_sleep || (dt2w_switch > 0);
+-- 
+1.7.9.5
+

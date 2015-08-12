@@ -1,0 +1,30 @@
+From 4dc33c808cb1c2e9108382d00110927b0c841afd Mon Sep 17 00:00:00 2001
+From: franciscofranco <franciscofranco.1990@gmail.com>
+Date: Sat, 2 Mar 2013 14:55:39 -0800
+Subject: [PATCH 229/276] Enable UNALIGNED_ACCESS for the new LZO algorithm to
+ use. LZO decrompression is used on QCACHE so we
+ benefit a little from the new and improved LZO
+ code.
+
+Signed-off-by: franciscofranco <franciscofranco.1990@gmail.com>
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/Kconfig b/arch/Kconfig
+index 0a3ffe4..63fc37a 100644
+--- a/arch/Kconfig
++++ b/arch/Kconfig
+@@ -78,6 +78,7 @@ config OPTPROBES
+ 
+ config HAVE_EFFICIENT_UNALIGNED_ACCESS
+ 	bool
++	def_bool y
+ 	help
+ 	  Some architectures are unable to perform unaligned accesses
+ 	  without the use of get_unaligned/put_unaligned. Others are
+-- 
+1.7.9.5
+

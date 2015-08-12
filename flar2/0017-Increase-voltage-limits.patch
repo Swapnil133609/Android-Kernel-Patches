@@ -1,0 +1,111 @@
+From 5953bde19a9fba04ccc39aab76b1f61e0ec97c29 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Sat, 9 Nov 2013 00:17:33 -0500
+Subject: [PATCH 017/276] Increase voltage limits
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/boot/dts/msm8974-regulator.dtsi |    8 ++++----
+ arch/arm/mach-msm/acpuclock-8974.c       |    8 ++++----
+ arch/arm/mach-msm/acpuclock-krait.c      |    4 ++--
+ 3 files changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/boot/dts/msm8974-regulator.dtsi b/arch/arm/boot/dts/msm8974-regulator.dtsi
+index 9de41f4..6a38980 100644
+--- a/arch/arm/boot/dts/msm8974-regulator.dtsi
++++ b/arch/arm/boot/dts/msm8974-regulator.dtsi
+@@ -477,7 +477,7 @@
+ 				<0xf908a800 0x1000>; /* APCS_ALIAS0_KPSS_MDD */
+ 			reg-names = "acs", "mdd";
+ 			regulator-min-microvolt = <500000>;
+-			regulator-max-microvolt = <1100000>;
++			regulator-max-microvolt = <1200000>;
+ 			qcom,headroom-voltage = <150000>;
+ 			qcom,retention-voltage = <675000>;
+ 			qcom,ldo-default-voltage = <750000>;
+@@ -493,7 +493,7 @@
+ 				<0xf909a800 0x1000>; /* APCS_ALIAS1_KPSS_MDD */
+ 			reg-names = "acs", "mdd";
+ 			regulator-min-microvolt = <500000>;
+-			regulator-max-microvolt = <1100000>;
++			regulator-max-microvolt = <1200000>;
+ 			qcom,headroom-voltage = <150000>;
+ 			qcom,retention-voltage = <675000>;
+ 			qcom,ldo-default-voltage = <750000>;
+@@ -509,7 +509,7 @@
+ 				<0xf90aa800 0x1000>; /* APCS_ALIAS2_KPSS_MDD */
+ 			reg-names = "acs", "mdd";
+ 			regulator-min-microvolt = <500000>;
+-			regulator-max-microvolt = <1100000>;
++			regulator-max-microvolt = <1200000>;
+ 			qcom,headroom-voltage = <150000>;
+ 			qcom,retention-voltage = <675000>;
+ 			qcom,ldo-default-voltage = <750000>;
+@@ -525,7 +525,7 @@
+ 				<0xf90ba800 0x1000>; /* APCS_ALIAS3_KPSS_MDD */
+ 			reg-names = "acs", "mdd";
+ 			regulator-min-microvolt = <500000>;
+-			regulator-max-microvolt = <1100000>;
++			regulator-max-microvolt = <1200000>;
+ 			qcom,headroom-voltage = <150000>;
+ 			qcom,retention-voltage = <675000>;
+ 			qcom,ldo-default-voltage = <750000>;
+diff --git a/arch/arm/mach-msm/acpuclock-8974.c b/arch/arm/mach-msm/acpuclock-8974.c
+index 694d783..8b7d74e 100644
+--- a/arch/arm/mach-msm/acpuclock-8974.c
++++ b/arch/arm/mach-msm/acpuclock-8974.c
+@@ -55,7 +55,7 @@ static struct scalable scalable[] __initdata = {
+ 		.hfpll_phys_base = 0xF908A000,
+ 		.l2cpmr_iaddr = 0x4501,
+ 		.sec_clk_sel = 2,
+-		.vreg[VREG_CORE] = { "krait0",     1100000 },
++		.vreg[VREG_CORE] = { "krait0",     1200000 },
+ 		.vreg[VREG_MEM]  = { "krait0_mem", 1050000 },
+ 		.vreg[VREG_DIG]  = { "krait0_dig", LVL_HIGH },
+ 		.vreg[VREG_HFPLL_A] = { "krait0_hfpll", 1800000 },
+@@ -64,7 +64,7 @@ static struct scalable scalable[] __initdata = {
+ 		.hfpll_phys_base = 0xF909A000,
+ 		.l2cpmr_iaddr = 0x5501,
+ 		.sec_clk_sel = 2,
+-		.vreg[VREG_CORE] = { "krait1",     1100000 },
++		.vreg[VREG_CORE] = { "krait1",     1200000 },
+ 		.vreg[VREG_MEM]  = { "krait1_mem", 1050000 },
+ 		.vreg[VREG_DIG]  = { "krait1_dig", LVL_HIGH },
+ 		.vreg[VREG_HFPLL_A] = { "krait1_hfpll", 1800000 },
+@@ -73,7 +73,7 @@ static struct scalable scalable[] __initdata = {
+ 		.hfpll_phys_base = 0xF90AA000,
+ 		.l2cpmr_iaddr = 0x6501,
+ 		.sec_clk_sel = 2,
+-		.vreg[VREG_CORE] = { "krait2",     1100000 },
++		.vreg[VREG_CORE] = { "krait2",     1200000 },
+ 		.vreg[VREG_MEM]  = { "krait2_mem", 1050000 },
+ 		.vreg[VREG_DIG]  = { "krait2_dig", LVL_HIGH },
+ 		.vreg[VREG_HFPLL_A] = { "krait2_hfpll", 1800000 },
+@@ -82,7 +82,7 @@ static struct scalable scalable[] __initdata = {
+ 		.hfpll_phys_base = 0xF90BA000,
+ 		.l2cpmr_iaddr = 0x7501,
+ 		.sec_clk_sel = 2,
+-		.vreg[VREG_CORE] = { "krait3",     1100000 },
++		.vreg[VREG_CORE] = { "krait3",     1200000 },
+ 		.vreg[VREG_MEM]  = { "krait3_mem", 1050000 },
+ 		.vreg[VREG_DIG]  = { "krait3_dig", LVL_HIGH },
+ 		.vreg[VREG_HFPLL_A] = { "krait3_hfpll", 1800000 },
+diff --git a/arch/arm/mach-msm/acpuclock-krait.c b/arch/arm/mach-msm/acpuclock-krait.c
+index c7eceb1..2211ad3 100644
+--- a/arch/arm/mach-msm/acpuclock-krait.c
++++ b/arch/arm/mach-msm/acpuclock-krait.c
+@@ -939,8 +939,8 @@ static void __init bus_init(const struct l2_level *l2_level)
+ 
+ #ifdef CONFIG_CPU_VOLTAGE_TABLE
+ 
+-#define HFPLL_MIN_VDD		 800000
+-#define HFPLL_MAX_VDD		1350000
++#define HFPLL_MIN_VDD		 500000
++#define HFPLL_MAX_VDD		1200000
+ 
+ ssize_t acpuclk_get_vdd_levels_str(char *buf) {
+ 
+-- 
+1.7.9.5
+

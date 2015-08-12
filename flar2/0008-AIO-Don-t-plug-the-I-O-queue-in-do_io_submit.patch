@@ -1,0 +1,43 @@
+From 33b1dbffb649996db20dc64bc5b519c79a43ef2f Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Wed, 6 Nov 2013 23:24:29 -0500
+Subject: [PATCH 008/276]  AIO: Don't plug the I/O queue in do_io_submit()
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ fs/aio.c |    4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/fs/aio.c b/fs/aio.c
+index 67a6db3..de8a503 100644
+--- a/fs/aio.c
++++ b/fs/aio.c
+@@ -1682,7 +1682,6 @@ long do_io_submit(aio_context_t ctx_id, long nr,
+ 	struct kioctx *ctx;
+ 	long ret = 0;
+ 	int i = 0;
+-	struct blk_plug plug;
+ 	struct kiocb_batch batch;
+ 
+ 	if (unlikely(nr < 0))
+@@ -1702,8 +1701,6 @@ long do_io_submit(aio_context_t ctx_id, long nr,
+ 
+ 	kiocb_batch_init(&batch, nr);
+ 
+-	blk_start_plug(&plug);
+-
+ 	/*
+ 	 * AKPM: should this return a partial result if some of the IOs were
+ 	 * successfully submitted?
+@@ -1726,7 +1723,6 @@ long do_io_submit(aio_context_t ctx_id, long nr,
+ 		if (ret)
+ 			break;
+ 	}
+-	blk_finish_plug(&plug);
+ 
+ 	kiocb_batch_free(ctx, &batch);
+ 	put_ioctx(ctx);
+-- 
+1.7.9.5
+

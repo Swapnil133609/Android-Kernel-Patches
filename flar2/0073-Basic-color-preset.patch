@@ -1,0 +1,44 @@
+From b2b1f9f5e98618798e5d5c84f42c915f3af7de36 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Mon, 18 Nov 2013 21:39:40 -0500
+Subject: [PATCH 073/276] Basic color preset
+
+I scooped the payload value from @fransiscofranco https://github.com/franciscofranco/hammerhead/commit/6747c5003dba8fda142b7a4041db3033dda6d036
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_dsi_panel.c |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/video/msm/mdss/mdss_dsi_panel.c b/drivers/video/msm/mdss/mdss_dsi_panel.c
+index 9eabaec..dc7733d 100644
+--- a/drivers/video/msm/mdss/mdss_dsi_panel.c
++++ b/drivers/video/msm/mdss/mdss_dsi_panel.c
+@@ -33,6 +33,11 @@
+ 
+ #define DT_CMD_HDR 6
+ 
++//Basic color preset
++int color_preset = 0;
++module_param(color_preset, int, 0755);
++
++
+ static bool mdss_panel_flip_ud = false;
+ static int mdss_panel_id = PANEL_QCOM;
+ 
+@@ -301,6 +306,12 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
+ 
+ 	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
+ 
++//Basic color preset 
++	if (color_preset == 1)
++		ctrl->on_cmds.cmds[1].payload[0] = 0x77;
++	else
++		ctrl->on_cmds.cmds[1].payload[0] = 0xFF;
++
+ 	if (ctrl->on_cmds.cmd_cnt)
+ 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
+ 
+-- 
+1.7.9.5
+

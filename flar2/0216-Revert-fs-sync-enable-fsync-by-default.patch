@@ -1,0 +1,28 @@
+From 56809d9b92d96413a536896c8d02550a0a2774c0 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Sun, 15 Dec 2013 17:30:28 -0500
+Subject: [PATCH 216/276] Revert "fs: sync: enable fsync by default."
+
+This reverts commit 1f0a872a98781eac300fe9afe29745121a9b161a.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ fs/sync.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/fs/sync.c b/fs/sync.c
+index 5162fbe..3c506d8 100644
+--- a/fs/sync.c
++++ b/fs/sync.c
+@@ -18,7 +18,7 @@
+ #include <linux/backing-dev.h>
+ #include "internal.h"
+ 
+-bool fsync_enabled = true;
++bool fsync_enabled = false;
+ module_param(fsync_enabled, bool, 0755);
+ 
+ #define VALID_FLAGS (SYNC_FILE_RANGE_WAIT_BEFORE|SYNC_FILE_RANGE_WRITE| \
+-- 
+1.7.9.5
+

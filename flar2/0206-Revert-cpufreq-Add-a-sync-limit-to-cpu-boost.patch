@@ -1,0 +1,48 @@
+From afab52b6c354bc1b6a630872f3c938514b4edd40 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Fri, 6 Dec 2013 23:03:49 -0500
+Subject: [PATCH 206/276] Revert "cpufreq: Add a sync limit to cpu-boost"
+
+This reverts commit 095a6b92c4838599df3480d99090f2929c3d9b48.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpu-boost.c |   14 +-------------
+ 1 file changed, 1 insertion(+), 13 deletions(-)
+
+diff --git a/drivers/cpufreq/cpu-boost.c b/drivers/cpufreq/cpu-boost.c
+index f789425..ab23ac8 100644
+--- a/drivers/cpufreq/cpu-boost.c
++++ b/drivers/cpufreq/cpu-boost.c
+@@ -39,8 +39,6 @@ static struct workqueue_struct *boost_rem_wq;
+ static unsigned int boost_ms = 50;
+ module_param(boost_ms, uint, 0644);
+ 
+-static unsigned int sync_threshold;
+-module_param(sync_threshold, uint, 0644);
+ /*
+  * The CPUFREQ_ADJUST notifier is used to override the current policy min to
+  * make sure policy min >= boost_min. The cpufreq framework then does the job
+@@ -120,18 +118,8 @@ static int boost_mig_sync_thread(void *data)
+ 			continue;
+ 		}
+ 
+-		if (sync_threshold && (dest_policy.cur >= sync_threshold))
+-			continue;
+-
+ 		cancel_delayed_work_sync(&s->boost_rem);
+-		if (sync_threshold) {
+-			if (src_policy.cur >= sync_threshold)
+-				s->boost_min = sync_threshold;
+-			else
+-				s->boost_min = src_policy.cur;
+-		} else {
+-			s->boost_min = src_policy.cur;
+-		}
++		s->boost_min = src_policy.cur;
+ 		/* Force policy re-evaluation to trigger adjust notifier. */
+ 		cpufreq_update_policy(dest_cpu);
+ 		queue_delayed_work_on(s->cpu, boost_rem_wq,
+-- 
+1.7.9.5
+

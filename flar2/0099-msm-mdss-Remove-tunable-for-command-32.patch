@@ -1,0 +1,52 @@
+From 53936e4da559ede531dea8da1a2ecb188959c7c5 Mon Sep 17 00:00:00 2001
+From: myfluxi <linflux@arcor.de>
+Date: Sun, 24 Nov 2013 22:24:07 +0100
+Subject: [PATCH 099/276] msm: mdss: Remove tunable for command 32
+
+Even slight changes look ugly or distort the screen.
+
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_dsi_panel.c |    4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_dsi_panel.c b/drivers/video/msm/mdss/mdss_dsi_panel.c
+index 1f86ba6..70b26c5 100644
+--- a/drivers/video/msm/mdss/mdss_dsi_panel.c
++++ b/drivers/video/msm/mdss/mdss_dsi_panel.c
+@@ -1239,7 +1239,6 @@ read_one(kgamma_20, 20);
+ read_one(kgamma_22, 22);
+ read_one(kgamma_28, 28);
+ read_one(kgamma_31, 31);
+-read_one(kgamma_32, 32);
+ 
+ #define write_one(file_name, cmd)				\
+ static ssize_t write_##file_name				\
+@@ -1259,7 +1258,6 @@ write_one(kgamma_20, 20);
+ write_one(kgamma_22, 22);
+ write_one(kgamma_28, 28);
+ write_one(kgamma_31, 31);
+-write_one(kgamma_32, 32);
+ 
+ #define define_one_rw(_name)					\
+ static DEVICE_ATTR(_name, 0644, read_##_name, write_##_name);
+@@ -1274,7 +1272,6 @@ define_one_rw(kgamma_20);
+ define_one_rw(kgamma_22);
+ define_one_rw(kgamma_28);
+ define_one_rw(kgamma_31);
+-define_one_rw(kgamma_32);
+ 
+ static struct attribute *dsi_panel_attributes[] = {
+ 	&dev_attr_kgamma_r.attr,
+@@ -1287,7 +1284,6 @@ static struct attribute *dsi_panel_attributes[] = {
+ 	&dev_attr_kgamma_22.attr,
+ 	&dev_attr_kgamma_28.attr,
+ 	&dev_attr_kgamma_31.attr,
+-	&dev_attr_kgamma_32.attr,
+ 	NULL
+ };
+ 
+-- 
+1.7.9.5
+

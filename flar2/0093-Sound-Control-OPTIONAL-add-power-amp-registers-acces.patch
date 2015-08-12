@@ -1,0 +1,31 @@
+From 69eca8e170f1e1e925a8070333f57d825acbe3e0 Mon Sep 17 00:00:00 2001
+From: Paul Reioux <reioux@gmail.com>
+Date: Wed, 20 Nov 2013 01:07:50 -0600
+Subject: [PATCH 093/276] Sound Control: (OPTIONAL) add power amp registers
+ access control as well
+
+Signed-off-by: Paul Reioux <reioux@gmail.com>
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ sound/soc/codecs/sound_control_3_gpl.c |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/sound/soc/codecs/sound_control_3_gpl.c b/sound/soc/codecs/sound_control_3_gpl.c
+index ed851f2..e6707f0 100644
+--- a/sound/soc/codecs/sound_control_3_gpl.c
++++ b/sound/soc/codecs/sound_control_3_gpl.c
+@@ -37,6 +37,10 @@ int reg_access(unsigned int reg)
+ 	int ret = 1;
+ 
+ 	switch (reg) {
++		case TAIKO_A_RX_HPH_L_GAIN:
++		case TAIKO_A_RX_HPH_R_GAIN:
++		case TAIKO_A_RX_HPH_L_STATUS:
++		case TAIKO_A_RX_HPH_R_STATUS:
+ 		case TAIKO_A_CDC_RX1_VOL_CTL_B2_CTL:
+ 		case TAIKO_A_CDC_RX2_VOL_CTL_B2_CTL:
+ 		case TAIKO_A_CDC_RX3_VOL_CTL_B2_CTL:
+-- 
+1.7.9.5
+

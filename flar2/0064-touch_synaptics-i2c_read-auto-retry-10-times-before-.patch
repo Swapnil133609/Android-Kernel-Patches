@@ -1,0 +1,54 @@
+From 3e52b68320270411b3137aa8d64d7035c593b9af Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 18 Nov 2013 08:09:31 +0100
+Subject: [PATCH 064/276] touch_synaptics: i2c_read: auto retry 10 times
+ before erroring out The i2c devices we are
+ connecting to may not be ready yet, or just busy.
+ Retry with a 10ms pause in order to still obtain
+ touch data. This improves overall touch data
+ robustness, but the main thing it does: WE CAN
+ FINALLY GET TOUCH DATA IN SUSPEND ALL THE TIME.
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/touch_synaptics.c |   15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/input/touchscreen/touch_synaptics.c b/drivers/input/touchscreen/touch_synaptics.c
+index cf3efbc..61a437b 100644
+--- a/drivers/input/touchscreen/touch_synaptics.c
++++ b/drivers/input/touchscreen/touch_synaptics.c
+@@ -660,6 +660,8 @@ static void *get_touch_handle(struct i2c_client *client)
+  */
+ static int touch_i2c_read(struct i2c_client *client, u8 reg, int len, u8 *buf)
+ {
++#define SYNAPTICS_I2C_RETRY 10
++	int retry = 0;
+ 	struct i2c_msg msgs[] = {
+ 		{
+ 			.addr = client->addr,
+@@ -675,10 +677,15 @@ static int touch_i2c_read(struct i2c_client *client, u8 reg, int len, u8 *buf)
+ 		},
+ 	};
+ 
+-	if (i2c_transfer(client->adapter, msgs, 2) < 0) {
+-		if (printk_ratelimit())
+-			TOUCH_ERR_MSG("transfer error\n");
+-		return -EIO;
++	for (retry = 0; retry <= SYNAPTICS_I2C_RETRY; retry++) {
++		if (i2c_transfer(client->adapter, msgs, 2) == 2)
++			break;
++		if (retry == SYNAPTICS_I2C_RETRY) {
++			if (printk_ratelimit())
++				TOUCH_ERR_MSG("transfer error\n");
++			return -EIO;
++		} else
++			msleep(10);
+ 	}
+ 
+ 	return 0;
+-- 
+1.7.9.5
+

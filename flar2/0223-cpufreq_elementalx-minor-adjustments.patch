@@ -1,0 +1,38 @@
+From 935b3f7a4f797e2db3ec14611b13b597f4ef6c97 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Sun, 15 Dec 2013 22:59:02 -0500
+Subject: [PATCH 223/276] cpufreq_elementalx: minor adjustments
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpufreq/cpufreq_elementalx.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/cpufreq_elementalx.c b/drivers/cpufreq/cpufreq_elementalx.c
+index 0958bb2..3cca32f 100644
+--- a/drivers/cpufreq/cpufreq_elementalx.c
++++ b/drivers/cpufreq/cpufreq_elementalx.c
+@@ -35,7 +35,7 @@
+ #include <mach/kgsl.h>
+ static int orig_up_threshold = 90;
+ 
+-#define DEF_SAMPLING_RATE			(40000)
++#define DEF_SAMPLING_RATE			(30000)
+ #define DEF_FREQUENCY_DOWN_DIFFERENTIAL		(10)
+ #define DEF_FREQUENCY_UP_THRESHOLD		(80)
+ #define DEF_SAMPLING_DOWN_FACTOR		(1)
+@@ -1247,6 +1247,10 @@ if (dbs_tuners_ins.gboost) {
+ 	} else {
+ 		dbs_tuners_ins.up_threshold = orig_up_threshold;
+ 	}
++	if ((graphics_boost == 3 || graphics_boost == 4) && dbs_tuners_ins.gboost) {
++		input_event_boost = true;
++		input_event_boost_expired = jiffies + usecs_to_jiffies(dbs_tuners_ins.sampling_rate * 2);
++	}
+ //end
+ 
+ 	if (num_online_cpus() > 1) {
+-- 
+1.7.9.5
+

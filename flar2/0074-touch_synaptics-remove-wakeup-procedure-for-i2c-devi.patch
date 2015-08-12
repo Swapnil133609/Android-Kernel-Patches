@@ -1,0 +1,46 @@
+From 84d35818f97256b42b4cd4d6be667176199c32ae Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Mon, 18 Nov 2013 23:46:12 +0100
+Subject: [PATCH 074/276] touch_synaptics: remove wakeup procedure for i2c
+ device
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/touch_synaptics.c |    5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/input/touchscreen/touch_synaptics.c b/drivers/input/touchscreen/touch_synaptics.c
+index 61a437b..fad2344 100644
+--- a/drivers/input/touchscreen/touch_synaptics.c
++++ b/drivers/input/touchscreen/touch_synaptics.c
+@@ -1616,7 +1616,7 @@ static int synaptics_ts_start(struct synaptics_ts_data *ts)
+ 			&ts->work_init, msecs_to_jiffies(BOOTING_DELAY));
+ 
+ #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+-	if (device_may_wakeup(&ts->client->dev))
++	if (s2w_switch > 0)
+ 		disable_irq_wake(ts->client->irq);
+ #endif
+ 
+@@ -1649,7 +1649,7 @@ static int synaptics_ts_stop(struct synaptics_ts_data *ts)
+ 		touch_power_cntl(ts, POWER_OFF);
+ 	}
+ #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+-	if (device_may_wakeup(&ts->client->dev))
++	if (s2w_switch > 0)
+ 		enable_irq_wake(ts->client->irq);
+ #endif
+ 	return 0;
+@@ -1803,7 +1803,6 @@ static int synaptics_ts_probe(
+ 	ret = request_threaded_irq(client->irq, NULL, touch_irq_handler,
+ #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE_PREVENT_SLEEP
+ 			IRQF_TRIGGER_FALLING | IRQF_ONESHOT | IRQF_NO_SUSPEND, client->name, ts);
+-	device_init_wakeup(&client->dev, 1);
+ #else
+ 			IRQF_TRIGGER_FALLING | IRQF_ONESHOT, client->name, ts);
+ #endif
+-- 
+1.7.9.5
+

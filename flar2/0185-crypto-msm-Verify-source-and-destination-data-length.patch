@@ -1,0 +1,60 @@
+From c2f3ea4508d33dcec4e5c762ed0c259bb3d51563 Mon Sep 17 00:00:00 2001
+From: Ajay Dudani <adudani@codeaurora.org>
+Date: Sat, 12 Oct 2013 16:17:15 -0700
+Subject: [PATCH 185/276] crypto: msm: Verify source and destination data
+ lengths
+
+Check to confirm the sum of length of the source
+and destination segments is equal to the total length
+sent by client.
+
+Change-Id: Ib10b8f792591631060135022d81f1f08c424ee66
+Signed-off-by: Mona Hossain <mhossain@codeaurora.org>
+Signed-off-by: Ajay Dudani <adudani@codeaurora.org>
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/crypto/msm/qcedev.c |   20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/crypto/msm/qcedev.c b/drivers/crypto/msm/qcedev.c
+index 15d613f..ed7dc70 100644
+--- a/drivers/crypto/msm/qcedev.c
++++ b/drivers/crypto/msm/qcedev.c
+@@ -1643,6 +1643,9 @@ error:
+ static int qcedev_check_cipher_params(struct qcedev_cipher_op_req *req,
+ 						struct qcedev_control *podev)
+ {
++	uint32_t total = 0;
++	uint32_t i;
++
+ 	if (req->use_pmem) {
+ 		pr_err("%s: Use of PMEM is not supported\n", __func__);
+ 		goto error;
+@@ -1694,7 +1697,22 @@ static int qcedev_check_cipher_params(struct qcedev_cipher_op_req *req,
+ 			goto error;
+ 		}
+ 	}
+-
++	/* Check for sum of all dst length is equal to data_len  */
++	for (i = 0; (i < QCEDEV_MAX_BUFFERS) && (total < req->data_len); i++)
++		total += req->vbuf.dst[i].len;
++	if (total != req->data_len) {
++		pr_err("%s: Total (i=%d) dst(%d) buf size != data_len (%d)\n",
++			__func__, i, total, req->data_len);
++		goto error;
++	}
++	/* Check for sum of all src length is equal to data_len  */
++	for (i = 0, total = 0; i < req->entries; i++)
++		total += req->vbuf.src[i].len;
++	if (total != req->data_len) {
++		pr_err("%s: Total src(%d) buf size != data_len (%d)\n",
++			__func__, total, req->data_len);
++		goto error;
++	}
+ 	return 0;
+ error:
+ 	return -EINVAL;
+-- 
+1.7.9.5
+

@@ -1,0 +1,54 @@
+From 2f2deb4e5811ecb6fd79c712d0d9aef91f1dcfbe Mon Sep 17 00:00:00 2001
+From: myfluxi <linflux@arcor.de>
+Date: Wed, 27 Nov 2013 16:52:26 +0100
+Subject: [PATCH 102/276] msm: mdss: Identify white point in sysfs
+
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_dsi_panel.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_dsi_panel.c b/drivers/video/msm/mdss/mdss_dsi_panel.c
+index 990920a..0e6fb02 100644
+--- a/drivers/video/msm/mdss/mdss_dsi_panel.c
++++ b/drivers/video/msm/mdss/mdss_dsi_panel.c
+@@ -1237,7 +1237,7 @@ read_one(kgamma_bp, 15);
+ read_one(kgamma_bn, 17);
+ read_one(kgamma_1,   1);
+ read_one(kgamma_3,   3);
+-read_one(kgamma_5,   5);
++read_one(kgamma_w,   5);
+ read_one(kgamma_20, 20);
+ read_one(kgamma_22, 22);
+ 
+@@ -1257,7 +1257,7 @@ write_one(kgamma_bp, 15);
+ write_one(kgamma_bn, 17);
+ write_one(kgamma_1,   1);
+ write_one(kgamma_3,   3);
+-write_one(kgamma_5,   5);
++write_one(kgamma_w,   5);
+ write_one(kgamma_20, 20);
+ write_one(kgamma_22, 22);
+ 
+@@ -1272,7 +1272,7 @@ define_one_rw(kgamma_bp);
+ define_one_rw(kgamma_bn);
+ define_one_rw(kgamma_1);
+ define_one_rw(kgamma_3);
+-define_one_rw(kgamma_5);
++define_one_rw(kgamma_w);
+ define_one_rw(kgamma_20);
+ define_one_rw(kgamma_22);
+ 
+@@ -1285,7 +1285,7 @@ static struct attribute *dsi_panel_attributes[] = {
+ 	&dev_attr_kgamma_bn.attr,
+ 	&dev_attr_kgamma_1.attr,
+ 	&dev_attr_kgamma_3.attr,
+-	&dev_attr_kgamma_5.attr,
++	&dev_attr_kgamma_w.attr,
+ 	&dev_attr_kgamma_20.attr,
+ 	&dev_attr_kgamma_22.attr,
+ 	NULL
+-- 
+1.7.9.5
+

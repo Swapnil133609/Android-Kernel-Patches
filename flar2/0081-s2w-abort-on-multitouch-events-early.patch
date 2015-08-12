@@ -1,0 +1,31 @@
+From 6974cfcf259689c72fe3bab789328893bc62740a Mon Sep 17 00:00:00 2001
+From: Dennis Rassmann <showp1984@gmail.com>
+Date: Wed, 20 Nov 2013 03:45:14 +0100
+Subject: [PATCH 081/276] s2w: abort on multitouch events early
+
+Signed-off-by: Dennis Rassmann <showp1984@gmail.com>
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/sweep2wake.c |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/input/touchscreen/sweep2wake.c b/drivers/input/touchscreen/sweep2wake.c
+index e27d92a..9c93ee2 100644
+--- a/drivers/input/touchscreen/sweep2wake.c
++++ b/drivers/input/touchscreen/sweep2wake.c
+@@ -217,6 +217,11 @@ static void s2w_input_event(struct input_handle *handle, unsigned int type,
+ 		(code==ABS_MT_TRACKING_ID) ? "ID" :
+ 		"undef"), code, value);
+ #endif
++	if (code == ABS_MT_SLOT) {
++		sweep2wake_reset();
++		return;
++	}
++
+ 	if (code == ABS_MT_TRACKING_ID && value == -1) {
+ 		sweep2wake_reset();
+ 		return;
+-- 
+1.7.9.5
+

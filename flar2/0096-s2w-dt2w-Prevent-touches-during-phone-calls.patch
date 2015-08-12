@@ -1,0 +1,123 @@
+From a7d9c3606096b5939bd952d4ba677b345785b725 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Tue, 26 Nov 2013 13:41:48 -0500
+Subject: [PATCH 096/276] [s2w/dt2w] Prevent touches during phone calls
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_dsi_panel.c |    5 +++++
+ include/linux/input/prevent_sleep.h     |   24 ++++++++++++++++++++++++
+ sound/soc/msm/qdsp6v2/q6voice.c         |   14 ++++++++++++++
+ 3 files changed, 43 insertions(+)
+ create mode 100644 include/linux/input/prevent_sleep.h
+
+diff --git a/drivers/video/msm/mdss/mdss_dsi_panel.c b/drivers/video/msm/mdss/mdss_dsi_panel.c
+index 2beea12..b7abfc4 100644
+--- a/drivers/video/msm/mdss/mdss_dsi_panel.c
++++ b/drivers/video/msm/mdss/mdss_dsi_panel.c
+@@ -26,6 +26,7 @@
+ #include <linux/ctype.h>
+ #endif
+ #ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++#include <linux/input/prevent_sleep.h>
+ #ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+ #include <linux/input/sweep2wake.h>
+ #endif
+@@ -194,6 +195,8 @@ void mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
+ #if defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
+ 	prevent_sleep = prevent_sleep || (dt2w_switch > 0);
+ #endif
++	if (prevent_sleep && in_phone_call)
++		prevent_sleep = false;
+ #endif
+ #ifdef CONFIG_PWRKEY_SUSPEND
+ 	if (pwrkey_pressed)
+@@ -359,6 +362,8 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
+ #if defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE)
+ 	prevent_sleep = prevent_sleep || (dt2w_switch > 0);
+ #endif
++	if (prevent_sleep && in_phone_call)
++		prevent_sleep = false;
+ #endif
+ #ifdef CONFIG_PWRKEY_SUSPEND
+ 	if (pwrkey_pressed)
+diff --git a/include/linux/input/prevent_sleep.h b/include/linux/input/prevent_sleep.h
+new file mode 100644
+index 0000000..ab4bd53
+--- /dev/null
++++ b/include/linux/input/prevent_sleep.h
+@@ -0,0 +1,24 @@
++/*
++ * include/linux/input/prevent_sleep.h
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
++ */
++
++#ifndef _LINUX_PREVENT_SLEEP_H
++#define _LINUX_PREVENT_SLEEP_H
++
++extern bool in_phone_call;
++
++#endif	/* _LINUX_PREVENT_SLEEP_H */
+diff --git a/sound/soc/msm/qdsp6v2/q6voice.c b/sound/soc/msm/qdsp6v2/q6voice.c
+index fe6ef5d..32f59bb 100644
+--- a/sound/soc/msm/qdsp6v2/q6voice.c
++++ b/sound/soc/msm/qdsp6v2/q6voice.c
+@@ -29,6 +29,9 @@
+ #include "audio_acdb.h"
+ #include "q6voice.h"
+ 
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++#include <linux/input/prevent_sleep.h>
++#endif
+ 
+ #define TIMEOUT_MS 500
+ 
+@@ -41,6 +44,10 @@
+ /* CVS CAL Size: 49152 = 48 * 1024 */
+ #define CVS_CAL_SIZE 49152
+ 
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++bool in_phone_call = false;
++#endif
++
+ enum {
+ 	VOC_TOKEN_NONE,
+ 	VOIP_MEM_MAP_TOKEN,
+@@ -4323,6 +4330,9 @@ int voc_end_voice_call(uint32_t session_id)
+ 
+ 		v->voc_state = VOC_RELEASE;
+ 	}
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++	in_phone_call = false;
++#endif
+ 	mutex_unlock(&v->lock);
+ 	return ret;
+ }
+@@ -4529,6 +4539,10 @@ int voc_start_voice_call(uint32_t session_id)
+ 		ret = -EINVAL;
+ 		goto fail;
+ 	}
++#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
++	in_phone_call = true;
++#endif
++
+ fail:
+ 	mutex_unlock(&v->lock);
+ 	return ret;
+-- 
+1.7.9.5
+

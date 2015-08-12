@@ -1,0 +1,243 @@
+From f1b7f87d5a8bb23d927cfe3923694ebe581d17b9 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Mon, 11 Nov 2013 00:41:47 -0500
+Subject: [PATCH 031/276] Max screen off frequency and shut down cores while
+ screen is off
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/Kconfig       |    6 +++
+ arch/arm/mach-msm/Makefile      |    1 +
+ arch/arm/mach-msm/cpufreq.c     |   71 +++++++++++++++++++++++++++++
+ arch/arm/mach-msm/msm-sleeper.c |   94 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 172 insertions(+)
+ create mode 100644 arch/arm/mach-msm/msm-sleeper.c
+
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index 9b3b55e..993c025 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -3029,6 +3029,12 @@ config FORCE_FAST_CHARGE
+ 	  A simple sysfs interface to increase input current limit to
+ 	  900mA when charging via USB.
+ 
++config MSM_SLEEPER
++	bool "Limit max frequency and shut off cores while screen is off"
++	default y
++	help
++	  Limit max frequency and shut off cores while screen is off 
++
+ config MSM_UARTDM_Core_v14
+ 	bool "Use MSM BLSP based HSUART Core v1.4"
+ 	depends on SERIAL_MSM_HS
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index afe158b..1b4b64a 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -436,3 +436,4 @@ obj-$(CONFIG_WALL_CLK) += wallclk.o
+ obj-$(CONFIG_WALL_CLK_SYSFS) += wallclk_sysfs.o
+ 
+ obj-$(CONFIG_FORCE_FAST_CHARGE) += fastchg.o
++obj-$(CONFIG_MSM_SLEEPER) += msm-sleeper.o
+diff --git a/arch/arm/mach-msm/cpufreq.c b/arch/arm/mach-msm/cpufreq.c
+index a6c86af..f286a56 100644
+--- a/arch/arm/mach-msm/cpufreq.c
++++ b/arch/arm/mach-msm/cpufreq.c
+@@ -44,6 +44,10 @@ struct cpufreq_work_struct {
+ static DEFINE_PER_CPU(struct cpufreq_work_struct, cpufreq_work);
+ static struct workqueue_struct *msm_cpufreq_wq;
+ 
++/* maxscroff */
++uint32_t maxscroff_freq = 729600;
++uint32_t maxscroff = 1; 
++
+ struct cpufreq_suspend_t {
+ 	struct mutex suspend_mutex;
+ 	int device_suspended;
+@@ -61,6 +65,23 @@ struct cpu_freq {
+ 
+ static DEFINE_PER_CPU(struct cpu_freq, cpu_freq_info);
+ 
++
++/**maxscroff**/
++static int __init cpufreq_read_arg_maxscroff(char *max_so)
++{
++	if (strcmp(max_so, "0") == 0) {
++		maxscroff = 0;
++	} else if (strcmp(max_so, "1") == 0) {
++		maxscroff = 1;
++	} else {
++		maxscroff = 0;
++	}
++	return 1;
++}
++
++__setup("max_so=", cpufreq_read_arg_maxscroff);
++/**end maxscroff**/ 
++
+ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq)
+ {
+ 	int ret = 0;
+@@ -362,8 +383,58 @@ static int msm_cpufreq_resume(struct cpufreq_policy *policy)
+ 	return 0;
+ }
+ 
++/** maxscreen off sysfs interface **/
++
++static ssize_t show_max_screen_off_khz(struct cpufreq_policy *policy, char *buf)
++{
++	return sprintf(buf, "%u\n", maxscroff_freq);
++}
++
++static ssize_t store_max_screen_off_khz(struct cpufreq_policy *policy,
++		const char *buf, size_t count)
++{
++	unsigned int freq = 0;
++	int ret;
++	int index;
++	struct cpufreq_frequency_table *freq_table = cpufreq_frequency_get_table(policy->cpu);
++
++	if (!freq_table)
++		return -EINVAL;
++
++	ret = sscanf(buf, "%u", &freq);
++	if (ret != 1)
++		return -EINVAL;
++
++	mutex_lock(&per_cpu(cpufreq_suspend, policy->cpu).suspend_mutex);
++
++	ret = cpufreq_frequency_table_target(policy, freq_table, freq,
++			CPUFREQ_RELATION_H, &index);
++	if (ret)
++		goto out;
++
++	maxscroff_freq = freq_table[index].frequency;
++
++	ret = count;
++
++out:
++	mutex_unlock(&per_cpu(cpufreq_suspend, policy->cpu).suspend_mutex);
++	return ret;
++}
++
++struct freq_attr msm_cpufreq_attr_max_screen_off_khz = {
++	.attr = { .name = "screen_off_max_freq",
++		.mode = 0644,
++	},
++	.show = show_max_screen_off_khz,
++	.store = store_max_screen_off_khz,
++};
++
++
++/** end maxscreen off sysfs interface **/
++
+ static struct freq_attr *msm_freq_attr[] = {
+ 	&cpufreq_freq_attr_scaling_available_freqs,
++	&msm_cpufreq_attr_max_screen_off_khz, 
+ 	NULL,
+ };
+ 
+diff --git a/arch/arm/mach-msm/msm-sleeper.c b/arch/arm/mach-msm/msm-sleeper.c
+new file mode 100644
+index 0000000..b4b17d3
+--- /dev/null
++++ b/arch/arm/mach-msm/msm-sleeper.c
+@@ -0,0 +1,94 @@
++/*
++ * ElementalX msm-sleeper by flar2 <asegaert@gmail.com>
++ * 
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/earlysuspend2.h>
++#include <linux/workqueue.h>
++#include <linux/cpu.h>
++#include <linux/module.h>
++#include <linux/cpufreq.h>
++#include <mach/cpufreq.h>
++
++#define MSM_SLEEPER_MAJOR_VERSION	2
++#define MSM_SLEEPER_MINOR_VERSION	0
++
++extern uint32_t maxscroff;
++extern uint32_t maxscroff_freq;
++
++
++#ifdef CONFIG_HAS_EARLYSUSPEND2
++static void __cpuinit msm_sleeper_early_suspend(struct early_suspend2 *h)
++{
++	int cpu;
++	int i;
++	int num_cores = 4;
++
++	for_each_possible_cpu(cpu) {
++		msm_cpufreq_set_freq_limits(cpu, MSM_CPUFREQ_NO_LIMIT, maxscroff_freq);
++		pr_info("Limit max frequency to: %d\n", maxscroff_freq);
++	}
++
++	for (i = 1; i < num_cores; i++) {
++		if (cpu_online(i))
++			cpu_down(i);
++	}
++
++
++	return; 
++}
++
++static void __cpuinit msm_sleeper_late_resume(struct early_suspend2 *h)
++{
++	int cpu;
++	int i;
++	int num_cores = 4;
++
++	for_each_possible_cpu(cpu) {
++		msm_cpufreq_set_freq_limits(cpu, MSM_CPUFREQ_NO_LIMIT, MSM_CPUFREQ_NO_LIMIT);
++		pr_info("Restore max frequency to %d\n", MSM_CPUFREQ_NO_LIMIT);
++	}
++
++	for (i = 1; i < num_cores; i++) {
++		if (!cpu_online(i))
++			cpu_up(i);
++	}
++
++	return; 
++}
++
++static struct early_suspend2 msm_sleeper_early_suspend_driver = {
++	.level = EARLY_SUSPEND2_LEVEL_BLANK_SCREEN + 10,
++	.suspend = msm_sleeper_early_suspend,
++	.resume = msm_sleeper_late_resume,
++};
++#endif
++
++static int __init msm_sleeper_init(void)
++{
++	pr_info("msm-sleeper version %d.%d\n",
++		 MSM_SLEEPER_MAJOR_VERSION,
++		 MSM_SLEEPER_MINOR_VERSION);
++
++#ifdef CONFIG_HAS_EARLYSUSPEND2
++		register_early_suspend2(&msm_sleeper_early_suspend_driver);
++#endif
++	return 0;
++}
++
++MODULE_AUTHOR("flar2 <asegaert@gmail.com>");
++MODULE_DESCRIPTION("'msm-sleeper' - Limit max frequency and shut down cores while screen is off");
++MODULE_LICENSE("GPL v2");
++
++late_initcall(msm_sleeper_init);
++
+-- 
+1.7.9.5
+

@@ -1,0 +1,27 @@
+From 4b99049c2f4782a77dafe12c64cb3ef5103fb3b6 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Fri, 13 Dec 2013 00:16:39 -0500
+Subject: [PATCH 211/276] Makefile adjustment
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/vfp/Makefile |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/vfp/Makefile b/arch/arm/vfp/Makefile
+index bec25ae..e7b053c 100644
+--- a/arch/arm/vfp/Makefile
++++ b/arch/arm/vfp/Makefile
+@@ -7,7 +7,7 @@
+ # ccflags-y := -DDEBUG
+ # asflags-y := -DDEBUG
+ 
+-KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=neon -mfloat-abi=soft)
++KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=neon -mfloat-abi=hard)
+ LDFLAGS		+=--no-warn-mismatch
+ 
+ obj-y			+= vfp.o
+-- 
+1.7.9.5
+

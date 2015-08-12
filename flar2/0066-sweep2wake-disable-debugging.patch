@@ -1,0 +1,27 @@
+From 6cdabe04d0f737c7dcc1427ee1974e402d3d6e48 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Mon, 18 Nov 2013 07:24:21 -0500
+Subject: [PATCH 066/276] sweep2wake: disable debugging
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/sweep2wake.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/input/touchscreen/sweep2wake.c b/drivers/input/touchscreen/sweep2wake.c
+index 636c702..1268fd3 100644
+--- a/drivers/input/touchscreen/sweep2wake.c
++++ b/drivers/input/touchscreen/sweep2wake.c
+@@ -42,7 +42,7 @@ MODULE_VERSION(DRIVER_VERSION);
+ MODULE_LICENSE("GPLv2");
+ 
+ /* Tuneables */
+-#define DEBUG                   1
++#define DEBUG                   0
+ #define S2W_PWRKEY_DUR          60
+ 
+ #ifdef CONFIG_MACH_MSM8974_HAMMERHEAD
+-- 
+1.7.9.5
+

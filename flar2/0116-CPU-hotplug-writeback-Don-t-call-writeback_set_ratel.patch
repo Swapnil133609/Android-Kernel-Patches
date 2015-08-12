@@ -1,0 +1,49 @@
+From e7cb9d070250abbf38e06bd3fef22f3f868f9b43 Mon Sep 17 00:00:00 2001
+From: "Srivatsa S. Bhat" <srivatsa.bhat@linux.vnet.ibm.com>
+Date: Fri, 28 Sep 2012 20:27:49 +0800
+Subject: [PATCH 116/276] CPU hotplug, writeback: Don't call
+ writeback_set_ratelimit() too often during hotplug
+
+The CPU hotplug callback related to writeback calls writeback_set_ratelimit()
+during every state change in the hotplug sequence. This is unnecessary
+since num_online_cpus() changes only once during the entire hotplug operation.
+
+So invoke the function only once per hotplug, thereby avoiding the
+unnecessary repetition of those costly calculations.
+
+Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/page-writeback.c |   14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/mm/page-writeback.c b/mm/page-writeback.c
+index 07701c5..12b795e 100644
+--- a/mm/page-writeback.c
++++ b/mm/page-writeback.c
+@@ -1574,10 +1574,18 @@ void writeback_set_ratelimit(void)
+ }
+ 
+ static int __cpuinit
+-ratelimit_handler(struct notifier_block *self, unsigned long u, void *v)
++ratelimit_handler(struct notifier_block *self, unsigned long action,
++		  void *hcpu)
+ {
+-	writeback_set_ratelimit();
+-	return NOTIFY_DONE;
++
++	switch (action & ~CPU_TASKS_FROZEN) {
++	case CPU_ONLINE:
++	case CPU_DEAD:
++		writeback_set_ratelimit();
++		return NOTIFY_OK;
++	default:
++		return NOTIFY_DONE;
++	}
+ }
+ 
+ static struct notifier_block __cpuinitdata ratelimit_nb = {
+-- 
+1.7.9.5
+

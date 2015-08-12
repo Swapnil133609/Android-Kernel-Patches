@@ -1,0 +1,53 @@
+From 8c824fcfc3ea5c744568fa6dbb5b557757f48dd1 Mon Sep 17 00:00:00 2001
+From: Maya Erez <merez@codeaurora.org>
+Date: Sat, 28 Sep 2013 22:23:37 +0300
+Subject: [PATCH 264/276] mmc: print an error on FLUSH timeout
+
+Up until now the FLUSH timeout error was not printed and there
+was no way to know if the FLUSH completed successfully or not.
+Printing the FLUSH failure will help to identify if FS corruption
+happened due to this timeout.
+
+Change-Id: Ibbb51d030d7130d63974a1b4319ad4a24621c595
+Signed-off-by: Maya Erez <merez@codeaurora.org>
+Signed-off-by: Konstantin Dorfman <kdorfman@codeaurora.org>
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/mmc/card/block.c |    5 ++++-
+ drivers/mmc/core/core.c  |    2 +-
+ 2 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+index 2a3c2d4..8431fed 100644
+--- a/drivers/mmc/card/block.c
++++ b/drivers/mmc/card/block.c
+@@ -1405,8 +1405,11 @@ static int mmc_blk_issue_flush(struct mmc_queue *mq, struct request *req)
+ 	int ret = 0;
+ 
+ 	ret = mmc_flush_cache(card);
+-	if (ret)
++	if (ret) {
++		pr_err("%s: %s: notify flush error to upper layers",
++				req->rq_disk->disk_name, __func__);
+ 		ret = -EIO;
++	}
+ 
+ 	blk_end_request_all(req, ret);
+ 
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 22c14e9..210b012 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -3337,7 +3337,7 @@ int mmc_flush_cache(struct mmc_card *card)
+ 						EXT_CSD_FLUSH_CACHE, 1,
+ 						MMC_FLUSH_REQ_TIMEOUT_MS);
+ 		if (err == -ETIMEDOUT) {
+-			pr_debug("%s: cache flush timeout\n",
++			pr_err("%s: cache flush timeout\n",
+ 					mmc_hostname(card->host));
+ 			rc = mmc_interrupt_hpi(card);
+ 			if (rc)
+-- 
+1.7.9.5
+

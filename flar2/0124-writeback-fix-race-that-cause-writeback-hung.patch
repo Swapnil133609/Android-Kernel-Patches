@@ -1,0 +1,81 @@
+From 0b20591ab0c1cad9f1a3afce8b050fd8f9061c7a Mon Sep 17 00:00:00 2001
+From: Junxiao Bi <junxiao.bi@oracle.com>
+Date: Wed, 11 Sep 2013 14:23:04 -0700
+Subject: [PATCH 124/276] writeback: fix race that cause writeback hung
+
+There is a race between mark inode dirty and writeback thread, see the
+following scenario.  In this case, writeback thread will not run though
+there is dirty_io.
+
+__mark_inode_dirty()                                          bdi_writeback_workfn()
+	...                                                       	...
+	spin_lock(&inode->i_lock);
+	...
+	if (bdi_cap_writeback_dirty(bdi)) {
+	    <<< assume wb has dirty_io, so wakeup_bdi is false.
+	    <<< the following inode_dirty also have wakeup_bdi false.
+	    if (!wb_has_dirty_io(&bdi->wb))
+		    wakeup_bdi = true;
+	}
+	spin_unlock(&inode->i_lock);
+	                                                            <<< assume last dirty_io is removed here.
+	                                                            pages_written = wb_do_writeback(wb);
+	                                                            ...
+	                                                            <<< work_list empty and wb has no dirty_io,
+	                                                            <<< delayed_work will not be queued.
+	                                                            if (!list_empty(&bdi->work_list) ||
+	                                                                (wb_has_dirty_io(wb) && dirty_writeback_interval))
+	                                                                queue_delayed_work(bdi_wq, &wb->dwork,
+	                                                                    msecs_to_jiffies(dirty_writeback_interval * 10));
+	spin_lock(&bdi->wb.list_lock);
+	inode->dirtied_when = jiffies;
+	<<< new dirty_io is added.
+	list_move(&inode->i_wb_list, &bdi->wb.b_dirty);
+	spin_unlock(&bdi->wb.list_lock);
+
+	<<< though there is dirty_io, but wakeup_bdi is false,
+	<<< so writeback thread will not be waked up and
+	<<< the new dirty_io will not be flushed.
+	if (wakeup_bdi)
+	    bdi_wakeup_thread_delayed(bdi);
+
+Writeback will run until there is a new flush work queued.  This may cause
+a lot of dirty pages stay in memory for a long time.
+
+Signed-off-by: Junxiao Bi <junxiao.bi@oracle.com>
+Reviewed-by: Jan Kara <jack@suse.cz>
+Cc: Fengguang Wu <fengguang.wu@intel.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Signed-off-by: Francisco Franco <franciscofranco.1990@gmail.com>
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ fs/fs-writeback.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/fs/fs-writeback.c b/fs/fs-writeback.c
+index f36fc00..37314a0 100644
+--- a/fs/fs-writeback.c
++++ b/fs/fs-writeback.c
+@@ -1118,6 +1118,8 @@ void __mark_inode_dirty(struct inode *inode, int flags)
+ 			bool wakeup_bdi = false;
+ 			bdi = inode_to_bdi(inode);
+ 
++			spin_unlock(&inode->i_lock);
++			spin_lock(&bdi->wb.list_lock);
+ 			if (bdi_cap_writeback_dirty(bdi)) {
+ 				WARN(!test_bit(BDI_registered, &bdi->state),
+ 				     "bdi-%s not registered\n", bdi->name);
+@@ -1132,8 +1134,6 @@ void __mark_inode_dirty(struct inode *inode, int flags)
+ 					wakeup_bdi = true;
+ 			}
+ 
+-			spin_unlock(&inode->i_lock);
+-			spin_lock(&bdi->wb.list_lock);
+ 			inode->dirtied_when = jiffies;
+ 			list_move(&inode->i_wb_list, &bdi->wb.b_dirty);
+ 			spin_unlock(&bdi->wb.list_lock);
+-- 
+1.7.9.5
+

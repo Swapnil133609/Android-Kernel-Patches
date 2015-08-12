@@ -1,0 +1,31 @@
+From a962d9b12bff8e160b422261cd6e701ae8c6818d Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Wed, 27 Nov 2013 23:00:23 -0500
+Subject: [PATCH 104/276] fixup color preset to work with experimental gamma
+ interface
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_dsi_panel.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_dsi_panel.c b/drivers/video/msm/mdss/mdss_dsi_panel.c
+index 8ce9863..5100d65 100644
+--- a/drivers/video/msm/mdss/mdss_dsi_panel.c
++++ b/drivers/video/msm/mdss/mdss_dsi_panel.c
+@@ -335,9 +335,9 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
+ 
+ //Basic color preset 
+ 	if (color_preset == 1)
+-		ctrl->on_cmds.cmds[1].payload[0] = 0x77;
++		local_pdata->on_cmds.cmds[1].payload[0] = 0x77;
+ 	else
+-		ctrl->on_cmds.cmds[1].payload[0] = 0xFF;
++		local_pdata->on_cmds.cmds[1].payload[0] = 0xFF;
+ 
+ 	if (local_pdata->on_cmds.cmd_cnt)
+ 		mdss_dsi_panel_cmds_send(ctrl, &local_pdata->on_cmds);
+-- 
+1.7.9.5
+

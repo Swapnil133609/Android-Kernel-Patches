@@ -1,0 +1,133 @@
+From 2047a95d7b111809f0e588ad6f3b9cf96cec5be2 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Wed, 20 Nov 2013 21:36:09 -0500
+Subject: [PATCH 083/276] Option to disable touch wake with power button
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/input/touchscreen/Kconfig       |    4 ++++
+ drivers/platform/msm/qpnp-power-on.c    |   20 +++++++++++++++++++-
+ drivers/video/msm/mdss/mdss_dsi_panel.c |   18 +++++++++++++++++-
+ include/linux/qpnp/power-on.h           |    4 ++++
+ 4 files changed, 44 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+index 9c2c9de..66b691b 100644
+--- a/drivers/input/touchscreen/Kconfig
++++ b/drivers/input/touchscreen/Kconfig
+@@ -1048,4 +1048,8 @@ config TOUCHSCREEN_PREVENT_SLEEP
+ 	help
+ 	  This disables the sleep function of modified touchscreen drivers.
+ 
++config PWRKEY_SUSPEND
++	tristate "Suspend touch wake if power button pressed"
++	default y
++
+ endif
+diff --git a/drivers/platform/msm/qpnp-power-on.c b/drivers/platform/msm/qpnp-power-on.c
+index 67ce1b5..48eba67 100644
+--- a/drivers/platform/msm/qpnp-power-on.c
++++ b/drivers/platform/msm/qpnp-power-on.c
+@@ -77,6 +77,13 @@
+ 
+ #define QPNP_KEY_STATUS_DELAY			msecs_to_jiffies(250)
+ 
++#ifdef CONFIG_PWRKEY_SUSPEND
++bool pwrkey_pressed = false;
++bool pwrkey_suspend = false;
++static int cnt = 0;
++module_param(pwrkey_suspend, bool, 0755);
++#endif
++
+ enum pon_type {
+ 	PON_KPDPWR,
+ 	PON_RESIN,
+@@ -336,7 +343,18 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
+ 	default:
+ 		return -EINVAL;
+ 	}
+-
++	
++#ifdef CONFIG_PWRKEY_SUSPEND
++	if (pwrkey_suspend) {
++		if (cfg->key_code == KEY_POWER && cnt == 0) {
++			pwrkey_pressed = true;
++			cnt++;
++		} else {
++			cnt = 0;
++		}
++	}
++#endif			
++	
+ 	input_report_key(pon->pon_input, cfg->key_code,
+ 					(pon_rt_sts & pon_rt_bit));
+ 	input_sync(pon->pon_input);
+diff --git a/drivers/video/msm/mdss/mdss_dsi_panel.c b/drivers/video/msm/mdss/mdss_dsi_panel.c
+index 1ebbbca..998b40f 100644
+--- a/drivers/video/msm/mdss/mdss_dsi_panel.c
++++ b/drivers/video/msm/mdss/mdss_dsi_panel.c
+@@ -33,7 +33,9 @@
+ #include <linux/input/doubletap2wake.h>
+ #endif
+ #endif
+-
++#ifdef CONFIG_PWRKEY_SUSPEND
++#include <linux/qpnp/power-on.h>
++#endif
+ #include "mdss_dsi.h"
+ 
+ #define DT_CMD_HDR 6
+@@ -193,6 +195,11 @@ void mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
+ 	prevent_sleep = prevent_sleep || (dt2w_switch > 0);
+ #endif
+ #endif
++#ifdef CONFIG_PWRKEY_SUSPEND
++	if (pwrkey_pressed)
++		prevent_sleep = false;
++#endif
++
+ 	if (pdata == NULL) {
+ 		pr_err("%s: Invalid input data\n", __func__);
+ 		return;
+@@ -330,6 +337,10 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
+ 	if (ctrl->on_cmds.cmd_cnt)
+ 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
+ 
++#ifdef CONFIG_PWRKEY_SUSPEND
++	pwrkey_pressed = false;	
++#endif
++		
+ 	pr_info("%s\n", __func__);
+ 	return 0;
+ }
+@@ -349,6 +360,11 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
+ 	prevent_sleep = prevent_sleep || (dt2w_switch > 0);
+ #endif
+ #endif
++#ifdef CONFIG_PWRKEY_SUSPEND
++	if (pwrkey_pressed)
++		prevent_sleep = false;
++#endif
++
+ 	if (pdata == NULL) {
+ 		pr_err("%s: Invalid input data\n", __func__);
+ 		return -EINVAL;
+diff --git a/include/linux/qpnp/power-on.h b/include/linux/qpnp/power-on.h
+index 772bf62..195cb80 100644
+--- a/include/linux/qpnp/power-on.h
++++ b/include/linux/qpnp/power-on.h
+@@ -15,6 +15,10 @@
+ 
+ #include <linux/errno.h>
+ 
++#ifdef CONFIG_PWRKEY_SUSPEND
++extern bool pwrkey_pressed;
++#endif
++
+ /**
+  * enum pon_trigger_source: List of PON trigger sources
+  * %PON_SMPL:		PON triggered by SMPL - Sudden Momentary Power Loss
+-- 
+1.7.9.5
+

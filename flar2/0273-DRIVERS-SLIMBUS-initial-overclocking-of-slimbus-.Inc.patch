@@ -1,0 +1,35 @@
+From d0fdfe5b67c766336a1e2a85d1c40d448676d5b2 Mon Sep 17 00:00:00 2001
+From: poondog <markj338@gmail.com>
+Date: Thu, 2 Jan 2014 23:18:07 +1100
+Subject: [PATCH 273/276] DRIVERS: SLIMBUS: initial overclocking of slimbus
+ .Increase root freq from 11 (24.526MHz) to 31 max
+ (27+MHz) which is the largest it will take
+ .Increase clock gear from 7 to 10 (max again)
+
+This means SLIMbus will use its maximum potential to give the best audio quality for the hardware. Takes advantage of both hardware and the mods from zeroinfinity, also opening the door for more things that were previously limited by this. Researched and experimented by ZeroInfinity and Poondog
+
+Signed-off-by: poondog <markj338@gmail.com>
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/slimbus/slim-msm-ctrl.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/slimbus/slim-msm-ctrl.c b/drivers/slimbus/slim-msm-ctrl.c
+index 4a3ea76..5d1933a 100644
+--- a/drivers/slimbus/slim-msm-ctrl.c
++++ b/drivers/slimbus/slim-msm-ctrl.c
+@@ -98,8 +98,8 @@ enum mgr_intr {
+ 
+ enum frm_cfg {
+ 	FRM_ACTIVE	= 1,
+-	CLK_GEAR	= 7,
+-	ROOT_FREQ	= 11,
++	CLK_GEAR	= 10,
++	ROOT_FREQ	= 31,
+ 	REF_CLK_GEAR	= 15,
+ 	INTR_WAKE	= 19,
+ };
+-- 
+1.7.9.5
+

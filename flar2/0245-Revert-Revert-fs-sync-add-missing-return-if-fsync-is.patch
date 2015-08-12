@@ -1,0 +1,30 @@
+From 399747ac22fe6ebced5ed0067180b99ae2f7f034 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Sat, 28 Dec 2013 09:47:02 -0500
+Subject: [PATCH 245/276] Revert "Revert "fs: sync: add missing return if
+ fsync is disabled from userspace.""
+
+This reverts commit 353ac8885fe2afc5a96b2d963e7c73a2c49de6c2.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ fs/sync.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/fs/sync.c b/fs/sync.c
+index f9c190e..3c506d8 100644
+--- a/fs/sync.c
++++ b/fs/sync.c
+@@ -215,6 +215,9 @@ static int do_fsync(unsigned int fd, int datasync)
+ 
+ SYSCALL_DEFINE1(fsync, unsigned int, fd)
+ {
++	if (!fsync_enabled)
++		return 0;
++	
+ 	return do_fsync(fd, 0);
+ }
+ 
+-- 
+1.7.9.5
+

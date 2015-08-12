@@ -1,0 +1,28 @@
+From 048758efdac89bdf36d232ef8c4d37d728d5e6d8 Mon Sep 17 00:00:00 2001
+From: Francisco Franco <franciscofranco.1990@gmail.com>
+Date: Sat, 15 Jun 2013 20:57:59 +0100
+Subject: [PATCH 115/276] writeback: increase bdi_min_ratio to 5 in light of
+ the latest writeback commit.
+
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ mm/page-writeback.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mm/page-writeback.c b/mm/page-writeback.c
+index 26adea8..07701c5 100644
+--- a/mm/page-writeback.c
++++ b/mm/page-writeback.c
+@@ -440,7 +440,7 @@ static void bdi_writeout_fraction(struct backing_dev_info *bdi,
+  * registered backing devices, which, for obvious reasons, can not
+  * exceed 100%.
+  */
+-static unsigned int bdi_min_ratio;
++static unsigned int bdi_min_ratio = 5;
+ 
+ int bdi_set_min_ratio(struct backing_dev_info *bdi, unsigned int min_ratio)
+ {
+-- 
+1.7.9.5
+

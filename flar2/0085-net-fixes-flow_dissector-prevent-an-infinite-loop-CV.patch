@@ -1,0 +1,48 @@
+From 51a9d7863f19f0b2fd7eeda0a712106020d3367d Mon Sep 17 00:00:00 2001
+From: Eric Dumazet <edumazet@google.com>
+Date: Thu, 31 Oct 2013 15:50:21 -0700
+Subject: [PATCH 085/276] net-fixes: flow_dissector: prevent an infinite loop
+ (CVE-2013-4348)
+
+Jason Wang found that a malicious packet could make skb_flow_dissect()
+loop forever. We must check that IP header has a valid ihl to avoid
+this loop. It involves IPIP encapsulation and ihl = 0 to trigger.
+
+Given this bug is critical, I cooked a patch before having
+a fix in upstream kernel.
+
+Tested:
+
+ Compiled/booted
+ Ran some tests on bnx2x and explicitely disabled hardware provided rxhash
+ ethtool -K eth1 rxhash off
+ ethtool -K eth2 rxhash off
+
+Google-Bug-Id: 11465355
+Effort: net-fixes
+Change-Id: I813e4dc48cecb05f8edfa218304e1f13fd764323
+
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ net/core/flow_dissector.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/net/core/flow_dissector.c b/net/core/flow_dissector.c
+index a225089..96c5f0e 100644
+--- a/net/core/flow_dissector.c
++++ b/net/core/flow_dissector.c
+@@ -35,7 +35,9 @@ again:
+ 		struct iphdr _iph;
+ ip:
+ 		iph = skb_header_pointer(skb, nhoff, sizeof(_iph), &_iph);
+-		if (!iph)
++
++		/* CVE-2013-4348 issue : make sure iph->ihl is not zero ... */
++		if (!iph || iph->ihl < 5)
+ 			return false;
+ 
+ 		if (ip_is_fragment(iph))
+-- 
+1.7.9.5
+

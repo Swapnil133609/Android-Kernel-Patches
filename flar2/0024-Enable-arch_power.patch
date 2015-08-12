@@ -1,0 +1,27 @@
+From fbc292571813fb4680fdd3929e6334cd62a8e68f Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Sat, 9 Nov 2013 21:51:32 -0500
+Subject: [PATCH 024/276] Enable arch_power
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ kernel/sched/features.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/sched/features.h b/kernel/sched/features.h
+index de00a48..d98ae90 100644
+--- a/kernel/sched/features.h
++++ b/kernel/sched/features.h
+@@ -42,7 +42,7 @@ SCHED_FEAT(CACHE_HOT_BUDDY, true)
+ /*
+  * Use arch dependent cpu power functions
+  */
+-SCHED_FEAT(ARCH_POWER, false)
++SCHED_FEAT(ARCH_POWER, true)
+ 
+ SCHED_FEAT(HRTICK, false)
+ SCHED_FEAT(DOUBLE_TICK, false)
+-- 
+1.7.9.5
+

@@ -1,0 +1,64 @@
+From 8f14b9d1b6e605d3e2746e4d9fa2aabe3a6559f4 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Wed, 6 Nov 2013 22:00:22 -0500
+Subject: [PATCH 001/276] Makefile adjustments
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ Makefile              |    4 ++--
+ arch/arm/Makefile     |    2 +-
+ arch/arm/vfp/Makefile |    2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index be32c2f..bcf909b 100644
+--- a/Makefile
++++ b/Makefile
+@@ -354,7 +354,7 @@ CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
+ CFLAGS_MODULE   =
+ AFLAGS_MODULE   =
+ LDFLAGS_MODULE  =
+-CFLAGS_KERNEL	=
++CFLAGS_KERNEL	= -mtune=cortex-a15 -mfpu=neon-vfpv4
+ AFLAGS_KERNEL	=
+ CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
+ 
+@@ -565,7 +565,7 @@ all: vmlinux
+ ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
+ KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
+ else
+-KBUILD_CFLAGS	+= -O2
++KBUILD_CFLAGS	+= -O3
+ endif
+ 
+ include $(srctree)/arch/$(SRCARCH)/Makefile
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index a1f42d9..930ecc2 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -17,7 +17,7 @@ endif
+ 
+ OBJCOPYFLAGS	:=-O binary -R .comment -S
+ GZFLAGS		:=-9
+-#KBUILD_CFLAGS	+=-pipe
++KBUILD_CFLAGS	+=-pipe
+ # Explicitly specifiy 32-bit ARM ISA since toolchain default can be -mthumb:
+ KBUILD_CFLAGS	+=$(call cc-option,-marm,)
+ 
+diff --git a/arch/arm/vfp/Makefile b/arch/arm/vfp/Makefile
+index a81404c..bec25ae 100644
+--- a/arch/arm/vfp/Makefile
++++ b/arch/arm/vfp/Makefile
+@@ -7,7 +7,7 @@
+ # ccflags-y := -DDEBUG
+ # asflags-y := -DDEBUG
+ 
+-KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=softvfp+vfp -mfloat-abi=soft)
++KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=neon -mfloat-abi=soft)
+ LDFLAGS		+=--no-warn-mismatch
+ 
+ obj-y			+= vfp.o
+-- 
+1.7.9.5
+

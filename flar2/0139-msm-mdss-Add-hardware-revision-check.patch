@@ -1,0 +1,67 @@
+From 4b385ddc420c0c5ff22d27abd249fa36c9fb497f Mon Sep 17 00:00:00 2001
+From: myfluxi <linflux@arcor.de>
+Date: Tue, 3 Dec 2013 20:20:40 +0100
+Subject: [PATCH 139/276] msm: mdss: Add hardware revision check
+
+Our gamma interface works with both current hardware revisions,
+11 and 11j, although all testing was carried out on 11. As we
+don't know about possible future revisions, let's bail out until
+correct offsets for panel commands have been added.
+
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_dsi_panel.c |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/drivers/video/msm/mdss/mdss_dsi_panel.c b/drivers/video/msm/mdss/mdss_dsi_panel.c
+index 5cf78f9..b425990 100644
+--- a/drivers/video/msm/mdss/mdss_dsi_panel.c
++++ b/drivers/video/msm/mdss/mdss_dsi_panel.c
+@@ -39,7 +39,10 @@
+ #endif
+ #include "mdss_dsi.h"
+ 
++#include <asm/system_info.h>
++
+ #define DT_CMD_HDR 6
++#define GAMMA_COMPAT 11
+ 
+ //Basic color preset
+ int color_preset = 0;
+@@ -1147,6 +1150,11 @@ static int read_local_on_cmds(char *buf, size_t cmd)
+ 	int i, len = 0;
+ 	int dlen;
+ 
++	if (system_rev != GAMMA_COMPAT) {
++		pr_err("Incompatible hardware revision: %d\n", system_rev);
++		return -EINVAL;
++	}
++
+ 	dlen = local_pdata->on_cmds.cmds[cmd].dchdr.dlen - 1;
+ 	if (!dlen)
+ 		return -ENOMEM;
+@@ -1178,6 +1186,11 @@ static int write_local_on_cmds(struct device *dev, const char *buf,
+ 		return -EINVAL;
+ 	}
+ 
++	if (system_rev != GAMMA_COMPAT) {
++		pr_err("Incompatible hardware revision: %d\n", system_rev);
++		return -EINVAL;
++	}
++
+ 	if (cmds_panel_data == NULL) {
+ 		pr_err("%s: Invalid input data\n", __func__);
+ 		return -EINVAL;
+@@ -1217,6 +1230,8 @@ static int write_local_on_cmds(struct device *dev, const char *buf,
+ 		cnt = strlen(tmp);
+ 	}
+ 
++	pr_info("%s\n", __func__);
++
+ 	return rc;
+ }
+ 
+-- 
+1.7.9.5
+

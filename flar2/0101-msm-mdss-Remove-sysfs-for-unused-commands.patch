@@ -1,0 +1,54 @@
+From 948b7547e0d32f58b77456c6f9de499ae0f7b659 Mon Sep 17 00:00:00 2001
+From: myfluxi <linflux@arcor.de>
+Date: Wed, 27 Nov 2013 16:51:46 +0100
+Subject: [PATCH 101/276] msm: mdss: Remove sysfs for unused commands
+
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/video/msm/mdss/mdss_dsi_panel.c |    8 --------
+ 1 file changed, 8 deletions(-)
+
+diff --git a/drivers/video/msm/mdss/mdss_dsi_panel.c b/drivers/video/msm/mdss/mdss_dsi_panel.c
+index 2607229..990920a 100644
+--- a/drivers/video/msm/mdss/mdss_dsi_panel.c
++++ b/drivers/video/msm/mdss/mdss_dsi_panel.c
+@@ -1240,8 +1240,6 @@ read_one(kgamma_3,   3);
+ read_one(kgamma_5,   5);
+ read_one(kgamma_20, 20);
+ read_one(kgamma_22, 22);
+-read_one(kgamma_28, 28);
+-read_one(kgamma_31, 31);
+ 
+ #define write_one(file_name, cmd)				\
+ static ssize_t write_##file_name				\
+@@ -1262,8 +1260,6 @@ write_one(kgamma_3,   3);
+ write_one(kgamma_5,   5);
+ write_one(kgamma_20, 20);
+ write_one(kgamma_22, 22);
+-write_one(kgamma_28, 28);
+-write_one(kgamma_31, 31);
+ 
+ #define define_one_rw(_name)					\
+ static DEVICE_ATTR(_name, 0644, read_##_name, write_##_name);
+@@ -1279,8 +1275,6 @@ define_one_rw(kgamma_3);
+ define_one_rw(kgamma_5);
+ define_one_rw(kgamma_20);
+ define_one_rw(kgamma_22);
+-define_one_rw(kgamma_28);
+-define_one_rw(kgamma_31);
+ 
+ static struct attribute *dsi_panel_attributes[] = {
+ 	&dev_attr_kgamma_rp.attr,
+@@ -1294,8 +1288,6 @@ static struct attribute *dsi_panel_attributes[] = {
+ 	&dev_attr_kgamma_5.attr,
+ 	&dev_attr_kgamma_20.attr,
+ 	&dev_attr_kgamma_22.attr,
+-	&dev_attr_kgamma_28.attr,
+-	&dev_attr_kgamma_31.attr,
+ 	NULL
+ };
+ 
+-- 
+1.7.9.5
+

@@ -1,0 +1,55 @@
+From 7494d9129bdf06776fe24a571f17b376928d8fd8 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Mon, 30 Dec 2013 00:42:35 -0500
+Subject: [PATCH 250/276] Revert "ARM: 7583/1: decompressor: Enable unaligned
+ memory access for v6 and above"
+
+This reverts commit 431f37719ea5f8b5c132b06b71af995e92244e1c.
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/boot/compressed/head.S |   14 +-------------
+ 1 file changed, 1 insertion(+), 13 deletions(-)
+
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index fd33137..29e8a3a 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -677,15 +677,6 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
+ 		mov	pc, lr
+ ENDPROC(__setup_mmu)
+ 
+-@ Enable unaligned access on v6, to allow better code generation
+-@ for the decompressor C code:
+-__armv6_mmu_cache_on:
+-		mrc	p15, 0, r0, c1, c0, 0	@ read SCTLR
+-		bic	r0, r0, #2		@ A (no unaligned access fault)
+-		orr	r0, r0, #1 << 22	@ U (v6 unaligned access model)
+-		mcr	p15, 0, r0, c1, c0, 0	@ write SCTLR
+-		b	__armv4_mmu_cache_on
+-
+ __arm926ejs_mmu_cache_on:
+ #ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+ 		mov	r0, #4			@ put dcache in WT mode
+@@ -727,9 +718,6 @@ __armv7_mmu_cache_on:
+ 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
+ 		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
+ 		orr	r0, r0, #0x003c		@ write buffer
+-		bic	r0, r0, #2		@ A (no unaligned access fault)
+-		orr	r0, r0, #1 << 22	@ U (v6 unaligned access model)
+-						@ (needed for ARM1176)
+ #ifdef CONFIG_MMU
+ #ifdef CONFIG_CPU_ENDIAN_BE8
+ 		orr	r0, r0, #1 << 25	@ big-endian page tables
+@@ -970,7 +958,7 @@ proc_types:
+ 
+ 		.word	0x0007b000		@ ARMv6
+ 		.word	0x000ff000
+-		W(b)	__armv6_mmu_cache_on
++		W(b)	__armv4_mmu_cache_on
+ 		W(b)	__armv4_mmu_cache_off
+ 		W(b)	__armv6_mmu_cache_flush
+ 
+-- 
+1.7.9.5
+

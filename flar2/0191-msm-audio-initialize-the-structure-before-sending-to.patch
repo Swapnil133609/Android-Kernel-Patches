@@ -1,0 +1,51 @@
+From 9ac8677f209ce4e2abdd5b043866fdf8f74f91b6 Mon Sep 17 00:00:00 2001
+From: Ajay Dudani <adudani@codeaurora.org>
+Date: Sat, 12 Oct 2013 20:56:20 -0700
+Subject: [PATCH 191/276] msm: audio: initialize the structure before sending
+ to user space
+
+If uninitialzied structure is passed from kernel to user space, it
+may contain sensitive information that will be leaked.
+
+Change-Id: Ie7c4568c78df8cbd1efeff559848058c2163b0b8
+Signed-off-by: Fred Oh <fred@codeaurora.org>
+Signed-off-by: Ajay Dudani <adudani@codeaurora.org>
+Signed-off-by: flar2 <asegaert@gmail.com>
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/mach-msm/qdsp5/audio_aac.c         |    3 ++-
+ arch/arm/mach-msm/qdsp6v2/audio_utils_aio.c |    3 ++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-msm/qdsp5/audio_aac.c b/arch/arm/mach-msm/qdsp5/audio_aac.c
+index b82df8d..078e9d2 100644
+--- a/arch/arm/mach-msm/qdsp5/audio_aac.c
++++ b/arch/arm/mach-msm/qdsp5/audio_aac.c
+@@ -912,7 +912,8 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 	MM_DBG("cmd = %d\n", cmd);
+ 
+ 	if (cmd == AUDIO_GET_STATS) {
+-		struct msm_audio_stats stats;
++		struct msm_audio_stats stats = {0,};
++		memset(&stats, 0, sizeof(struct msm_audio_stats));
+ 		stats.byte_count = audpp_avsync_byte_count(audio->dec_id);
+ 		stats.sample_count = audpp_avsync_sample_count(audio->dec_id);
+ 		if (copy_to_user((void *)arg, &stats, sizeof(stats)))
+diff --git a/arch/arm/mach-msm/qdsp6v2/audio_utils_aio.c b/arch/arm/mach-msm/qdsp6v2/audio_utils_aio.c
+index fede8cc..06b4dcc 100644
+--- a/arch/arm/mach-msm/qdsp6v2/audio_utils_aio.c
++++ b/arch/arm/mach-msm/qdsp6v2/audio_utils_aio.c
+@@ -1176,8 +1176,9 @@ long audio_aio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 
+ 	switch (cmd) {
+ 	case AUDIO_GET_STATS: {
+-		struct msm_audio_stats stats;
++		struct msm_audio_stats stats = {0,};
+ 		uint64_t timestamp;
++		memset(&stats, 0, sizeof(struct msm_audio_stats));
+ 		stats.byte_count = atomic_read(&audio->in_bytes);
+ 		stats.sample_count = atomic_read(&audio->in_samples);
+ 		rc = q6asm_get_session_time(audio->ac, &timestamp);
+-- 
+1.7.9.5
+

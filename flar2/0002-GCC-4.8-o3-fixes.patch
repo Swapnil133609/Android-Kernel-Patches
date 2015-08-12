@@ -1,0 +1,635 @@
+From e70a5c359f58c0e5ac10722218e7d4f78226e9b5 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Wed, 6 Nov 2013 23:10:51 -0500
+Subject: [PATCH 002/276] GCC 4.8 -o3 fixes
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ arch/arm/boot/compressed/Makefile      |    8 ++++++++
+ arch/arm/mach-msm/clock-generic.c      |    2 +-
+ arch/arm/mach-msm/sensors_adsp.c       |    2 +-
+ drivers/mfd/Makefile                   |    2 ++
+ drivers/net/ppp/ppp_generic.c          |    4 ++--
+ drivers/net/usb/Makefile               |    1 +
+ drivers/net/usb/smsc95xx.c             |    4 ++--
+ drivers/usb/core/hub.c                 |    2 +-
+ drivers/usb/gadget/f_qdss.c            |    4 ++--
+ drivers/usb/storage/transport.c        |    4 ++--
+ drivers/video/msm/mdss/Makefile        |    2 ++
+ fs/fuse/control.c                      |    4 ++--
+ fs/jbd/journal.c                       |    6 +++---
+ fs/jbd2/journal.c                      |    6 +++---
+ fs/namei.c                             |    8 ++++----
+ fs/namespace.c                         |    6 +++---
+ ipc/shm.c                              |    2 +-
+ kernel/auditsc.c                       |    2 +-
+ kernel/sysctl.c                        |    4 ++--
+ kernel/workqueue.c                     |   14 ++++++++++++--
+ net/bluetooth/hci_conn.c               |    4 ++--
+ net/bridge/Makefile                    |    1 +
+ net/ipv4/tcp_input.c                   |    3 ++-
+ net/netfilter/nf_conntrack_h323_main.c |    8 ++++----
+ net/socket.c                           |    4 ++--
+ net/unix/af_unix.c                     |    8 ++++----
+ sound/usb/mixer.c                      |    8 ++++----
+ 27 files changed, 74 insertions(+), 49 deletions(-)
+
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index bb26756..6474de0 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -22,6 +22,11 @@ OBJS		+= sdhi-sh7372.o
+ endif
+ 
+ AFLAGS_head.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
++
++AFLAGS_head.o += -Wa,-march=armv7-a$(plus_sec)
++AFLAGS_misc.o +=-Wa,-march=armv7-a$(plus_sec)
++AFLAGS_decompress.o += -Wa,-march=armv7-a$(plus_sec)
++
+ HEAD	= head.o
+ OBJS	+= misc.o decompress.o
+ FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
+@@ -149,6 +154,7 @@ LDFLAGS_vmlinux += -X
+ LDFLAGS_vmlinux += -T
+ 
+ # For __aeabi_uidivmod
++AFLAGS_lib1funcs.o +=-Wa,-march=armv7-a$(plus_sec)
+ lib1funcs = $(obj)/lib1funcs.o
+ 
+ $(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
+@@ -157,6 +163,7 @@ $(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
+ # For __aeabi_llsl
+ ashldi3 = $(obj)/ashldi3.o
+ 
++AFLAGS_ashldi3.o +=-Wa,-march=armv7-a$(plus_sec)
+ $(obj)/ashldi3.S: $(srctree)/arch/$(SRCARCH)/lib/ashldi3.S
+ 	$(call cmd,shipped)
+ 
+@@ -189,6 +196,7 @@ $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
+ $(obj)/piggy.$(suffix_y): $(obj)/../Image FORCE
+ 	$(call if_changed,$(suffix_y))
+ 
++AFLAGS_piggy.$(suffix_y).o += -Wa,-march=armv7-a$(plus_sec)
+ $(obj)/piggy.$(suffix_y).o:  $(obj)/piggy.$(suffix_y) FORCE
+ 
+ CFLAGS_font.o := -Dstatic=
+diff --git a/arch/arm/mach-msm/clock-generic.c b/arch/arm/mach-msm/clock-generic.c
+index 4d74533..be45739 100644
+--- a/arch/arm/mach-msm/clock-generic.c
++++ b/arch/arm/mach-msm/clock-generic.c
+@@ -256,7 +256,7 @@ static long div_round_rate(struct clk *c, unsigned long rate)
+ static int div_set_rate(struct clk *c, unsigned long rate)
+ {
+ 	struct div_clk *d = to_div_clk(c);
+-	int div, rc = 0;
++	int div = 0, rc = 0;
+ 	long rrate, old_prate;
+ 
+ 	rrate = __div_round_rate(c, rate, &div);
+diff --git a/arch/arm/mach-msm/sensors_adsp.c b/arch/arm/mach-msm/sensors_adsp.c
+index 1534358..4548b26 100644
+--- a/arch/arm/mach-msm/sensors_adsp.c
++++ b/arch/arm/mach-msm/sensors_adsp.c
+@@ -874,7 +874,7 @@ static int sns_ocmem_map_send(void)
+ 
+ 	vectors = ocmem_get_vectors(SNS_OCMEM_CLIENT_ID, sns_ctl.buf);
+ 	if ((vectors != NULL)) {
+-		memcpy(&msg.vectors, vectors, sizeof(vectors));
++		memcpy(&msg.vectors, vectors, sizeof(*vectors));
+ 		/* TODO: set vectors_len */
+ 		msg.vectors_valid = true;
+ 		msg.vectors_len = 0;
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index c99bed1..fd91f61 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -2,6 +2,8 @@
+ # Makefile for multifunction miscellaneous devices
+ #
+ 
++ccflags-y  := -Wno-array-bounds
++
+ 88pm860x-objs			:= 88pm860x-core.o 88pm860x-i2c.o
+ obj-$(CONFIG_MFD_88PM860X)	+= 88pm860x.o
+ obj-$(CONFIG_MFD_SM501)		+= sm501.o
+diff --git a/drivers/net/ppp/ppp_generic.c b/drivers/net/ppp/ppp_generic.c
+index 21d7151..2de3ec5 100644
+--- a/drivers/net/ppp/ppp_generic.c
++++ b/drivers/net/ppp/ppp_generic.c
+@@ -741,7 +741,7 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ #ifdef CONFIG_PPP_FILTER
+ 	case PPPIOCSPASS:
+ 	{
+-		struct sock_filter *code;
++		struct sock_filter *code = NULL;
+ 		err = get_filter(argp, &code);
+ 		if (err >= 0) {
+ 			ppp_lock(ppp);
+@@ -755,7 +755,7 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 	}
+ 	case PPPIOCSACTIVE:
+ 	{
+-		struct sock_filter *code;
++		struct sock_filter *code = NULL;
+ 		err = get_filter(argp, &code);
+ 		if (err >= 0) {
+ 			ppp_lock(ppp);
+diff --git a/drivers/net/usb/Makefile b/drivers/net/usb/Makefile
+index 6296304..d45ee25 100644
+--- a/drivers/net/usb/Makefile
++++ b/drivers/net/usb/Makefile
+@@ -1,6 +1,7 @@
+ #
+ # Makefile for USB Network drivers
+ #
++ccflags-y  := -Wno-maybe-uninitialized
+ 
+ obj-$(CONFIG_USB_CATC)		+= catc.o
+ obj-$(CONFIG_USB_KAWETH)	+= kaweth.o
+diff --git a/drivers/net/usb/smsc95xx.c b/drivers/net/usb/smsc95xx.c
+index 94ae669..dd59d98 100644
+--- a/drivers/net/usb/smsc95xx.c
++++ b/drivers/net/usb/smsc95xx.c
+@@ -119,7 +119,7 @@ static int smsc95xx_write_reg(struct usbnet *dev, u32 index, u32 data)
+ static int smsc95xx_phy_wait_not_busy(struct usbnet *dev)
+ {
+ 	unsigned long start_time = jiffies;
+-	u32 val;
++	u32 val = 0;
+ 
+ 	do {
+ 		smsc95xx_read_reg(dev, MII_ADDR, &val);
+@@ -196,7 +196,7 @@ static void smsc95xx_mdio_write(struct net_device *netdev, int phy_id, int idx,
+ static int smsc95xx_wait_eeprom(struct usbnet *dev)
+ {
+ 	unsigned long start_time = jiffies;
+-	u32 val;
++	u32 val = 0;
+ 
+ 	do {
+ 		smsc95xx_read_reg(dev, E2P_CMD, &val);
+diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
+index 95e0785..d276b3f 100644
+--- a/drivers/usb/core/hub.c
++++ b/drivers/usb/core/hub.c
+@@ -2744,7 +2744,7 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
+ 	struct usb_hub	*hub = hdev_to_hub(udev->parent);
+ 	int		port1 = udev->portnum;
+ 	int		status;
+-	u16		portchange, portstatus;
++	u16		portchange = 0, portstatus = 0;
+ 
+ 	/* Skip the initial Clear-Suspend step for a remote wakeup */
+ 	status = hub_port_status(hub, port1, &portstatus, &portchange);
+diff --git a/drivers/usb/gadget/f_qdss.c b/drivers/usb/gadget/f_qdss.c
+index cece500..c90f0d8 100644
+--- a/drivers/usb/gadget/f_qdss.c
++++ b/drivers/usb/gadget/f_qdss.c
+@@ -596,7 +596,7 @@ static int qdss_bind_config(struct usb_configuration *c, const char *name)
+ 
+ 	spin_lock_irqsave(&d_lock, flags);
+ 	list_for_each_entry(ch, &usb_qdss_ch_list, list) {
+-		if (!strncmp(name, ch->name, sizeof(ch->name))) {
++		if (!strncmp(name, ch->name, sizeof(*ch->name))) {
+ 			found = 1;
+ 			break;
+ 		}
+@@ -752,7 +752,7 @@ struct usb_qdss_ch *usb_qdss_open(const char *name, void *priv,
+ 	spin_lock_irqsave(&d_lock, flags);
+ 	/* Check if we already have a channel with this name */
+ 	list_for_each_entry(ch, &usb_qdss_ch_list, list) {
+-		if (!strncmp(name, ch->name, sizeof(ch->name))) {
++		if (!strncmp(name, ch->name, sizeof(*ch->name))) {
+ 			found = 1;
+ 			break;
+ 		}
+diff --git a/drivers/usb/storage/transport.c b/drivers/usb/storage/transport.c
+index c70109e..32a21c0 100644
+--- a/drivers/usb/storage/transport.c
++++ b/drivers/usb/storage/transport.c
+@@ -467,7 +467,7 @@ static int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
+ int usb_stor_bulk_srb(struct us_data* us, unsigned int pipe,
+ 		      struct scsi_cmnd* srb)
+ {
+-	unsigned int partial;
++	unsigned int partial = 0;
+ 	int result = usb_stor_bulk_transfer_sglist(us, pipe, scsi_sglist(srb),
+ 				      scsi_sg_count(srb), scsi_bufflen(srb),
+ 				      &partial);
+@@ -490,7 +490,7 @@ int usb_stor_bulk_transfer_sg(struct us_data* us, unsigned int pipe,
+ 		void *buf, unsigned int length_left, int use_sg, int *residual)
+ {
+ 	int result;
+-	unsigned int partial;
++	unsigned int partial = 0;
+ 
+ 	/* are we scatter-gathering? */
+ 	if (use_sg) {
+diff --git a/drivers/video/msm/mdss/Makefile b/drivers/video/msm/mdss/Makefile
+index 983db13..988e40a 100644
+--- a/drivers/video/msm/mdss/Makefile
++++ b/drivers/video/msm/mdss/Makefile
+@@ -1,3 +1,5 @@
++ccflags-y  := -Wno-array-bounds
++
+ mdss-mdp3-objs = mdp3.o mdp3_dma.o mdp3_ctrl.o
+ mdss-mdp3-objs += mdp3_ppp.o mdp3_ppp_hwio.o mdp3_ppp_data.o
+ obj-$(CONFIG_FB_MSM_MDSS) += mdss-mdp3.o
+diff --git a/fs/fuse/control.c b/fs/fuse/control.c
+index 42593c5..2f0b4f3 100644
+--- a/fs/fuse/control.c
++++ b/fs/fuse/control.c
+@@ -123,7 +123,7 @@ static ssize_t fuse_conn_max_background_write(struct file *file,
+ 					      const char __user *buf,
+ 					      size_t count, loff_t *ppos)
+ {
+-	unsigned val;
++	unsigned val = 0;
+ 	ssize_t ret;
+ 
+ 	ret = fuse_conn_limit_write(file, buf, count, ppos, &val,
+@@ -160,7 +160,7 @@ static ssize_t fuse_conn_congestion_threshold_write(struct file *file,
+ 						    const char __user *buf,
+ 						    size_t count, loff_t *ppos)
+ {
+-	unsigned val;
++	unsigned val = 0;
+ 	ssize_t ret;
+ 
+ 	ret = fuse_conn_limit_write(file, buf, count, ppos, &val,
+diff --git a/fs/jbd/journal.c b/fs/jbd/journal.c
+index 0971e92..2d4fa2f 100644
+--- a/fs/jbd/journal.c
++++ b/fs/jbd/journal.c
+@@ -680,7 +680,7 @@ int journal_bmap(journal_t *journal, unsigned int blocknr,
+ struct journal_head *journal_get_descriptor_buffer(journal_t *journal)
+ {
+ 	struct buffer_head *bh;
+-	unsigned int blocknr;
++	unsigned int blocknr = 0;
+ 	int err;
+ 
+ 	err = journal_next_log_block(journal, &blocknr);
+@@ -824,7 +824,7 @@ journal_t * journal_init_inode (struct inode *inode)
+ 	journal_t *journal = journal_init_common();
+ 	int err;
+ 	int n;
+-	unsigned int blocknr;
++	unsigned int blocknr = 0;
+ 
+ 	if (!journal)
+ 		return NULL;
+@@ -936,7 +936,7 @@ static int journal_reset(journal_t *journal)
+  **/
+ int journal_create(journal_t *journal)
+ {
+-	unsigned int blocknr;
++	unsigned int blocknr = 0;
+ 	struct buffer_head *bh;
+ 	journal_superblock_t *sb;
+ 	int i, err;
+diff --git a/fs/jbd2/journal.c b/fs/jbd2/journal.c
+index 1afb701..2791a22 100644
+--- a/fs/jbd2/journal.c
++++ b/fs/jbd2/journal.c
+@@ -667,7 +667,7 @@ int jbd2_log_wait_commit(journal_t *journal, tid_t tid)
+ 
+ int jbd2_journal_next_log_block(journal_t *journal, unsigned long long *retp)
+ {
+-	unsigned long blocknr;
++	unsigned long blocknr = 0;
+ 
+ 	write_lock(&journal->j_state_lock);
+ 	J_ASSERT(journal->j_free > 1);
+@@ -724,7 +724,7 @@ int jbd2_journal_bmap(journal_t *journal, unsigned long blocknr,
+ struct journal_head *jbd2_journal_get_descriptor_buffer(journal_t *journal)
+ {
+ 	struct buffer_head *bh;
+-	unsigned long long blocknr;
++	unsigned long long blocknr = 0;
+ 	int err;
+ 
+ 	err = jbd2_journal_next_log_block(journal, &blocknr);
+@@ -1098,7 +1098,7 @@ journal_t * jbd2_journal_init_inode (struct inode *inode)
+ 	char *p;
+ 	int err;
+ 	int n;
+-	unsigned long long blocknr;
++	unsigned long long blocknr = 0;
+ 
+ 	if (!journal)
+ 		return NULL;
+diff --git a/fs/namei.c b/fs/namei.c
+index c427919..4a353b8 100644
+--- a/fs/namei.c
++++ b/fs/namei.c
+@@ -2743,7 +2743,7 @@ out:
+ static long do_rmdir(int dfd, const char __user *pathname)
+ {
+ 	int error = 0;
+-	char * name;
++	char * name = NULL;
+ 	struct dentry *dentry;
+ 	struct nameidata nd;
+ 
+@@ -2839,7 +2839,7 @@ int vfs_unlink(struct inode *dir, struct dentry *dentry)
+ static long do_unlinkat(int dfd, const char __user *pathname)
+ {
+ 	int error;
+-	char *name;
++	char *name = NULL;
+ 	struct dentry *dentry;
+ 	struct nameidata nd;
+ 	struct inode *inode = NULL;
+@@ -3239,8 +3239,8 @@ SYSCALL_DEFINE4(renameat, int, olddfd, const char __user *, oldname,
+ 	struct dentry *old_dentry, *new_dentry;
+ 	struct dentry *trap;
+ 	struct nameidata oldnd, newnd;
+-	char *from;
+-	char *to;
++	char *from = NULL;
++	char *to = NULL;
+ 	int error;
+ 
+ 	error = user_path_parent(olddfd, oldname, &oldnd, &from);
+diff --git a/fs/namespace.c b/fs/namespace.c
+index e608199..8df371c 100644
+--- a/fs/namespace.c
++++ b/fs/namespace.c
+@@ -2361,9 +2361,9 @@ SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
+ 		char __user *, type, unsigned long, flags, void __user *, data)
+ {
+ 	int ret;
+-	char *kernel_type;
+-	char *kernel_dir;
+-	char *kernel_dev;
++	char *kernel_type = NULL;
++	char *kernel_dir = NULL;
++	char *kernel_dev = NULL;
+ 	unsigned long data_page;
+ 
+ 	ret = copy_mount_string(type, &kernel_type);
+diff --git a/ipc/shm.c b/ipc/shm.c
+index 406c5b2..cb4c16c 100644
+--- a/ipc/shm.c
++++ b/ipc/shm.c
+@@ -1087,7 +1087,7 @@ out_put_dentry:
+ 
+ SYSCALL_DEFINE3(shmat, int, shmid, char __user *, shmaddr, int, shmflg)
+ {
+-	unsigned long ret;
++	unsigned long ret = 0;
+ 	long err;
+ 
+ 	err = do_shmat(shmid, shmaddr, shmflg, &ret);
+diff --git a/kernel/auditsc.c b/kernel/auditsc.c
+index af1de0f..e3fd8e5 100644
+--- a/kernel/auditsc.c
++++ b/kernel/auditsc.c
+@@ -913,7 +913,7 @@ static int audit_filter_inode_name(struct task_struct *tsk,
+ 	int h = audit_hash_ino((u32)n->ino);
+ 	struct list_head *list = &audit_inode_hash[h];
+ 	struct audit_entry *e;
+-	enum audit_state state;
++	enum audit_state state = 0;
+ 
+ 	word = AUDIT_WORD(ctx->major);
+ 	bit  = AUDIT_BIT(ctx->major);
+diff --git a/kernel/sysctl.c b/kernel/sysctl.c
+index b390dad..8345dbf 100644
+--- a/kernel/sysctl.c
++++ b/kernel/sysctl.c
+@@ -1829,7 +1829,7 @@ static int __do_proc_dointvec(void *tbl_data, struct ctl_table *table,
+ 	int *i, vleft, first = 1, err = 0;
+ 	unsigned long page = 0;
+ 	size_t left;
+-	char *kbuf;
++	char *kbuf = NULL;
+ 	
+ 	if (!tbl_data || !table->maxlen || !*lenp || (*ppos && !write)) {
+ 		*lenp = 0;
+@@ -2047,7 +2047,7 @@ static int __do_proc_doulongvec_minmax(void *data, struct ctl_table *table, int
+ 	int vleft, first = 1, err = 0;
+ 	unsigned long page = 0;
+ 	size_t left;
+-	char *kbuf;
++	char *kbuf = NULL;
+ 
+ 	if (!data || !table->maxlen || !*lenp || (*ppos && !write)) {
+ 		*lenp = 0;
+diff --git a/kernel/workqueue.c b/kernel/workqueue.c
+index 90fd57d..e8b7b65 100644
+--- a/kernel/workqueue.c
++++ b/kernel/workqueue.c
+@@ -3716,7 +3716,12 @@ void freeze_workqueues_begin(void)
+ 		gcwq->flags |= GCWQ_FREEZING;
+ 
+ 		list_for_each_entry(wq, &workqueues, list) {
+-			struct cpu_workqueue_struct *cwq = get_cwq(cpu, wq);
++
++		struct cpu_workqueue_struct *cwq;
++		if (cpu < CONFIG_NR_CPUS)
++			cwq = get_cwq(cpu, wq);
++		else
++			continue; 
+ 
+ 			if (cwq && wq->flags & WQ_FREEZABLE)
+ 				cwq->max_active = 0;
+@@ -3757,7 +3762,12 @@ bool freeze_workqueues_busy(void)
+ 		 * to peek without lock.
+ 		 */
+ 		list_for_each_entry(wq, &workqueues, list) {
+-			struct cpu_workqueue_struct *cwq = get_cwq(cpu, wq);
++
++			struct cpu_workqueue_struct *cwq;
++			if (cpu < CONFIG_NR_CPUS)
++				cwq = get_cwq(cpu, wq);
++			else
++				continue; 
+ 
+ 			if (!cwq || !(wq->flags & WQ_FREEZABLE))
+ 				continue;
+diff --git a/net/bluetooth/hci_conn.c b/net/bluetooth/hci_conn.c
+index 7a9fcd4..4cd5707 100644
+--- a/net/bluetooth/hci_conn.c
++++ b/net/bluetooth/hci_conn.c
+@@ -393,7 +393,7 @@ void hci_le_start_enc(struct hci_conn *conn, __le16 ediv, __u8 rand[8],
+ }
+ EXPORT_SYMBOL(hci_le_start_enc);
+ 
+-void hci_le_ltk_reply(struct hci_conn *conn, u8 ltk[16])
++void hci_le_ltk_reply(struct hci_conn *conn, __u8 ltk[16])
+ {
+ 	struct hci_dev *hdev = conn->hdev;
+ 	struct hci_cp_le_ltk_reply cp;
+@@ -403,7 +403,7 @@ void hci_le_ltk_reply(struct hci_conn *conn, u8 ltk[16])
+ 	memset(&cp, 0, sizeof(cp));
+ 
+ 	cp.handle = cpu_to_le16(conn->handle);
+-	memcpy(cp.ltk, ltk, sizeof(ltk));
++	memcpy(cp.ltk, ltk, sizeof(*ltk));
+ 
+ 	hci_send_cmd(hdev, HCI_OP_LE_LTK_REPLY, sizeof(cp), &cp);
+ }
+diff --git a/net/bridge/Makefile b/net/bridge/Makefile
+index d0359ea..d3a923a 100644
+--- a/net/bridge/Makefile
++++ b/net/bridge/Makefile
+@@ -1,6 +1,7 @@
+ #
+ # Makefile for the IEEE 802.1d ethernet bridging layer.
+ #
++ccflags-y  := -Wno-maybe-uninitialized
+ 
+ obj-$(CONFIG_BRIDGE) += bridge.o
+ 
+diff --git a/net/ipv4/tcp_input.c b/net/ipv4/tcp_input.c
+index 257b617..4988e3e 100644
+--- a/net/ipv4/tcp_input.c
++++ b/net/ipv4/tcp_input.c
+@@ -4373,10 +4373,11 @@ static void tcp_sack_remove(struct tcp_sock *tp)
+ 		return;
+ 	}
+ 
++	BUG_ON(num_sacks > 4); 
+ 	for (this_sack = 0; this_sack < num_sacks;) {
+ 		/* Check if the start of the sack is covered by RCV.NXT. */
+ 		if (!before(tp->rcv_nxt, sp->start_seq)) {
+-			int i;
++			int i = 0;
+ 
+ 			/* RCV.NXT must cover all the block! */
+ 			WARN_ON(before(tp->rcv_nxt, sp->end_seq));
+diff --git a/net/netfilter/nf_conntrack_h323_main.c b/net/netfilter/nf_conntrack_h323_main.c
+index 722291f..70512e9 100644
+--- a/net/netfilter/nf_conntrack_h323_main.c
++++ b/net/netfilter/nf_conntrack_h323_main.c
+@@ -566,8 +566,8 @@ static int h245_help(struct sk_buff *skb, unsigned int protoff,
+ {
+ 	static MultimediaSystemControlMessage mscm;
+ 	unsigned char *data = NULL;
+-	int datalen;
+-	int dataoff;
++	int datalen = 0;
++	int dataoff = 0;
+ 	int ret;
+ 
+ 	/* Until there's been traffic both ways, don't look in packets. */
+@@ -1118,8 +1118,8 @@ static int q931_help(struct sk_buff *skb, unsigned int protoff,
+ {
+ 	static Q931 q931;
+ 	unsigned char *data = NULL;
+-	int datalen;
+-	int dataoff;
++	int datalen = 0;
++	int dataoff = 0;
+ 	int ret;
+ 
+ 	/* Until there's been traffic both ways, don't look in packets. */
+diff --git a/net/socket.c b/net/socket.c
+index 851edcd..5e6e621 100644
+--- a/net/socket.c
++++ b/net/socket.c
+@@ -1322,7 +1322,7 @@ EXPORT_SYMBOL(sock_create_kern);
+ SYSCALL_DEFINE3(socket, int, family, int, type, int, protocol)
+ {
+ 	int retval;
+-	struct socket *sock;
++	struct socket *sock = NULL;
+ 	int flags;
+ 
+ 	/* Check the SOCK_* constants for consistency.  */
+@@ -1363,7 +1363,7 @@ out_release:
+ SYSCALL_DEFINE4(socketpair, int, family, int, type, int, protocol,
+ 		int __user *, usockvec)
+ {
+-	struct socket *sock1, *sock2;
++	struct socket *sock1 = NULL, *sock2;
+ 	int fd1, fd2, err;
+ 	struct file *newfile1, *newfile2;
+ 	int flags;
+diff --git a/net/unix/af_unix.c b/net/unix/af_unix.c
+index 8d932a5..a3fe72a 100644
+--- a/net/unix/af_unix.c
++++ b/net/unix/af_unix.c
+@@ -825,7 +825,7 @@ static int unix_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
+ 	struct dentry *dentry = NULL;
+ 	struct path path;
+ 	int err;
+-	unsigned hash;
++	unsigned hash = 0;
+ 	struct unix_address *addr;
+ 	struct hlist_head *list;
+ 
+@@ -965,7 +965,7 @@ static int unix_dgram_connect(struct socket *sock, struct sockaddr *addr,
+ 	struct net *net = sock_net(sk);
+ 	struct sockaddr_un *sunaddr = (struct sockaddr_un *)addr;
+ 	struct sock *other;
+-	unsigned hash;
++	unsigned hash = 0;
+ 	int err;
+ 
+ 	if (addr->sa_family != AF_UNSPEC) {
+@@ -1063,7 +1063,7 @@ static int unix_stream_connect(struct socket *sock, struct sockaddr *uaddr,
+ 	struct sock *newsk = NULL;
+ 	struct sock *other = NULL;
+ 	struct sk_buff *skb = NULL;
+-	unsigned hash;
++	unsigned hash = 0;
+ 	int st;
+ 	int err;
+ 	long timeo;
+@@ -1438,7 +1438,7 @@ static int unix_dgram_sendmsg(struct kiocb *kiocb, struct socket *sock,
+ 	struct sock *other = NULL;
+ 	int namelen = 0; /* fake GCC */
+ 	int err;
+-	unsigned hash;
++	unsigned hash = 0;
+ 	struct sk_buff *skb;
+ 	long timeo;
+ 	struct scm_cookie tmp_scm;
+diff --git a/sound/usb/mixer.c b/sound/usb/mixer.c
+index ab23869..04a09db 100644
+--- a/sound/usb/mixer.c
++++ b/sound/usb/mixer.c
+@@ -1420,7 +1420,7 @@ static int parse_audio_mixer_unit(struct mixer_build *state, int unitid, void *r
+ static int mixer_ctl_procunit_get(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+ {
+ 	struct usb_mixer_elem_info *cval = kcontrol->private_data;
+-	int err, val;
++	int err, val = 0;
+ 
+ 	err = get_cur_ctl_value(cval, cval->control << 8, &val);
+ 	if (err < 0 && cval->mixer->ignore_ctl_error) {
+@@ -1438,7 +1438,7 @@ static int mixer_ctl_procunit_get(struct snd_kcontrol *kcontrol, struct snd_ctl_
+ static int mixer_ctl_procunit_put(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+ {
+ 	struct usb_mixer_elem_info *cval = kcontrol->private_data;
+-	int val, oval, err;
++	int val, oval = 0, err;
+ 
+ 	err = get_cur_ctl_value(cval, cval->control << 8, &oval);
+ 	if (err < 0) {
+@@ -1701,7 +1701,7 @@ static int mixer_ctl_selector_info(struct snd_kcontrol *kcontrol, struct snd_ctl
+ static int mixer_ctl_selector_get(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+ {
+ 	struct usb_mixer_elem_info *cval = kcontrol->private_data;
+-	int val, err;
++	int val = 0, err;
+ 
+ 	err = get_cur_ctl_value(cval, cval->control << 8, &val);
+ 	if (err < 0) {
+@@ -1720,7 +1720,7 @@ static int mixer_ctl_selector_get(struct snd_kcontrol *kcontrol, struct snd_ctl_
+ static int mixer_ctl_selector_put(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+ {
+ 	struct usb_mixer_elem_info *cval = kcontrol->private_data;
+-	int val, oval, err;
++	int val, oval = 0, err;
+ 
+ 	err = get_cur_ctl_value(cval, cval->control << 8, &oval);
+ 	if (err < 0) {
+-- 
+1.7.9.5
+

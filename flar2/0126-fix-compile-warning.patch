@@ -1,0 +1,27 @@
+From 2b3a48d71f6b3560fedceac1b3ba8ce35d222834 Mon Sep 17 00:00:00 2001
+From: flar2 <asegaert@gmail.com>
+Date: Sat, 30 Nov 2013 00:12:31 -0500
+Subject: [PATCH 126/276] fix compile warning
+
+
+Signed-off-by: Simarpreet Singh <simar@linux.com>
+---
+ drivers/cpuidle/cpuidle.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
+index 145008c..edb76f2 100644
+--- a/drivers/cpuidle/cpuidle.c
++++ b/drivers/cpuidle/cpuidle.c
+@@ -80,7 +80,7 @@ int cpuidle_play_dead(void)
+ {
+ 	struct cpuidle_device *dev = __this_cpu_read(cpuidle_devices);
+ 	struct cpuidle_driver *drv = cpuidle_get_driver();
+-	int i, dead_state = -1;
++	int i;
+ 
+ 	if (!drv)
+ 		return -ENODEV;
+-- 
+1.7.9.5
+
